@@ -505,6 +505,7 @@ const InventoryManagementApp = () => {
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
+              key="product-search"
               placeholder="Search products by name, SKU, or category..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -543,23 +544,54 @@ const InventoryManagementApp = () => {
         </div>
       </Card>
 
-      {/* Products Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Products List - Single Column Rectangular Layout */}
+      <div className="space-y-4">
         {filteredProducts.map(product => (
-          <Card key={product.id} className="p-6 hover:shadow-glow transition-all duration-300 animate-scale-in bg-gradient-card">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-start gap-3">
+          <Card key={product.id} className="p-4 hover:shadow-glow transition-all duration-300 animate-scale-in bg-gradient-card">
+            <div className="flex items-center justify-between">
+              {/* Left Section: Checkbox & Product Info */}
+              <div className="flex items-center gap-4 flex-1">
                 <Checkbox
                   checked={selectedProducts.has(product.id)}
                   onCheckedChange={() => toggleProductSelection(product.id)}
-                  className="mt-1"
                 />
-                <div>
-                  <h3 className="font-semibold text-lg text-foreground">{product.name}</h3>
-                  <p className="text-muted-foreground text-sm">SKU: {product.sku}</p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-6">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-lg text-foreground truncate">{product.name}</h3>
+                      <p className="text-muted-foreground text-sm">SKU: {product.sku}</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-8">
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">Category</p>
+                        <p className="font-medium">{product.category}</p>
+                      </div>
+                      
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">Price</p>
+                        <p className="font-medium text-primary">${product.price.toFixed(2)}</p>
+                      </div>
+                      
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">Stock</p>
+                        <p className={`font-medium ${product.quantity < 10 ? 'text-destructive' : 'text-success'}`}>
+                          {product.quantity} units
+                        </p>
+                      </div>
+
+                      {product.quantity < 10 && (
+                        <div className="bg-warning/10 border border-warning/20 rounded-lg px-3 py-1">
+                          <p className="text-warning-foreground text-xs font-medium">⚠️ Low Stock</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="flex gap-2">
+
+              {/* Right Section: Action Buttons */}
+              <div className="flex gap-2 ml-4">
                 <Button
                   onClick={() => handleEditProduct(product)}
                   variant="outline"
@@ -576,29 +608,6 @@ const InventoryManagementApp = () => {
                 </Button>
               </div>
             </div>
-
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Category:</span>
-                <span className="font-medium">{product.category}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Price:</span>
-                <span className="font-medium text-primary">${product.price.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Stock:</span>
-                <span className={`font-medium ${product.quantity < 10 ? 'text-destructive' : 'text-success'}`}>
-                  {product.quantity} units
-                </span>
-              </div>
-            </div>
-
-            {product.quantity < 10 && (
-              <div className="mt-4 bg-warning/10 border border-warning/20 rounded-lg p-3">
-                <p className="text-warning-foreground text-sm font-medium">⚠️ Low stock alert</p>
-              </div>
-            )}
           </Card>
         ))}
       </div>
