@@ -1337,7 +1337,6 @@ const InventoryManagementApp = () => {
                 </Button>
                 <Button
                   onClick={handleSaveInvoice}
-                  disabled={invoiceItems.length === 0 || !customerInfo.name.trim()}
                   className="bg-success"
                 >
                   <Save className="h-4 w-4 mr-2" />
