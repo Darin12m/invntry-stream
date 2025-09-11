@@ -345,6 +345,7 @@ const InventoryManagementApp = () => {
     setCustomerInfo({ name: '', email: '', address: '' });
     setInvoiceProductSearch('');
     setShowInvoiceModal(true);
+    toast.success('Invoice modal opened');
   };
 
   const handleViewInvoice = (invoice) => {
@@ -773,6 +774,7 @@ const InventoryManagementApp = () => {
           )}
           <Button
             onClick={handleCreateInvoice}
+            type="button"
             className="bg-success hover:shadow-glow transition-all duration-300"
           >
             <FileText className="h-4 w-4 mr-2" />
@@ -826,7 +828,7 @@ const InventoryManagementApp = () => {
               <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-xl font-semibold mb-2">No invoices created yet</h3>
               <p className="text-muted-foreground mb-4">Create your first invoice to get started</p>
-              <Button onClick={handleCreateInvoice}>
+              <Button onClick={handleCreateInvoice} type="button">
                 <FileText className="h-4 w-4 mr-2" />
                 Create Invoice
               </Button>
