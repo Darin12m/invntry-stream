@@ -340,11 +340,19 @@ const InventoryManagementApp = () => {
       total: 0,
       status: 'draft'
     };
+    
+    // Set states in the correct order
     setCurrentInvoice(newInvoice);
     setInvoiceItems([]);
     setCustomerInfo({ name: '', email: '', address: '' });
     setInvoiceProductSearch('');
+    setCustomInvoiceNumber('');
+    
+    // Show the modal
     setShowInvoiceModal(true);
+    
+    // Show success toast
+    toast.success('Invoice creation started');
   };
 
   const handleViewInvoice = (invoice) => {
@@ -1148,14 +1156,30 @@ const InventoryManagementApp = () => {
 
       {/* Invoice Modal */}
       {showInvoiceModal && currentInvoice && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50">
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={(e) => {
+            // Close modal if clicking on backdrop
+            if (e.target === e.currentTarget) {
+              setShowInvoiceModal(false);
+              setCurrentInvoice(null);
+            }
+          }}
+        >
           <div className="h-full flex items-center justify-center p-4">
             <Card className="w-full max-w-7xl h-5/6 flex flex-col animate-scale-in shadow-glow">
               
               {/* Header */}
               <div className="flex justify-between items-center p-6 border-b">
                 <h2 className="text-2xl font-bold">Create New Invoice</h2>
-                <Button onClick={() => setShowInvoiceModal(false)} variant="ghost">
+                <Button 
+                  onClick={() => {
+                    setShowInvoiceModal(false);
+                    setCurrentInvoice(null);
+                  }} 
+                  variant="ghost"
+                >
                   <X className="h-6 w-6" />
                 </Button>
               </div>
@@ -1330,7 +1354,12 @@ const InventoryManagementApp = () => {
               {/* Footer Buttons */}
               <div className="p-6 border-t flex justify-end gap-3">
                 <Button
-                  onClick={() => setShowInvoiceModal(false)}
+                  onClick={() => {
+                    setShowInvoiceModal(false);
+                    setCurrentInvoice(null);
+                    setInvoiceItems([]);
+                    setCustomerInfo({ name: '', email: '', address: '' });
+                  }}
                   variant="outline"
                 >
                   Cancel
