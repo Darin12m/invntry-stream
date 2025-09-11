@@ -8,22 +8,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-
-// Mock data for demonstration
-const initialProducts = [
-  { id: '1', name: 'Laptop Pro 15"', sku: 'LP15-001', quantity: 25, price: 1299.99, category: 'Electronics' },
-  { id: '2', name: 'Wireless Mouse', sku: 'WM-002', quantity: 150, price: 29.99, category: 'Electronics' },
-  { id: '3', name: 'Office Chair', sku: 'OC-003', quantity: 12, price: 199.99, category: 'Furniture' },
-  { id: '4', name: 'Coffee Beans 1kg', sku: 'CB-004', quantity: 75, price: 24.99, category: 'Food & Beverage' },
-];
-
-const initialInvoices = [];
+import { db } from '@/lib/firebase';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 
 const InventoryManagementApp = () => {
   // State management
   const [activeTab, setActiveTab] = useState('inventory');
-  const [products, setProducts] = useState(initialProducts);
-  const [invoices, setInvoices] = useState(initialInvoices);
+  const [products, setProducts] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -36,8 +29,8 @@ const InventoryManagementApp = () => {
   const [viewingInvoice, setViewingInvoice] = useState(null);
   const [invoiceProductSearch, setInvoiceProductSearch] = useState('');
   const [customInvoiceNumber, setCustomInvoiceNumber] = useState('');
-  const [selectedProducts, setSelectedProducts] = useState(new Set());
-  const [selectedInvoices, setSelectedInvoices] = useState(new Set());
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
   const [showColumnMappingModal, setShowColumnMappingModal] = useState(false);
   const [excelData, setExcelData] = useState([]);
   const [excelColumns, setExcelColumns] = useState([]);
@@ -49,6 +42,44 @@ const InventoryManagementApp = () => {
     category: ''
   });
   const fileInputRef = useRef(null);
+
+  // Load data from Firebase on component mount
+  useEffect(() => {
+    loadProducts();
+    loadInvoices();
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      const productsQuery = query(collection(db, 'products'), orderBy('name'));
+      const querySnapshot = await getDocs(productsQuery);
+      const productsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setProducts(productsData);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      toast.error('Failed to load products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadInvoices = async () => {
+    try {
+      const invoicesQuery = query(collection(db, 'invoices'), orderBy('date', 'desc'));
+      const querySnapshot = await getDocs(invoicesQuery);
+      const invoicesData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setInvoices(invoicesData);
+    } catch (error) {
+      console.error('Error loading invoices:', error);
+      toast.error('Failed to load invoices');
+    }
+  };
 
   // Product form state
   const [productForm, setProductForm] = useState({
@@ -74,7 +105,7 @@ const InventoryManagementApp = () => {
   );
 
   // Selection handlers
-  const toggleProductSelection = (productId) => {
+  const toggleProductSelection = (productId: string) => {
     const newSelected = new Set(selectedProducts);
     if (newSelected.has(productId)) {
       newSelected.delete(productId);
@@ -129,14 +160,13 @@ const InventoryManagementApp = () => {
     setShowProductModal(true);
   };
 
-  const handleSaveProduct = () => {
+  const handleSaveProduct = async () => {
     if (!productForm.name.trim() || !productForm.sku.trim() || !productForm.price || !productForm.quantity) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    const newProduct = {
-      id: editingProduct ? editingProduct.id : Date.now().toString(),
+    const productData = {
       name: productForm.name,
       sku: productForm.sku,
       quantity: parseInt(productForm.quantity),
@@ -144,53 +174,83 @@ const InventoryManagementApp = () => {
       category: productForm.category
     };
 
-    if (editingProduct) {
-      setProducts(products.map(p => p.id === editingProduct.id ? newProduct : p));
-      toast.success("Product updated successfully");
-    } else {
-      setProducts([...products, newProduct]);
-      toast.success("Product added successfully");
+    try {
+      if (editingProduct) {
+        await updateDoc(doc(db, 'products', editingProduct.id), productData);
+        toast.success("Product updated successfully");
+      } else {
+        await addDoc(collection(db, 'products'), productData);
+        toast.success("Product added successfully");
+      }
+      
+      setShowProductModal(false);
+      setProductForm({ name: '', sku: '', quantity: '', price: '', category: '' });
+      loadProducts(); // Reload products from Firebase
+    } catch (error) {
+      console.error('Error saving product:', error);
+      toast.error('Failed to save product');
     }
-
-    setShowProductModal(false);
-    setProductForm({ name: '', sku: '', quantity: '', price: '', category: '' });
   };
 
   // DELETE FUNCTIONS - Multiple implementations
 
   // 1. Delete single product
-  const handleDeleteProduct = (productId) => {
+  const handleDeleteProduct = async (productId) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
-      setProducts(products.filter(p => p.id !== productId));
-      toast.success("Product deleted successfully");
+      try {
+        await deleteDoc(doc(db, 'products', productId));
+        toast.success("Product deleted successfully");
+        loadProducts(); // Reload products from Firebase
+      } catch (error) {
+        console.error('Error deleting product:', error);
+        toast.error('Failed to delete product');
+      }
     }
   };
 
   // 2. Bulk delete products
-  const handleBulkDeleteProducts = () => {
+  const handleBulkDeleteProducts = async () => {
     if (selectedProducts.size === 0) {
       toast.error("Please select products to delete");
       return;
     }
     
     if (window.confirm(`Are you sure you want to delete ${selectedProducts.size} selected product(s)?`)) {
-      setProducts(products.filter(p => !selectedProducts.has(p.id)));
-      setSelectedProducts(new Set());
-      toast.success(`${selectedProducts.size} products deleted successfully`);
+      try {
+        const deletePromises = Array.from(selectedProducts).map((productId) =>
+          deleteDoc(doc(db, 'products', productId))
+        );
+        await Promise.all(deletePromises);
+        setSelectedProducts(new Set());
+        toast.success(`${selectedProducts.size} products deleted successfully`);
+        loadProducts(); // Reload products from Firebase
+      } catch (error) {
+        console.error('Error bulk deleting products:', error);
+        toast.error('Failed to delete products');
+      }
     }
   };
 
   // 3. Delete all products
-  const handleDeleteAllProducts = () => {
+  const handleDeleteAllProducts = async () => {
     if (products.length === 0) {
       toast.error("No products to delete");
       return;
     }
     
     if (window.confirm(`Are you sure you want to delete ALL ${products.length} products? This action cannot be undone.`)) {
-      setProducts([]);
-      setSelectedProducts(new Set());
-      toast.success("All products deleted successfully");
+      try {
+        const deletePromises = products.map((product) =>
+          deleteDoc(doc(db, 'products', product.id))
+        );
+        await Promise.all(deletePromises);
+        setSelectedProducts(new Set());
+        toast.success("All products deleted successfully");
+        loadProducts(); // Reload products from Firebase
+      } catch (error) {
+        console.error('Error deleting all products:', error);
+        toast.error('Failed to delete all products');
+      }
     }
   };
 
@@ -329,7 +389,7 @@ const InventoryManagementApp = () => {
     return { subtotal, tax, total };
   };
 
-  const handleSaveInvoice = () => {
+  const handleSaveInvoice = async () => {
     // Validation
     if (!customerInfo.name.trim()) {
       toast.error('Please enter customer name');
@@ -342,8 +402,9 @@ const InventoryManagementApp = () => {
     }
 
     const { subtotal, tax, total } = calculateInvoiceTotal();
-    const invoice = {
-      ...currentInvoice,
+    const invoiceData = {
+      number: currentInvoice.number,
+      date: currentInvoice.date,
       customer: customerInfo,
       items: invoiceItems,
       subtotal,
@@ -352,26 +413,34 @@ const InventoryManagementApp = () => {
       status: 'saved'
     };
 
-    // Update product quantities
-    invoiceItems.forEach(item => {
-      setProducts(prevProducts =>
-        prevProducts.map(product =>
-          product.id === item.productId
-            ? { ...product, quantity: Math.max(0, product.quantity - item.quantity) }
-            : product
-        )
-      );
-    });
+    try {
+      // Save invoice to Firebase
+      await addDoc(collection(db, 'invoices'), invoiceData);
 
-    setInvoices([...invoices, invoice]);
-    setShowInvoiceModal(false);
-    setCurrentInvoice(null);
-    setInvoiceItems([]);
-    setCustomerInfo({ name: '', email: '', address: '' });
-    setCustomInvoiceNumber('');
-    setInvoiceProductSearch('');
-    
-    toast.success('Invoice saved successfully!');
+      // Update product quantities in Firebase
+      const updatePromises = invoiceItems.map(async (item) => {
+        const product = products.find(p => p.id === item.productId);
+        if (product) {
+          const newQuantity = Math.max(0, product.quantity - item.quantity);
+          await updateDoc(doc(db, 'products', item.productId), { quantity: newQuantity });
+        }
+      });
+      await Promise.all(updatePromises);
+
+      setShowInvoiceModal(false);
+      setCurrentInvoice(null);
+      setInvoiceItems([]);
+      setCustomerInfo({ name: '', email: '', address: '' });
+      setCustomInvoiceNumber('');
+      setInvoiceProductSearch('');
+      
+      toast.success('Invoice saved successfully!');
+      loadInvoices(); // Reload invoices from Firebase
+      loadProducts(); // Reload products to reflect updated quantities
+    } catch (error) {
+      console.error('Error saving invoice:', error);
+      toast.error('Failed to save invoice');
+    }
   };
 
   // Import/Export functions
@@ -414,15 +483,14 @@ const InventoryManagementApp = () => {
     reader.readAsBinaryString(file);
   };
 
-  const handleConfirmImport = () => {
+  const handleConfirmImport = async () => {
     if (!columnMapping.name || !columnMapping.sku || !columnMapping.quantity || !columnMapping.price) {
       toast.error("Please map all required fields (Name, SKU, Quantity, Price)");
       return;
     }
 
     try {
-      const importedProducts = excelData.map((row, index) => ({
-        id: Date.now().toString() + index,
+      const importedProducts = excelData.map((row) => ({
         name: row[columnMapping.name] || '',
         sku: row[columnMapping.sku] || '',
         quantity: parseInt(row[columnMapping.quantity] || 0),
@@ -430,11 +498,21 @@ const InventoryManagementApp = () => {
         category: columnMapping.category ? (row[columnMapping.category] || 'Uncategorized') : 'Uncategorized'
       })).filter(product => product.name && product.sku); // Filter out invalid rows
 
-      setProducts([...products, ...importedProducts]);
+      // Save all products to Firebase
+      const importPromises = importedProducts.map((product) =>
+        addDoc(collection(db, 'products'), product)
+      );
+      await Promise.all(importPromises);
+
       setShowColumnMappingModal(false);
+      setExcelData([]);
+      setExcelColumns([]);
+      
       toast.success(`Successfully imported ${importedProducts.length} products!`);
+      loadProducts(); // Reload products from Firebase
     } catch (error) {
-      toast.error("Error processing mapped columns");
+      console.error('Error importing products:', error);
+      toast.error('Failed to import products');
     }
   };
 
