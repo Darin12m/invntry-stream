@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash, FileDown } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -545,6 +547,47 @@ const InventoryManagementApp = () => {
     window.print();
   };
 
+  const saveInvoiceAsPDF = async () => {
+    try {
+      const element = document.querySelector('[data-invoice-content]') as HTMLElement;
+      if (!element) {
+        toast.error('Invoice content not found');
+        return;
+      }
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`${viewingInvoice?.number || 'invoice'}.pdf`);
+      toast.success('Invoice saved as PDF successfully');
+    } catch (error) {
+      console.error('Error saving PDF:', error);
+      toast.error('Failed to save PDF');
+    }
+  };
+
   // Tab content components
   const InventoryTab = () => (
     <div className="space-y-6 animate-fade-in">
@@ -626,66 +669,69 @@ const InventoryManagementApp = () => {
       <div className="space-y-4">
         {filteredProducts.map(product => (
           <Card key={product.id} className="p-4 hover:shadow-glow transition-all duration-300 animate-scale-in bg-gradient-card">
-            <div className="flex items-center justify-between">
-              {/* Left Section: Checkbox & Product Info */}
-              <div className="flex items-center gap-4 flex-1">
-                <Checkbox
-                  checked={selectedProducts.has(product.id)}
-                  onCheckedChange={() => toggleProductSelection(product.id)}
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-6">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold text-lg text-foreground truncate">{product.name}</h3>
-                      <p className="text-muted-foreground text-sm">SKU: {product.sku}</p>
+          <div className="flex items-center justify-between min-h-16">
+            {/* Left Section: Checkbox & Product Info */}
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+              <Checkbox
+                checked={selectedProducts.has(product.id)}
+                onCheckedChange={() => toggleProductSelection(product.id)}
+                className="flex-shrink-0"
+              />
+              <div className="flex items-center justify-between w-full min-w-0">
+                <div className="flex items-center gap-6 min-w-0 flex-1">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-lg text-foreground truncate max-w-60">{product.name}</h3>
+                    <p className="text-muted-foreground text-sm truncate max-w-60">SKU: {product.sku}</p>
+                  </div>
+                  
+                  <div className="flex items-center gap-4 flex-shrink-0">
+                    <div className="text-center min-w-20">
+                      <p className="text-sm text-muted-foreground">Category</p>
+                      <p className="font-medium text-sm truncate max-w-20">{product.category}</p>
                     </div>
                     
-                    <div className="flex items-center gap-8">
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Category</p>
-                        <p className="font-medium">{product.category}</p>
-                      </div>
-                      
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Price</p>
-                        <p className="font-medium text-primary">${product.price.toFixed(2)}</p>
-                      </div>
-                      
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Stock</p>
-                        <p className={`font-medium ${product.quantity < 10 ? 'text-destructive' : 'text-success'}`}>
-                          {product.quantity} units
-                        </p>
-                      </div>
-
-                      {product.quantity < 10 && (
-                        <div className="bg-warning/10 border border-warning/20 rounded-lg px-3 py-1">
-                          <p className="text-warning-foreground text-xs font-medium">⚠️ Low Stock</p>
-                        </div>
-                      )}
+                    <div className="text-center min-w-24">
+                      <p className="text-sm text-muted-foreground">Price</p>
+                      <p className="font-medium text-primary text-sm">{product.price.toFixed(2)} ден.</p>
                     </div>
+                    
+                    <div className="text-center min-w-20">
+                      <p className="text-sm text-muted-foreground">Stock</p>
+                      <p className={`font-medium text-sm ${product.quantity < 10 ? 'text-destructive' : 'text-success'}`}>
+                        {product.quantity}
+                      </p>
+                    </div>
+
+                    {product.quantity < 10 && (
+                      <div className="bg-warning/10 border border-warning/20 rounded-lg px-2 py-1 flex-shrink-0">
+                        <p className="text-warning-foreground text-xs font-medium">⚠️ Low</p>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
 
-              {/* Right Section: Action Buttons */}
-              <div className="flex gap-2 ml-4">
-                <Button
-                  onClick={() => handleEditProduct(product)}
-                  variant="outline"
-                  size="sm"
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  onClick={() => handleDeleteProduct(product.id)}
-                  variant="destructive"
-                  size="sm"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {/* Right Section: Action Buttons */}
+                <div className="flex gap-2 ml-4 flex-shrink-0">
+                  <Button
+                    onClick={() => handleEditProduct(product)}
+                    variant="outline"
+                    size="sm"
+                    className="min-w-10"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    onClick={() => handleDeleteProduct(product.id)}
+                    variant="destructive"
+                    size="sm"
+                    className="min-w-10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
+          </div>
           </Card>
         ))}
       </div>
@@ -804,7 +850,7 @@ const InventoryManagementApp = () => {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="font-semibold text-xl text-primary">${invoice.total.toFixed(2)}</p>
+                        <p className="font-semibold text-xl text-primary">{invoice.total.toFixed(2)} ден.</p>
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
                           invoice.status === 'saved' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
                         }`}>
@@ -1152,7 +1198,7 @@ const InventoryManagementApp = () => {
                             <div>
                               <h4 className="font-bold">{product.name}</h4>
                               <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
-                              <p className="text-primary font-semibold">${product.price.toFixed(2)}</p>
+                              <p className="text-primary font-semibold">{product.price.toFixed(2)} ден.</p>
                             </div>
                             <div className="text-right">
                               <p className="text-sm text-muted-foreground">Stock: {product.quantity}</p>
@@ -1240,8 +1286,8 @@ const InventoryManagementApp = () => {
                                   onChange={(e) => updateInvoiceItemQuantity(item.productId, parseInt(e.target.value))}
                                   className="w-16 text-center"
                                 />
-                                <span>× ${item.price.toFixed(2)}</span>
-                                <span className="font-bold">${(item.quantity * item.price).toFixed(2)}</span>
+                                 <span>× {item.price.toFixed(2)} ден.</span>
+                                 <span className="font-bold">{(item.quantity * item.price).toFixed(2)} ден.</span>
                                 <Button
                                   onClick={() => removeInvoiceItem(item.productId)}
                                   variant="destructive"
@@ -1261,18 +1307,18 @@ const InventoryManagementApp = () => {
                   {invoiceItems.length > 0 && (
                     <Card className="p-4">
                       <div className="space-y-2 text-right">
-                        <div className="flex justify-between">
-                          <span>Subtotal:</span>
-                          <span>${calculateInvoiceTotal().subtotal.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Tax (10%):</span>
-                          <span>${calculateInvoiceTotal().tax.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between font-bold text-lg border-t pt-2">
-                          <span>TOTAL:</span>
-                          <span className="text-primary">${calculateInvoiceTotal().total.toFixed(2)}</span>
-                        </div>
+                         <div className="flex justify-between">
+                           <span>Subtotal:</span>
+                           <span>{calculateInvoiceTotal().subtotal.toFixed(2)} ден.</span>
+                         </div>
+                         <div className="flex justify-between">
+                           <span>Tax (10%):</span>
+                           <span>{calculateInvoiceTotal().tax.toFixed(2)} ден.</span>
+                         </div>
+                         <div className="flex justify-between font-bold text-lg border-t pt-2">
+                           <span>TOTAL:</span>
+                           <span className="text-primary">{calculateInvoiceTotal().total.toFixed(2)} ден.</span>
+                         </div>
                       </div>
                     </Card>
                   )}
@@ -1317,7 +1363,16 @@ const InventoryManagementApp = () => {
                   variant="outline"
                   size="sm"
                 >
-                  <Printer className="h-4 w-4" />
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print
+                </Button>
+                <Button
+                  onClick={saveInvoiceAsPDF}
+                  variant="outline"
+                  size="sm"
+                >
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Save as PDF
                 </Button>
                 <Button
                   onClick={() => setShowInvoiceViewer(false)}
@@ -1331,7 +1386,7 @@ const InventoryManagementApp = () => {
 
             {/* Invoice Content */}
             <div className="flex-1 overflow-y-auto p-8 print:p-0">
-              <div className="max-w-3xl mx-auto bg-card print:shadow-none shadow-card p-8 print:p-0">
+              <div data-invoice-content className="max-w-3xl mx-auto bg-card print:shadow-none shadow-card p-8 print:p-0">
                 {/* Invoice Header */}
                 <div className="flex justify-between items-start mb-8">
                   <div>
@@ -1372,9 +1427,9 @@ const InventoryManagementApp = () => {
                           <td className="border border-border px-4 py-3">{item.name}</td>
                           <td className="border border-border px-4 py-3">{item.sku}</td>
                           <td className="border border-border px-4 py-3 text-center">{item.quantity}</td>
-                          <td className="border border-border px-4 py-3 text-right">${item.price.toFixed(2)}</td>
+                          <td className="border border-border px-4 py-3 text-right">{item.price.toFixed(2)} ден.</td>
                           <td className="border border-border px-4 py-3 text-right">
-                            ${(item.price * item.quantity).toFixed(2)}
+                            {(item.price * item.quantity).toFixed(2)} ден.
                           </td>
                         </tr>
                       ))}
@@ -1387,15 +1442,15 @@ const InventoryManagementApp = () => {
                   <div className="w-64 space-y-2">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
-                      <span>${viewingInvoice.subtotal.toFixed(2)}</span>
+                      <span>{viewingInvoice.subtotal.toFixed(2)} ден.</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Tax (10%):</span>
-                      <span>${viewingInvoice.tax.toFixed(2)}</span>
+                      <span>{viewingInvoice.tax.toFixed(2)} ден.</span>
                     </div>
                     <div className="flex justify-between font-bold text-lg border-t pt-2">
                       <span>Total:</span>
-                      <span className="text-primary">${viewingInvoice.total.toFixed(2)}</span>
+                      <span className="text-primary">{viewingInvoice.total.toFixed(2)} ден.</span>
                     </div>
                   </div>
                 </div>
@@ -1403,7 +1458,7 @@ const InventoryManagementApp = () => {
                 {/* Footer */}
                 <div className="text-center text-muted-foreground text-sm border-t pt-4">
                   <p>Thank you for your business!</p>
-                  <p>Generated by InventoryPro</p>
+                  <p>Generated by WeParty Inventory</p>
                 </div>
               </div>
             </div>
