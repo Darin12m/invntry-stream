@@ -1048,9 +1048,9 @@ const InventoryManagementApp = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {activeTab === 'inventory' && <InventoryTab />}
-        {activeTab === 'invoices' && <InvoicesTab />}
-        {activeTab === 'data' && <DataTab />}
+        {activeTab === 'inventory' && InventoryTab()}
+        {activeTab === 'invoices' && InvoicesTab()}
+        {activeTab === 'data' && DataTab()}
       </main>
 
       {/* Product Modal */}
