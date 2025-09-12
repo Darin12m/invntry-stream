@@ -1388,50 +1388,49 @@ const InventoryManagementApp = () => {
 
             {/* Invoice Content */}
             <div className="flex-1 overflow-y-auto p-8 print:p-0">
-              <div data-invoice-content className="max-w-3xl mx-auto bg-card print:shadow-none shadow-card p-8 print:p-0">
+              <div data-invoice-content className="max-w-4xl mx-auto bg-white print:shadow-none shadow-card p-12 print:p-0">
                 {/* Invoice Header */}
-                <div className="flex justify-between items-start mb-8">
+                <div className="flex justify-between items-start mb-12">
                   <div>
-                    <h1 className="text-4xl font-bold text-primary">INVOICE</h1>
-                    <p className="text-muted-foreground text-lg">WeParty Inventory</p>
+                    <h1 className="text-5xl font-bold text-black mb-2">WeParty.</h1>
+                    <p className="text-gray-600 text-lg font-medium">PARTY DECOR</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-semibold">{viewingInvoice.number}</p>
-                    <p className="text-muted-foreground">Date: {viewingInvoice.date}</p>
+                  <div className="text-right text-sm text-black leading-relaxed">
+                    <p className="font-semibold">ПАРТИЛА увоз-извоз ДОО Скопје</p>
+                    <p>Друштво за трговија и услуги</p>
+                    <p>ул. Гари 6Б/1-2, Карпош, Скопје</p>
+                    <p>Данчен број: 4057025575047</p>
+                    <p>Трансакциска сметка: 270078458980186</p>
+                    <p>Халк Банка АД Скопје</p>
                   </div>
                 </div>
 
-                {/* Customer Information */}
+                {/* Invoice Title */}
                 <div className="mb-8">
-                  <h3 className="text-lg font-semibold mb-3">Bill To:</h3>
-                  <div className="text-foreground">
-                    <p className="font-medium text-lg">{viewingInvoice.customer.name}</p>
-                    <p>{viewingInvoice.customer.email}</p>
-                    <p className="whitespace-pre-line">{viewingInvoice.customer.address}</p>
-                  </div>
+                  <h2 className="text-2xl font-bold text-black">ПОТВРДА ЗА НАРАЧКА</h2>
                 </div>
 
                 {/* Invoice Items */}
                 <div className="mb-8">
-                  <table className="w-full border-collapse border border-border">
+                  <table className="w-full border-collapse">
                     <thead>
-                      <tr className="bg-muted">
-                        <th className="border border-border px-4 py-3 text-left font-semibold">Item</th>
-                        <th className="border border-border px-4 py-3 text-left font-semibold">SKU</th>
-                        <th className="border border-border px-4 py-3 text-center font-semibold">Quantity</th>
-                        <th className="border border-border px-4 py-3 text-right font-semibold">Unit Price</th>
-                        <th className="border border-border px-4 py-3 text-right font-semibold">Total</th>
+                      <tr className="border-b-2 border-black">
+                        <th className="px-2 py-3 text-left font-bold text-black">Производ</th>
+                        <th className="px-2 py-3 text-center font-bold text-black">Количина</th>
+                        <th className="px-2 py-3 text-center font-bold text-black">Цена</th>
+                        <th className="px-2 py-3 text-center font-bold text-black">ДДВ</th>
+                        <th className="px-2 py-3 text-right font-bold text-black">Вкупно</th>
                       </tr>
                     </thead>
                     <tbody>
                       {viewingInvoice.items.map((item, index) => (
-                        <tr key={index}>
-                          <td className="border border-border px-4 py-3">{item.name}</td>
-                          <td className="border border-border px-4 py-3">{item.sku}</td>
-                          <td className="border border-border px-4 py-3 text-center">{item.quantity}</td>
-                          <td className="border border-border px-4 py-3 text-right">{item.price.toFixed(2)} ден.</td>
-                          <td className="border border-border px-4 py-3 text-right">
-                            {(item.price * item.quantity).toFixed(2)} ден.
+                        <tr key={index} className="border-b border-gray-300">
+                          <td className="px-2 py-3 text-black">{item.name}</td>
+                          <td className="px-2 py-3 text-center text-black">{item.quantity}</td>
+                          <td className="px-2 py-3 text-center text-black">{item.price.toFixed(0)} ден</td>
+                          <td className="px-2 py-3 text-center text-black">0%</td>
+                          <td className="px-2 py-3 text-right text-black">
+                            {(item.price * item.quantity).toFixed(0)} ден
                           </td>
                         </tr>
                       ))}
@@ -1440,27 +1439,23 @@ const InventoryManagementApp = () => {
                 </div>
 
                 {/* Totals */}
-                <div className="flex justify-end mb-8">
-                  <div className="w-64 space-y-2">
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>{viewingInvoice.subtotal.toFixed(2)} ден.</span>
+                <div className="flex justify-end mb-12">
+                  <div className="w-64 space-y-3 text-black">
+                    <div className="flex justify-between py-2 border-t border-gray-300">
+                      <span className="font-medium">Мегузбир</span>
+                      <span className="font-medium">{viewingInvoice.subtotal.toFixed(0)} ден</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Tax (10%):</span>
-                      <span>{viewingInvoice.tax.toFixed(2)} ден.</span>
-                    </div>
-                    <div className="flex justify-between font-bold text-lg border-t pt-2">
-                      <span>Total:</span>
-                      <span className="text-primary">{viewingInvoice.total.toFixed(2)} ден.</span>
+                    <div className="flex justify-between py-2 font-bold text-lg">
+                      <span>Вкупно</span>
+                      <span>{viewingInvoice.subtotal.toFixed(0)} ден</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Footer */}
-                <div className="text-center text-muted-foreground text-sm border-t pt-4">
-                  <p>Thank you for your business!</p>
-                  <p>Generated by WeParty Inventory</p>
+                {/* Date Footer */}
+                <div className="text-left text-black">
+                  <p className="font-medium">Датум</p>
+                  <p>{new Date(viewingInvoice.date).toLocaleDateString('mk-MK')}</p>
                 </div>
               </div>
             </div>
