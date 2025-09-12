@@ -670,10 +670,70 @@ const InventoryManagementApp = () => {
       {/* Products List - Single Column Rectangular Layout */}
       <div className="space-y-4">
         {filteredProducts.map(product => (
-          <Card key={product.id} className="p-4 hover:shadow-glow transition-all duration-300 animate-scale-in bg-gradient-card">
-          <div className="flex items-center justify-between min-h-16">
-            {/* Left Section: Checkbox & Product Info */}
-            <div className="flex items-center gap-4 flex-1 min-w-0">
+          <Card key={product.id} className="p-3 sm:p-4 hover:shadow-glow transition-all duration-300 animate-scale-in bg-gradient-card">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-h-16">
+            {/* Mobile: Stacked Layout */}
+            <div className="sm:hidden space-y-3">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  checked={selectedProducts.has(product.id)}
+                  onCheckedChange={() => toggleProductSelection(product.id)}
+                  className="flex-shrink-0 mt-1"
+                />
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-base text-foreground break-words">{product.name}</h3>
+                  <p className="text-muted-foreground text-sm break-words">SKU: {product.sku}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-xs text-muted-foreground">Category</p>
+                  <p className="font-medium text-sm break-words">{product.category}</p>
+                </div>
+                
+                <div>
+                  <p className="text-xs text-muted-foreground">Price</p>
+                  <p className="font-medium text-primary text-sm">{product.price.toFixed(2)} ден.</p>
+                </div>
+                
+                <div>
+                  <p className="text-xs text-muted-foreground">Stock</p>
+                  <p className={`font-medium text-sm ${product.quantity < 10 ? 'text-destructive' : 'text-success'}`}>
+                    {product.quantity}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                {product.quantity < 10 && (
+                  <div className="bg-warning/10 border border-warning/20 rounded-lg px-2 py-1">
+                    <p className="text-warning-foreground text-xs font-medium">⚠️ Low</p>
+                  </div>
+                )}
+                <div className="flex gap-2 ml-auto">
+                  <Button
+                    onClick={() => handleEditProduct(product)}
+                    variant="outline"
+                    size="sm"
+                    className="min-w-8 h-8"
+                  >
+                    <Edit className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    onClick={() => handleDeleteProduct(product.id)}
+                    variant="destructive"
+                    size="sm"
+                    className="min-w-8 h-8"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Desktop: Horizontal Layout */}
+            <div className="hidden sm:flex items-center gap-4 flex-1 min-w-0">
               <Checkbox
                 checked={selectedProducts.has(product.id)}
                 onCheckedChange={() => toggleProductSelection(product.id)}
@@ -1020,9 +1080,9 @@ const InventoryManagementApp = () => {
               <div className="bg-gradient-primary p-2 rounded-lg">
                 <Package className="h-6 w-6 text-primary-foreground" />
               </div>
-              <span className="ml-3 text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">WeParty Inventory</span>
+              <span className="ml-3 text-lg sm:text-xl font-bold bg-gradient-primary bg-clip-text text-transparent truncate">WeParty Inventory</span>
             </div>
-            <div className="flex space-x-8">
+            <div className="flex space-x-2 sm:space-x-8 overflow-x-auto">
               {[
                 { key: 'inventory', label: 'Inventory', icon: Package },
                 { key: 'invoices', label: 'Invoices', icon: FileText },
@@ -1031,14 +1091,15 @@ const InventoryManagementApp = () => {
                 <button
                   key={key}
                   onClick={() => setActiveTab(key)}
-                  className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-all duration-300 ${
+                  className={`inline-flex items-center px-2 sm:px-1 pt-1 text-xs sm:text-sm font-medium transition-all duration-300 whitespace-nowrap ${
                     activeTab === key
                       ? 'text-primary border-b-2 border-primary shadow-glow'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <Icon className="w-4 h-4 mr-2" />
-                  {label}
+                  <Icon className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">{label}</span>
+                  <span className="sm:hidden">{label.slice(0, 4)}</span>
                 </button>
               ))}
             </div>
@@ -1465,11 +1526,11 @@ const InventoryManagementApp = () => {
 
       {/* Column Mapping Modal */}
       {showColumnMappingModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <Card className="w-full max-w-2xl mx-4 animate-scale-in shadow-glow">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold">Map Excel Columns</h3>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col animate-scale-in shadow-glow">
+            <div className="p-4 sm:p-6 border-b flex-shrink-0">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg sm:text-xl font-semibold">Map Excel Columns</h3>
                 <Button
                   onClick={() => setShowColumnMappingModal(false)}
                   variant="ghost"
@@ -1479,13 +1540,15 @@ const InventoryManagementApp = () => {
                 </Button>
               </div>
 
-              <p className="text-muted-foreground mb-6">
+              <p className="text-muted-foreground text-sm">
                 Map the columns from your Excel file to the product fields. 
                 Found {excelData.length} rows with columns: {excelColumns.join(', ')}
               </p>
+            </div>
 
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="name-mapping">Product Name * → Excel Column</Label>
                     <select
@@ -1517,7 +1580,7 @@ const InventoryManagementApp = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="quantity-mapping">Quantity * → Excel Column</Label>
                     <select
@@ -1563,32 +1626,35 @@ const InventoryManagementApp = () => {
                     ))}
                   </select>
                 </div>
-              </div>
 
-              {excelData.length > 0 && (
-                <div className="mt-6 p-4 bg-muted rounded-lg">
-                  <h4 className="font-medium mb-2">Preview (First Row):</h4>
-                  <div className="text-sm space-y-1">
-                    <p><strong>Name:</strong> {columnMapping.name ? excelData[0][columnMapping.name] : '(not mapped)'}</p>
-                    <p><strong>SKU:</strong> {columnMapping.sku ? excelData[0][columnMapping.sku] : '(not mapped)'}</p>
-                    <p><strong>Quantity:</strong> {columnMapping.quantity ? excelData[0][columnMapping.quantity] : '(not mapped)'}</p>
-                    <p><strong>Price:</strong> {columnMapping.price ? excelData[0][columnMapping.price] : '(not mapped)'}</p>
-                    <p><strong>Category:</strong> {columnMapping.category ? excelData[0][columnMapping.category] : 'Uncategorized'}</p>
+                {excelData.length > 0 && (
+                  <div className="mt-6 p-4 bg-muted rounded-lg">
+                    <h4 className="font-medium mb-2">Preview (First Row):</h4>
+                    <div className="text-sm space-y-1">
+                      <p><strong>Name:</strong> {columnMapping.name ? excelData[0][columnMapping.name] : '(not mapped)'}</p>
+                      <p><strong>SKU:</strong> {columnMapping.sku ? excelData[0][columnMapping.sku] : '(not mapped)'}</p>
+                      <p><strong>Quantity:</strong> {columnMapping.quantity ? excelData[0][columnMapping.quantity] : '(not mapped)'}</p>
+                      <p><strong>Price:</strong> {columnMapping.price ? excelData[0][columnMapping.price] : '(not mapped)'}</p>
+                      <p><strong>Category:</strong> {columnMapping.category ? excelData[0][columnMapping.category] : 'Uncategorized'}</p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+            </div>
 
-              <div className="flex justify-end gap-3 mt-6">
+            <div className="p-4 sm:p-6 border-t flex-shrink-0">
+              <div className="flex flex-col sm:flex-row gap-3 justify-end">
                 <Button
                   onClick={() => setShowColumnMappingModal(false)}
                   variant="outline"
+                  className="w-full sm:w-auto"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleConfirmImport}
                   disabled={!columnMapping.name || !columnMapping.sku || !columnMapping.quantity || !columnMapping.price}
-                  className="bg-success"
+                  className="w-full sm:w-auto bg-success"
                 >
                   <Upload className="h-4 w-4 mr-2" />
                   Import {excelData.length} Products
