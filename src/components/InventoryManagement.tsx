@@ -20,6 +20,9 @@ const InventoryManagementApp = () => {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const deferredSearch = React.useDeferredValue(searchInput);
+  useEffect(() => { setSearchTerm(deferredSearch); }, [deferredSearch]);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showInvoiceViewer, setShowInvoiceViewer] = useState(false);
@@ -626,10 +629,9 @@ const InventoryManagementApp = () => {
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
-              key="product-search"
               placeholder="Search products by name, SKU, or category..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="pl-10"
             />
           </div>
