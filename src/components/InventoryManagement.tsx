@@ -590,7 +590,17 @@ const InventoryManagementApp = () => {
   };
 
   const printInvoice = () => {
-    window.print();
+    // Check if user is on mobile device
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+    
+    if (isMobile) {
+      // On mobile, use PDF generation instead of window.print()
+      saveInvoiceAsPDF();
+      toast.success('Invoice PDF generated for printing');
+    } else {
+      // On desktop, use normal print
+      window.print();
+    }
   };
 
   const saveInvoiceAsPDF = async () => {
