@@ -1479,18 +1479,20 @@ const InventoryManagementApp = () => {
             <div className="flex-1 overflow-y-auto p-4 sm:p-8 print:p-0">
               <div data-invoice-content className="max-w-4xl mx-auto bg-white print:shadow-none shadow-card p-6 sm:p-12 print:p-0">
                  {/* Invoice Header */}
-                 <div className="flex flex-col sm:flex-row justify-between items-start mb-8 sm:mb-12 gap-4">
-                   <div className="flex flex-col items-center sm:items-start">
-                     <h1 className="text-3xl sm:text-5xl font-bold text-black mb-2">WeParty.</h1>
-                     <p className="text-gray-600 text-base sm:text-lg font-medium text-center">PARTY DECOR</p>
-                   </div>
-                   <div className="text-right text-xs sm:text-sm text-black leading-relaxed">
-                     <p className="font-semibold">ПАРТИЛАБ увоз-извоз ДОО Скопје</p>
-                     <p>Друштво за трговија и услуги</p>
-                     <p>ул. Гари 6Б/1-2, Карпош, Скопје</p>
-                     <p>Данчен број: 4057025575047</p>
-                     <p>Трансакциска сметка: 270078458980186</p>
-                     <p>Халк Банка АД Скопје</p>
+                 <div className="mb-8 sm:mb-12">
+                   <div className="flex flex-col sm:flex-row justify-between items-start gap-4 sm:gap-6">
+                     <div className="flex flex-col items-start order-1 sm:order-1">
+                       <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-black mb-1 sm:mb-2">WeParty.</h1>
+                       <p className="text-gray-600 text-sm sm:text-base lg:text-lg font-medium">PARTY DECOR</p>
+                     </div>
+                     <div className="text-right text-xs sm:text-xs lg:text-sm text-black leading-tight sm:leading-relaxed order-2 sm:order-2 ml-auto">
+                       <p className="font-semibold mb-0.5">ПАРТИЛАБ увоз-извоз ДОО Скопје</p>
+                       <p className="mb-0.5">Друштво за трговија и услуги</p>
+                       <p className="mb-0.5">ул. Гари 6Б/1-2, Карпош, Скопје</p>
+                       <p className="mb-0.5">Данчен број: 4057025575047</p>
+                       <p className="mb-0.5">Трансакциска сметка: 270078458980186</p>
+                       <p>Халк Банка АД Скопје</p>
+                     </div>
                    </div>
                  </div>
 
@@ -1504,47 +1506,49 @@ const InventoryManagementApp = () => {
                  </div>
 
                  {/* Invoice Items */}
-                 <div className="mb-6 sm:mb-8 overflow-x-auto">
-                   <table className="w-full border-collapse text-sm sm:text-base">
-                     <thead>
-                       <tr className="border-b-2 border-black">
-                         <th className="px-1 sm:px-2 py-2 sm:py-3 text-left font-bold text-black">Производ</th>
-                         <th className="px-1 sm:px-2 py-2 sm:py-3 text-center font-bold text-black">Кол.</th>
-                         <th className="px-1 sm:px-2 py-2 sm:py-3 text-center font-bold text-black">Цена</th>
-                         <th className="px-1 sm:px-2 py-2 sm:py-3 text-center font-bold text-black">ДДВ</th>
-                         <th className="px-1 sm:px-2 py-2 sm:py-3 text-right font-bold text-black">Вкупно</th>
-                       </tr>
-                     </thead>
-                     <tbody>
-                       {viewingInvoice.items.map((item, index) => (
-                         <tr key={index} className="border-b border-gray-300">
-                           <td className="px-1 sm:px-2 py-2 sm:py-3 text-black break-words">{item.name}</td>
-                           <td className="px-1 sm:px-2 py-2 sm:py-3 text-center text-black">{item.quantity}</td>
-                           <td className="px-1 sm:px-2 py-2 sm:py-3 text-center text-black">{item.price.toFixed(0)} ден</td>
-                           <td className="px-1 sm:px-2 py-2 sm:py-3 text-center text-black">0%</td>
-                           <td className="px-1 sm:px-2 py-2 sm:py-3 text-right text-black">
-                             {(item.price * item.quantity).toFixed(0)} ден
-                           </td>
+                 <div className="mb-6 sm:mb-8">
+                   <div className="overflow-x-auto -mx-2 sm:mx-0">
+                     <table className="w-full border-collapse text-xs sm:text-sm lg:text-base min-w-[500px]">
+                       <thead>
+                         <tr className="border-b-2 border-black">
+                           <th className="px-1 sm:px-2 py-2 sm:py-3 text-left font-bold text-black w-2/5">Производ</th>
+                           <th className="px-1 sm:px-2 py-2 sm:py-3 text-center font-bold text-black w-1/6">Кол.</th>
+                           <th className="px-1 sm:px-2 py-2 sm:py-3 text-center font-bold text-black w-1/6">Цена</th>
+                           <th className="px-1 sm:px-2 py-2 sm:py-3 text-center font-bold text-black w-1/6">ДДВ</th>
+                           <th className="px-1 sm:px-2 py-2 sm:py-3 text-right font-bold text-black w-1/6">Вкупно</th>
                          </tr>
-                       ))}
-                     </tbody>
-                   </table>
+                       </thead>
+                       <tbody>
+                         {viewingInvoice.items.map((item, index) => (
+                           <tr key={index} className="border-b border-gray-300">
+                             <td className="px-1 sm:px-2 py-2 sm:py-3 text-black break-words text-xs sm:text-sm">{item.name}</td>
+                             <td className="px-1 sm:px-2 py-2 sm:py-3 text-center text-black text-xs sm:text-sm">{item.quantity}</td>
+                             <td className="px-1 sm:px-2 py-2 sm:py-3 text-center text-black text-xs sm:text-sm">{item.price.toFixed(0)} ден</td>
+                             <td className="px-1 sm:px-2 py-2 sm:py-3 text-center text-black text-xs sm:text-sm">0%</td>
+                             <td className="px-1 sm:px-2 py-2 sm:py-3 text-right text-black text-xs sm:text-sm">
+                               {(item.price * item.quantity).toFixed(0)} ден
+                             </td>
+                           </tr>
+                         ))}
+                       </tbody>
+                     </table>
+                   </div>
                  </div>
 
                  {/* Totals */}
-                 <div className="flex justify-end mb-8 sm:mb-12">
-                   <div className="w-full sm:w-64 space-y-2 sm:space-y-3 text-black text-sm sm:text-base">
-                     <div className="flex justify-between py-2 border-t border-gray-300">
-                       <span className="font-medium">Мегузбир</span>
-                       <span className="font-medium">{viewingInvoice.subtotal.toFixed(0)} ден</span>
+                 <div className="flex justify-end mb-6 sm:mb-8">
+                   <div className="w-full sm:w-80 lg:w-64 space-y-1 sm:space-y-2 text-black text-sm sm:text-base">
+                     <div className="flex justify-between py-1 sm:py-2 border-t border-gray-300">
+                       <span className="font-medium text-xs sm:text-sm lg:text-base">Мегузбир</span>
+                       <span className="font-medium text-xs sm:text-sm lg:text-base">{viewingInvoice.subtotal.toFixed(0)} ден</span>
                      </div>
                      {viewingInvoice.discountPercentage > 0 && (
-                       <div className="flex justify-between py-2">
-                         <span className="font-medium">Попуст ({viewingInvoice.discountPercentage}%)</span>
-                         <span className="font-medium">-{viewingInvoice.discount.toFixed(0)} ден</span>
+                       <div className="flex justify-between py-1 sm:py-2">
+                         <span className="font-medium text-xs sm:text-sm lg:text-base">Попуст ({viewingInvoice.discountPercentage}%)</span>
+                         <span className="font-medium text-xs sm:text-sm lg:text-base">-{viewingInvoice.discount.toFixed(0)} ден</span>
                        </div>
                      )}
-                     <div className="flex justify-between py-2 font-bold text-base sm:text-lg">
+                     <div className="flex justify-between py-1 sm:py-2 font-bold text-sm sm:text-base lg:text-lg border-t border-black">
                        <span>Вкупно</span>
                        <span>{viewingInvoice.total.toFixed(0)} ден</span>
                      </div>
@@ -1552,8 +1556,8 @@ const InventoryManagementApp = () => {
                  </div>
 
                 {/* Date Footer */}
-                <div className="text-left text-black">
-                  <p className="font-medium">Датум</p>
+                <div className="text-left text-black text-xs sm:text-sm lg:text-base mt-4 sm:mt-6">
+                  <p className="font-medium mb-1">Датум</p>
                   <p>{new Date(viewingInvoice.date).toLocaleDateString('mk-MK')}</p>
                 </div>
               </div>
