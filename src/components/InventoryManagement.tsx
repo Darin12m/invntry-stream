@@ -34,6 +34,7 @@ const InventoryManagementApp = () => {
   const [viewingInvoice, setViewingInvoice] = useState(null);
   const [invoiceProductSearch, setInvoiceProductSearch] = useState('');
   const [customInvoiceNumber, setCustomInvoiceNumber] = useState('');
+  const [discount, setDiscount] = useState(0);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
   const [showColumnMappingModal, setShowColumnMappingModal] = useState(false);
@@ -260,38 +261,62 @@ const InventoryManagementApp = () => {
   };
 
   // 4. Delete single invoice
-  const handleDeleteInvoice = (invoiceId) => {
+  const handleDeleteInvoice = async (invoiceId) => {
     if (window.confirm('Are you sure you want to delete this invoice?')) {
-      setInvoices(invoices.filter(i => i.id !== invoiceId));
-      toast.success("Invoice deleted successfully");
+      try {
+        await deleteDoc(doc(db, 'invoices', invoiceId));
+        toast.success("Invoice deleted successfully");
+        loadInvoices(); // Reload invoices from Firebase
+      } catch (error) {
+        console.error('Error deleting invoice:', error);
+        toast.error('Failed to delete invoice');
+      }
     }
   };
 
   // 5. Bulk delete invoices
-  const handleBulkDeleteInvoices = () => {
+  const handleBulkDeleteInvoices = async () => {
     if (selectedInvoices.size === 0) {
       toast.error("Please select invoices to delete");
       return;
     }
     
     if (window.confirm(`Are you sure you want to delete ${selectedInvoices.size} selected invoice(s)?`)) {
-      setInvoices(invoices.filter(i => !selectedInvoices.has(i.id)));
-      setSelectedInvoices(new Set());
-      toast.success(`${selectedInvoices.size} invoices deleted successfully`);
+      try {
+        const deletePromises = Array.from(selectedInvoices).map((invoiceId) =>
+          deleteDoc(doc(db, 'invoices', invoiceId))
+        );
+        await Promise.all(deletePromises);
+        setSelectedInvoices(new Set());
+        toast.success(`${selectedInvoices.size} invoices deleted successfully`);
+        loadInvoices(); // Reload invoices from Firebase
+      } catch (error) {
+        console.error('Error bulk deleting invoices:', error);
+        toast.error('Failed to delete invoices');
+      }
     }
   };
 
   // 6. Delete all invoices
-  const handleDeleteAllInvoices = () => {
+  const handleDeleteAllInvoices = async () => {
     if (invoices.length === 0) {
       toast.error("No invoices to delete");
       return;
     }
     
     if (window.confirm(`Are you sure you want to delete ALL ${invoices.length} invoices? This action cannot be undone.`)) {
-      setInvoices([]);
-      setSelectedInvoices(new Set());
-      toast.success("All invoices deleted successfully");
+      try {
+        const deletePromises = invoices.map((invoice) =>
+          deleteDoc(doc(db, 'invoices', invoice.id))
+        );
+        await Promise.all(deletePromises);
+        setSelectedInvoices(new Set());
+        toast.success("All invoices deleted successfully");
+        loadInvoices(); // Reload invoices from Firebase
+      } catch (error) {
+        console.error('Error deleting all invoices:', error);
+        toast.error('Failed to delete all invoices');
+      }
     }
   };
 
@@ -315,18 +340,33 @@ const InventoryManagementApp = () => {
   };
 
   // 9. Clear all data (nuclear option)
-  const handleClearAllData = () => {
+  const handleClearAllData = async () => {
     if (products.length === 0 && invoices.length === 0) {
       toast.error("No data to clear");
       return;
     }
     
     if (window.confirm("⚠️ WARNING: This will delete ALL products and invoices permanently. This action cannot be undone. Are you absolutely sure?")) {
-      setProducts([]);
-      setInvoices([]);
-      setSelectedProducts(new Set());
-      setSelectedInvoices(new Set());
-      toast.success("All data cleared successfully");
+      try {
+        // Delete all products and invoices in parallel
+        const deleteProductsPromises = products.map((product) =>
+          deleteDoc(doc(db, 'products', product.id))
+        );
+        const deleteInvoicesPromises = invoices.map((invoice) =>
+          deleteDoc(doc(db, 'invoices', invoice.id))
+        );
+        
+        await Promise.all([...deleteProductsPromises, ...deleteInvoicesPromises]);
+        
+        setSelectedProducts(new Set());
+        setSelectedInvoices(new Set());
+        toast.success("All data cleared successfully");
+        loadProducts();
+        loadInvoices();
+      } catch (error) {
+        console.error('Error clearing all data:', error);
+        toast.error('Failed to clear all data');
+      }
     }
   };
 
@@ -346,6 +386,7 @@ const InventoryManagementApp = () => {
     setCurrentInvoice(newInvoice);
     setInvoiceItems([]);
     setCustomerInfo({ name: '', email: '', address: '' });
+    setDiscount(0);
     setInvoiceProductSearch('');
     setShowInvoiceModal(true);
   };
@@ -389,9 +430,9 @@ const InventoryManagementApp = () => {
 
   const calculateInvoiceTotal = () => {
     const subtotal = invoiceItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const tax = subtotal * 0.1; // 10% tax
-    const total = subtotal + tax;
-    return { subtotal, tax, total };
+    const discountAmount = subtotal * (discount / 100);
+    const total = subtotal - discountAmount;
+    return { subtotal, discount: discountAmount, total };
   };
 
   const handleSaveInvoice = async () => {
@@ -406,14 +447,15 @@ const InventoryManagementApp = () => {
       return;
     }
 
-    const { subtotal, tax, total } = calculateInvoiceTotal();
+    const { subtotal, discount: discountAmount, total } = calculateInvoiceTotal();
     const invoiceData = {
       number: currentInvoice.number,
       date: currentInvoice.date,
       customer: customerInfo,
       items: invoiceItems,
       subtotal,
-      tax,
+      discount: discountAmount,
+      discountPercentage: discount,
       total,
       status: 'saved'
     };
@@ -437,6 +479,7 @@ const InventoryManagementApp = () => {
       setInvoiceItems([]);
       setCustomerInfo({ name: '', email: '', address: '' });
       setCustomInvoiceNumber('');
+      setDiscount(0);
       setInvoiceProductSearch('');
       
       toast.success('Invoice saved successfully!');
@@ -680,29 +723,29 @@ const InventoryManagementApp = () => {
                 className="flex-shrink-0"
               />
               <div className="flex items-center justify-between w-full min-w-0">
-                <div className="flex items-center gap-6 min-w-0 flex-1">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-lg text-foreground truncate max-w-60">{product.name}</h3>
-                    <p className="text-muted-foreground text-sm truncate max-w-60">SKU: {product.sku}</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-4 flex-shrink-0">
-                    <div className="text-center min-w-20">
-                      <p className="text-sm text-muted-foreground">Category</p>
-                      <p className="font-medium text-sm truncate max-w-20">{product.category}</p>
-                    </div>
-                    
-                    <div className="text-center min-w-24">
-                      <p className="text-sm text-muted-foreground">Price</p>
-                      <p className="font-medium text-primary text-sm">{product.price.toFixed(2)} ден.</p>
-                    </div>
-                    
-                    <div className="text-center min-w-20">
-                      <p className="text-sm text-muted-foreground">Stock</p>
-                      <p className={`font-medium text-sm ${product.quantity < 10 ? 'text-destructive' : 'text-success'}`}>
-                        {product.quantity}
-                      </p>
-                    </div>
+                 <div className="flex items-center gap-4 min-w-0 flex-1 flex-wrap sm:flex-nowrap">
+                   <div className="text-center min-w-20 order-2 sm:order-1">
+                     <p className="text-sm text-muted-foreground">Category</p>
+                     <p className="font-medium text-sm truncate max-w-20">{product.category}</p>
+                   </div>
+                   
+                   <div className="min-w-0 flex-1 order-1 sm:order-2">
+                     <h3 className="font-semibold text-lg text-foreground truncate">{product.name}</h3>
+                     <p className="text-muted-foreground text-sm truncate">SKU: {product.sku}</p>
+                   </div>
+                   
+                   <div className="flex items-center gap-4 flex-shrink-0 order-3">
+                     <div className="text-center min-w-24">
+                       <p className="text-sm text-muted-foreground">Price</p>
+                       <p className="font-medium text-primary text-sm">{product.price.toFixed(2)} ден.</p>
+                     </div>
+                     
+                     <div className="text-center min-w-20">
+                       <p className="text-sm text-muted-foreground">Stock</p>
+                       <p className={`font-medium text-sm ${product.quantity < 10 ? 'text-destructive' : 'text-success'}`}>
+                         {product.quantity}
+                       </p>
+                     </div>
 
                     {product.quantity < 10 && (
                       <div className="bg-warning/10 border border-warning/20 rounded-lg px-2 py-1 flex-shrink-0">
@@ -1020,9 +1063,9 @@ const InventoryManagementApp = () => {
               <div className="bg-gradient-primary p-2 rounded-lg">
                 <Package className="h-6 w-6 text-primary-foreground" />
               </div>
-              <span className="ml-3 text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">WeParty Inventory</span>
+              <span className="ml-3 text-lg sm:text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">WeParty Inventory</span>
             </div>
-            <div className="flex space-x-8">
+            <div className="hidden sm:flex space-x-8">
               {[
                 { key: 'inventory', label: 'Inventory', icon: Package },
                 { key: 'invoices', label: 'Invoices', icon: FileText },
@@ -1039,6 +1082,26 @@ const InventoryManagementApp = () => {
                 >
                   <Icon className="w-4 h-4 mr-2" />
                   {label}
+                </button>
+              ))}
+            </div>
+            {/* Mobile Navigation */}
+            <div className="flex sm:hidden space-x-1">
+              {[
+                { key: 'inventory', icon: Package },
+                { key: 'invoices', icon: FileText },
+                { key: 'data', icon: Upload }
+              ].map(({ key, icon: Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`p-2 rounded-lg transition-all duration-300 ${
+                    activeTab === key
+                      ? 'text-primary bg-primary/10'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
                 </button>
               ))}
             </div>
@@ -1150,9 +1213,9 @@ const InventoryManagementApp = () => {
 
       {/* Invoice Modal */}
       {showInvoiceModal && currentInvoice && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50">
-          <div className="h-full flex items-center justify-center p-4">
-            <Card className="w-full max-w-7xl h-5/6 flex flex-col animate-scale-in shadow-glow">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 overflow-y-auto">
+          <div className="min-h-full flex items-center justify-center p-2 sm:p-4">
+            <Card className="w-full max-w-7xl max-h-[95vh] sm:h-5/6 flex flex-col animate-scale-in shadow-glow">
               
               {/* Header */}
               <div className="flex justify-between items-center p-6 border-b">
@@ -1162,11 +1225,11 @@ const InventoryManagementApp = () => {
                 </Button>
               </div>
               
-              {/* Main Content Area */}
-              <div className="flex-1 flex overflow-hidden">
-                
-                {/* LEFT SIDE - Products */}
-                <div className="w-1/2 border-r bg-muted/30 flex flex-col">
+               {/* Main Content Area */}
+               <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
+                 
+                 {/* LEFT SIDE - Products */}
+                 <div className="w-full sm:w-1/2 border-r bg-muted/30 flex flex-col max-h-64 sm:max-h-none">
                   
                   {/* Search Section */}
                   <div className="p-4 bg-primary/5 border-b">
@@ -1216,8 +1279,8 @@ const InventoryManagementApp = () => {
                   
                 </div>
                 
-                {/* RIGHT SIDE - Invoice Form */}
-                <div className="w-1/2 p-6 overflow-y-auto">
+                 {/* RIGHT SIDE - Invoice Form */}
+                 <div className="w-full sm:w-1/2 p-4 sm:p-6 overflow-y-auto">
                   
                   {/* Invoice Number */}
                   <div className="mb-6">
@@ -1305,25 +1368,39 @@ const InventoryManagementApp = () => {
                     )}
                   </div>
 
-                  {/* Totals */}
-                  {invoiceItems.length > 0 && (
-                    <Card className="p-4">
-                      <div className="space-y-2 text-right">
-                         <div className="flex justify-between">
-                           <span>Subtotal:</span>
-                           <span>{calculateInvoiceTotal().subtotal.toFixed(2)} ден.</span>
-                         </div>
-                         <div className="flex justify-between">
-                           <span>Tax (10%):</span>
-                           <span>{calculateInvoiceTotal().tax.toFixed(2)} ден.</span>
-                         </div>
-                         <div className="flex justify-between font-bold text-lg border-t pt-2">
-                           <span>TOTAL:</span>
-                           <span className="text-primary">{calculateInvoiceTotal().total.toFixed(2)} ден.</span>
-                         </div>
-                      </div>
-                    </Card>
-                  )}
+                   {/* Discount and Totals */}
+                   {invoiceItems.length > 0 && (
+                     <Card className="p-4 space-y-4">
+                       <div>
+                         <Label htmlFor="discount">Попуст (%)</Label>
+                         <Input
+                           id="discount"
+                           type="number"
+                           min="0"
+                           max="100"
+                           value={discount}
+                           onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                           placeholder="0"
+                         />
+                       </div>
+                       <div className="space-y-2 text-right">
+                          <div className="flex justify-between">
+                            <span>Мегузбир:</span>
+                            <span>{calculateInvoiceTotal().subtotal.toFixed(2)} ден.</span>
+                          </div>
+                          {discount > 0 && (
+                            <div className="flex justify-between text-success">
+                              <span>Попуст ({discount}%):</span>
+                              <span>-{calculateInvoiceTotal().discount.toFixed(2)} ден.</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between font-bold text-lg border-t pt-2">
+                            <span>ВКУПНО:</span>
+                            <span className="text-primary">{calculateInvoiceTotal().total.toFixed(2)} ден.</span>
+                          </div>
+                       </div>
+                     </Card>
+                   )}
 
                 </div>
                 
@@ -1354,27 +1431,29 @@ const InventoryManagementApp = () => {
 
       {/* Invoice Viewer Modal */}
       {showInvoiceViewer && viewingInvoice && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <Card className="w-full max-w-4xl mx-4 h-5/6 flex flex-col animate-scale-in shadow-glow">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <Card className="w-full max-w-4xl h-full sm:h-5/6 flex flex-col animate-scale-in shadow-glow">
             {/* Modal Header */}
-            <div className="flex justify-between items-center p-6 border-b print:hidden">
-              <h3 className="text-xl font-semibold">Invoice Details</h3>
-              <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 border-b print:hidden gap-4">
+              <h3 className="text-lg sm:text-xl font-semibold">Invoice Details</h3>
+              <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={() => window.print()}
                   variant="outline"
                   size="sm"
+                  className="text-xs sm:text-sm"
                 >
-                  <Printer className="h-4 w-4 mr-2" />
+                  <Printer className="h-4 w-4 mr-1 sm:mr-2" />
                   Print
                 </Button>
                 <Button
                   onClick={saveInvoiceAsPDF}
                   variant="outline"
                   size="sm"
+                  className="text-xs sm:text-sm"
                 >
-                  <FileDown className="h-4 w-4 mr-2" />
-                  Save as PDF
+                  <FileDown className="h-4 w-4 mr-1 sm:mr-2" />
+                  PDF
                 </Button>
                 <Button
                   onClick={() => setShowInvoiceViewer(false)}
@@ -1387,70 +1466,80 @@ const InventoryManagementApp = () => {
             </div>
 
             {/* Invoice Content */}
-            <div className="flex-1 overflow-y-auto p-8 print:p-0">
-              <div data-invoice-content className="max-w-4xl mx-auto bg-white print:shadow-none shadow-card p-12 print:p-0">
-                {/* Invoice Header */}
-                <div className="flex justify-between items-start mb-12">
-                  <div>
-                    <h1 className="text-5xl font-bold text-black mb-2">WeParty.</h1>
-                    <p className="text-gray-600 text-lg font-medium">PARTY DECOR</p>
-                  </div>
-                  <div className="text-right text-sm text-black leading-relaxed">
-                    <p className="font-semibold">ПАРТИЛА увоз-извоз ДОО Скопје</p>
-                    <p>Друштво за трговија и услуги</p>
-                    <p>ул. Гари 6Б/1-2, Карпош, Скопје</p>
-                    <p>Данчен број: 4057025575047</p>
-                    <p>Трансакциска сметка: 270078458980186</p>
-                    <p>Халк Банка АД Скопје</p>
-                  </div>
-                </div>
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 print:p-0">
+              <div data-invoice-content className="max-w-4xl mx-auto bg-white print:shadow-none shadow-card p-6 sm:p-12 print:p-0">
+                 {/* Invoice Header */}
+                 <div className="flex flex-col sm:flex-row justify-between items-start mb-8 sm:mb-12 gap-4">
+                   <div className="flex flex-col items-center sm:items-start">
+                     <h1 className="text-3xl sm:text-5xl font-bold text-black mb-2">WeParty.</h1>
+                     <p className="text-gray-600 text-base sm:text-lg font-medium text-center">PARTY DECOR</p>
+                   </div>
+                   <div className="text-right text-xs sm:text-sm text-black leading-relaxed">
+                     <p className="font-semibold">ПАРТИЛАБ увоз-извоз ДОО Скопје</p>
+                     <p>Друштво за трговија и услуги</p>
+                     <p>ул. Гари 6Б/1-2, Карпош, Скопје</p>
+                     <p>Данчен број: 4057025575047</p>
+                     <p>Трансакциска сметка: 270078458980186</p>
+                     <p>Халк Банка АД Скопје</p>
+                   </div>
+                 </div>
 
-                {/* Invoice Title */}
-                <div className="mb-8">
-                  <h2 className="text-2xl font-bold text-black">ПОТВРДА ЗА НАРАЧКА</h2>
-                </div>
+                 {/* Invoice Title */}
+                 <div className="mb-6 sm:mb-8">
+                   <h2 className="text-xl sm:text-2xl font-bold text-black">
+                     Фактура {viewingInvoice.number?.split('-')[1] ? 
+                       `${viewingInvoice.number.split('-')[1]}/${new Date(viewingInvoice.date).getFullYear().toString().slice(-2)}` : 
+                       viewingInvoice.number}
+                   </h2>
+                 </div>
 
-                {/* Invoice Items */}
-                <div className="mb-8">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b-2 border-black">
-                        <th className="px-2 py-3 text-left font-bold text-black">Производ</th>
-                        <th className="px-2 py-3 text-center font-bold text-black">Количина</th>
-                        <th className="px-2 py-3 text-center font-bold text-black">Цена</th>
-                        <th className="px-2 py-3 text-center font-bold text-black">ДДВ</th>
-                        <th className="px-2 py-3 text-right font-bold text-black">Вкупно</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {viewingInvoice.items.map((item, index) => (
-                        <tr key={index} className="border-b border-gray-300">
-                          <td className="px-2 py-3 text-black">{item.name}</td>
-                          <td className="px-2 py-3 text-center text-black">{item.quantity}</td>
-                          <td className="px-2 py-3 text-center text-black">{item.price.toFixed(0)} ден</td>
-                          <td className="px-2 py-3 text-center text-black">0%</td>
-                          <td className="px-2 py-3 text-right text-black">
-                            {(item.price * item.quantity).toFixed(0)} ден
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                 {/* Invoice Items */}
+                 <div className="mb-6 sm:mb-8 overflow-x-auto">
+                   <table className="w-full border-collapse text-sm sm:text-base">
+                     <thead>
+                       <tr className="border-b-2 border-black">
+                         <th className="px-1 sm:px-2 py-2 sm:py-3 text-left font-bold text-black">Производ</th>
+                         <th className="px-1 sm:px-2 py-2 sm:py-3 text-center font-bold text-black">Кол.</th>
+                         <th className="px-1 sm:px-2 py-2 sm:py-3 text-center font-bold text-black">Цена</th>
+                         <th className="px-1 sm:px-2 py-2 sm:py-3 text-center font-bold text-black">ДДВ</th>
+                         <th className="px-1 sm:px-2 py-2 sm:py-3 text-right font-bold text-black">Вкупно</th>
+                       </tr>
+                     </thead>
+                     <tbody>
+                       {viewingInvoice.items.map((item, index) => (
+                         <tr key={index} className="border-b border-gray-300">
+                           <td className="px-1 sm:px-2 py-2 sm:py-3 text-black break-words">{item.name}</td>
+                           <td className="px-1 sm:px-2 py-2 sm:py-3 text-center text-black">{item.quantity}</td>
+                           <td className="px-1 sm:px-2 py-2 sm:py-3 text-center text-black">{item.price.toFixed(0)} ден</td>
+                           <td className="px-1 sm:px-2 py-2 sm:py-3 text-center text-black">0%</td>
+                           <td className="px-1 sm:px-2 py-2 sm:py-3 text-right text-black">
+                             {(item.price * item.quantity).toFixed(0)} ден
+                           </td>
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                 </div>
 
-                {/* Totals */}
-                <div className="flex justify-end mb-12">
-                  <div className="w-64 space-y-3 text-black">
-                    <div className="flex justify-between py-2 border-t border-gray-300">
-                      <span className="font-medium">Мегузбир</span>
-                      <span className="font-medium">{viewingInvoice.subtotal.toFixed(0)} ден</span>
-                    </div>
-                    <div className="flex justify-between py-2 font-bold text-lg">
-                      <span>Вкупно</span>
-                      <span>{viewingInvoice.subtotal.toFixed(0)} ден</span>
-                    </div>
-                  </div>
-                </div>
+                 {/* Totals */}
+                 <div className="flex justify-end mb-8 sm:mb-12">
+                   <div className="w-full sm:w-64 space-y-2 sm:space-y-3 text-black text-sm sm:text-base">
+                     <div className="flex justify-between py-2 border-t border-gray-300">
+                       <span className="font-medium">Мегузбир</span>
+                       <span className="font-medium">{viewingInvoice.subtotal.toFixed(0)} ден</span>
+                     </div>
+                     {viewingInvoice.discountPercentage > 0 && (
+                       <div className="flex justify-between py-2">
+                         <span className="font-medium">Попуст ({viewingInvoice.discountPercentage}%)</span>
+                         <span className="font-medium">-{viewingInvoice.discount.toFixed(0)} ден</span>
+                       </div>
+                     )}
+                     <div className="flex justify-between py-2 font-bold text-base sm:text-lg">
+                       <span>Вкупно</span>
+                       <span>{viewingInvoice.total.toFixed(0)} ден</span>
+                     </div>
+                   </div>
+                 </div>
 
                 {/* Date Footer */}
                 <div className="text-left text-black">
