@@ -1492,13 +1492,13 @@ const InventoryManagementApp = () => {
                 `}</style>
 
                 <div style={{
-                  maxWidth: "900px",
-                  margin: "auto",
+                  maxWidth: "100%",
+                  margin: "0",
                   padding: "20px",
                   fontFamily: "Arial, sans-serif",
                   background: "#fff",
-                  border: "1px solid #ddd",
-                  borderRadius: "6px",
+                  border: "none",
+                  borderRadius: "0",
                 }}>
                   {/* Header */}
                   <div className="invoice-header" style={{
