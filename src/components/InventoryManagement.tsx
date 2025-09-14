@@ -1477,88 +1477,197 @@ const InventoryManagementApp = () => {
 
             {/* Invoice Content */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-8 print:p-0">
-              <div data-invoice-content className="max-w-4xl mx-auto bg-white print:shadow-none shadow-card p-6 sm:p-12 print:p-0">
-                 {/* Invoice Header */}
-                 <div className="mb-8 sm:mb-12">
-                   <div className="flex flex-col sm:flex-row justify-between items-start gap-4 sm:gap-6">
-                     <div className="flex flex-col items-start order-1 sm:order-1">
-                       <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-black mb-1 sm:mb-2">WeParty.</h1>
-                       <p className="text-gray-600 text-sm sm:text-base lg:text-lg font-medium">PARTY DECOR</p>
-                     </div>
-                     <div className="text-right text-xs sm:text-xs lg:text-sm text-black leading-tight sm:leading-relaxed order-2 sm:order-2 ml-auto">
-                       <p className="font-semibold mb-0.5">ПАРТИЛАБ увоз-извоз ДОО Скопје</p>
-                       <p className="mb-0.5">Друштво за трговија и услуги</p>
-                       <p className="mb-0.5">ул. Гари 6Б/1-2, Карпош, Скопје</p>
-                       <p className="mb-0.5">Данчен број: 4057025575047</p>
-                       <p className="mb-0.5">Трансакциска сметка: 270078458980186</p>
-                       <p>Халк Банка АД Скопје</p>
-                     </div>
-                   </div>
-                 </div>
+              <div data-invoice-content>
+                <style>{`
+                  @media print {
+                    .invoice-header {
+                      flex-wrap: nowrap !important;
+                      align-items: flex-start !important;
+                    }
+                    .company-info {
+                      text-align: right !important;
+                      margin-top: 0 !important;
+                    }
+                  }
+                `}</style>
 
-                 {/* Invoice Title */}
-                 <div className="mb-6 sm:mb-8">
-                   <h2 className="text-xl sm:text-2xl font-bold text-black">
-                     Фактура {viewingInvoice.number?.split('-')[1] ? 
-                       `${viewingInvoice.number.split('-')[1]}/${new Date(viewingInvoice.date).getFullYear().toString().slice(-2)}` : 
-                       viewingInvoice.number}
-                   </h2>
-                 </div>
+                <div style={{
+                  maxWidth: "900px",
+                  margin: "auto",
+                  padding: "20px",
+                  fontFamily: "Arial, sans-serif",
+                  background: "#fff",
+                  border: "1px solid #ddd",
+                  borderRadius: "6px",
+                }}>
+                  {/* Header */}
+                  <div className="invoice-header" style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    marginBottom: "20px",
+                  }}>
+                    <div style={{ flex: "1" }}>
+                      <h1 style={{
+                        margin: "0",
+                        fontSize: "28px",
+                        fontWeight: "bold",
+                      }}>WeParty.</h1>
+                      <p style={{
+                        margin: "0",
+                        fontSize: "14px",
+                        color: "#666",
+                      }}>PARTY DECOR</p>
+                    </div>
+                    <div className="company-info" style={{
+                      textAlign: "right",
+                      fontSize: "14px",
+                      flex: "1",
+                    }}>
+                      <p>ПАРТИЛАБ увоз-извоз ДОО Скопје</p>
+                      <p>Друштво за трговија и услуги</p>
+                      <p>ул. Гари 65Б/1-2, Карпош, Скопје</p>
+                      <p>Даночен број: 4057025575047</p>
+                      <p>Трансакциска сметка: 270078458980186</p>
+                      <p>Халк Банка АД Скопје</p>
+                    </div>
+                  </div>
 
-                 {/* Invoice Items */}
-                 <div className="mb-6 sm:mb-8">
-                   <div className="overflow-x-auto -mx-2 sm:mx-0">
-                     <table className="w-full border-collapse text-xs sm:text-sm lg:text-base min-w-[500px]">
-                       <thead>
-                         <tr className="border-b-2 border-black">
-                           <th className="px-1 sm:px-2 py-2 sm:py-3 text-left font-bold text-black w-2/5">Производ</th>
-                           <th className="px-1 sm:px-2 py-2 sm:py-3 text-center font-bold text-black w-1/6">Кол.</th>
-                           <th className="px-1 sm:px-2 py-2 sm:py-3 text-center font-bold text-black w-1/6">Цена</th>
-                           <th className="px-1 sm:px-2 py-2 sm:py-3 text-center font-bold text-black w-1/6">ДДВ</th>
-                           <th className="px-1 sm:px-2 py-2 sm:py-3 text-right font-bold text-black w-1/6">Вкупно</th>
-                         </tr>
-                       </thead>
-                       <tbody>
-                         {viewingInvoice.items.map((item, index) => (
-                           <tr key={index} className="border-b border-gray-300">
-                             <td className="px-1 sm:px-2 py-2 sm:py-3 text-black break-words text-xs sm:text-sm">{item.name}</td>
-                             <td className="px-1 sm:px-2 py-2 sm:py-3 text-center text-black text-xs sm:text-sm">{item.quantity}</td>
-                             <td className="px-1 sm:px-2 py-2 sm:py-3 text-center text-black text-xs sm:text-sm">{item.price.toFixed(0)} ден</td>
-                             <td className="px-1 sm:px-2 py-2 sm:py-3 text-center text-black text-xs sm:text-sm">0%</td>
-                             <td className="px-1 sm:px-2 py-2 sm:py-3 text-right text-black text-xs sm:text-sm">
-                               {(item.price * item.quantity).toFixed(0)} ден
-                             </td>
-                           </tr>
-                         ))}
-                       </tbody>
-                     </table>
-                   </div>
-                 </div>
+                  {/* Title */}
+                  <h2 style={{
+                    textAlign: "center",
+                    margin: "20px 0",
+                    fontSize: "22px",
+                    fontWeight: "bold",
+                  }}>
+                    Фактура {viewingInvoice.number?.split('-')[1] ? 
+                      `${viewingInvoice.number.split('-')[1]}/${new Date(viewingInvoice.date).getFullYear().toString().slice(-2)}` : 
+                      viewingInvoice.number}
+                  </h2>
 
-                 {/* Totals */}
-                 <div className="flex justify-end mb-6 sm:mb-8">
-                   <div className="w-full sm:w-80 lg:w-64 space-y-1 sm:space-y-2 text-black text-sm sm:text-base">
-                     <div className="flex justify-between py-1 sm:py-2 border-t border-gray-300">
-                       <span className="font-medium text-xs sm:text-sm lg:text-base">Мегузбир</span>
-                       <span className="font-medium text-xs sm:text-sm lg:text-base">{viewingInvoice.subtotal.toFixed(0)} ден</span>
-                     </div>
-                     {viewingInvoice.discountPercentage > 0 && (
-                       <div className="flex justify-between py-1 sm:py-2">
-                         <span className="font-medium text-xs sm:text-sm lg:text-base">Попуст ({viewingInvoice.discountPercentage}%)</span>
-                         <span className="font-medium text-xs sm:text-sm lg:text-base">-{viewingInvoice.discount.toFixed(0)} ден</span>
-                       </div>
-                     )}
-                     <div className="flex justify-between py-1 sm:py-2 font-bold text-sm sm:text-base lg:text-lg border-t border-black">
-                       <span>Вкупно</span>
-                       <span>{viewingInvoice.total.toFixed(0)} ден</span>
-                     </div>
-                   </div>
-                 </div>
+                  {/* Table */}
+                  <table style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    marginBottom: "20px",
+                  }}>
+                    <thead>
+                      <tr>
+                        <th style={{
+                          border: "1px solid #ddd",
+                          padding: "10px",
+                          textAlign: "left",
+                          fontSize: "14px",
+                          backgroundColor: "#f9f9f9",
+                          fontWeight: "bold",
+                        }}>Производ</th>
+                        <th style={{
+                          border: "1px solid #ddd",
+                          padding: "10px",
+                          textAlign: "left",
+                          fontSize: "14px",
+                          backgroundColor: "#f9f9f9",
+                          fontWeight: "bold",
+                        }}>Количина</th>
+                        <th style={{
+                          border: "1px solid #ddd",
+                          padding: "10px",
+                          textAlign: "left",
+                          fontSize: "14px",
+                          backgroundColor: "#f9f9f9",
+                          fontWeight: "bold",
+                        }}>Цена</th>
+                        <th style={{
+                          border: "1px solid #ddd",
+                          padding: "10px",
+                          textAlign: "left",
+                          fontSize: "14px",
+                          backgroundColor: "#f9f9f9",
+                          fontWeight: "bold",
+                        }}>ДДВ</th>
+                        <th style={{
+                          border: "1px solid #ddd",
+                          padding: "10px",
+                          textAlign: "left",
+                          fontSize: "14px",
+                          backgroundColor: "#f9f9f9",
+                          fontWeight: "bold",
+                        }}>Вкупно</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewingInvoice.items.length > 0 ? (
+                        viewingInvoice.items.map((item, i) => (
+                          <tr key={i}>
+                            <td style={{
+                              border: "1px solid #ddd",
+                              padding: "10px",
+                              textAlign: "left",
+                              fontSize: "14px",
+                            }}>{item.name}</td>
+                            <td style={{
+                              border: "1px solid #ddd",
+                              padding: "10px",
+                              textAlign: "left",
+                              fontSize: "14px",
+                            }}>{item.quantity}</td>
+                            <td style={{
+                              border: "1px solid #ddd",
+                              padding: "10px",
+                              textAlign: "left",
+                              fontSize: "14px",
+                            }}>{item.price.toFixed(0)} ден</td>
+                            <td style={{
+                              border: "1px solid #ddd",
+                              padding: "10px",
+                              textAlign: "left",
+                              fontSize: "14px",
+                            }}>0%</td>
+                            <td style={{
+                              border: "1px solid #ddd",
+                              padding: "10px",
+                              textAlign: "left",
+                              fontSize: "14px",
+                            }}>{(item.price * item.quantity).toFixed(0)} ден</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} style={{
+                            border: "1px solid #ddd",
+                            padding: "10px",
+                            textAlign: "center",
+                            fontSize: "14px",
+                            color: "#888"
+                          }}>
+                            Нема внесени ставки
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
 
-                {/* Date Footer */}
-                <div className="text-left text-black text-xs sm:text-sm lg:text-base mt-4 sm:mt-6">
-                  <p className="font-medium mb-1">Датум</p>
-                  <p>{new Date(viewingInvoice.date).toLocaleDateString('mk-MK')}</p>
+                  {/* Totals */}
+                  <div style={{
+                    textAlign: "right",
+                    fontSize: "16px",
+                    marginTop: "10px",
+                  }}>
+                    <p>Меѓузбир: <strong>{viewingInvoice.subtotal.toFixed(0)} ден</strong></p>
+                    {viewingInvoice.discountPercentage > 0 && (
+                      <p>Попуст ({viewingInvoice.discountPercentage}%): <strong>-{viewingInvoice.discount.toFixed(0)} ден</strong></p>
+                    )}
+                    <p>Вкупно: <strong>{viewingInvoice.total.toFixed(0)} ден</strong></p>
+                  </div>
+
+                  {/* Footer */}
+                  <div style={{
+                    marginTop: "30px",
+                    textAlign: "left",
+                    fontSize: "14px",
+                  }}>
+                    <p>Датум: {new Date(viewingInvoice.date).toLocaleDateString('mk-MK')}</p>
+                  </div>
                 </div>
               </div>
             </div>
