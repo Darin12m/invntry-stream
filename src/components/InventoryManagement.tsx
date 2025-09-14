@@ -1479,27 +1479,52 @@ const InventoryManagementApp = () => {
             <div className="flex-1 overflow-y-auto p-4 sm:p-8 print:p-0">
               <div data-invoice-content>
                 <style>{`
+                  /* Print settings */
                   @media print {
+                    body {
+                      margin: 0;
+                      padding: 0;
+                      -webkit-print-color-adjust: exact;
+                      print-color-adjust: exact;
+                    }
+
+                    .invoice-container {
+                      width: 100%;
+                      margin: 0;
+                      padding: 20px;
+                      border: none !important;
+                      box-shadow: none !important;
+                    }
+
                     .invoice-header {
                       flex-wrap: nowrap !important;
                       align-items: flex-start !important;
                     }
+                    
                     .company-info {
                       text-align: right !important;
                       margin-top: 0 !important;
                     }
+
+                    @page {
+                      size: A4;
+                      margin: 20mm;
+                    }
+                  }
+
+                  /* Normal screen view */
+                  .invoice-container {
+                    max-width: 800px;
+                    margin: auto;
+                    padding: 20px;
+                    border: 1px solid #ccc;
+                    box-shadow: 0 0 5px rgba(0,0,0,0.2);
+                    background: #fff;
+                    font-family: Arial, sans-serif;
                   }
                 `}</style>
 
-                <div style={{
-                  maxWidth: "100%",
-                  margin: "0",
-                  padding: "20px",
-                  fontFamily: "Arial, sans-serif",
-                  background: "#fff",
-                  border: "none",
-                  borderRadius: "0",
-                }}>
+                <div className="invoice-container">
                   {/* Header */}
                   <div className="invoice-header" style={{
                     display: "flex",
