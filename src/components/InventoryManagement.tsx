@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash, FileDown } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash, FileDown, BarChart3, TrendingUp, Users } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -13,9 +13,48 @@ import { toast } from "sonner";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 
+// Product interface with purchase price for profit calculations
+interface Product {
+  id: string;
+  name: string;
+  sku: string;
+  quantity: number;
+  price: number;
+  category: string;
+  purchasePrice?: number; // Admin-only field for profit calculations
+}
+
+interface Invoice {
+  id: string;
+  number: string;
+  date: string;
+  customer: {
+    name: string;
+    email: string;
+    address: string;
+  };
+  items: {
+    productId: string;
+    name: string;
+    sku: string;
+    price: number;
+    quantity: number;
+    purchasePrice?: number;
+  }[];
+  subtotal: number;
+  discount: number;
+  discountPercentage: number;
+  total: number;
+  status: string;
+}
+
 const InventoryManagementApp = () => {
   // State management
-  const [activeTab, setActiveTab] = useState('inventory');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [dateFilter, setDateFilter] = useState({ 
+    from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // Start of year
+    to: new Date().toISOString().split('T')[0] // Today
+  });
   const [products, setProducts] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +84,8 @@ const InventoryManagementApp = () => {
     sku: '',
     quantity: '',
     price: '',
-    category: ''
+    category: '',
+    purchasePrice: ''
   });
   const fileInputRef = useRef(null);
 
@@ -93,7 +133,8 @@ const InventoryManagementApp = () => {
     sku: '',
     quantity: '',
     price: '',
-    category: ''
+    category: '',
+    purchasePrice: '' // Admin-only field
   });
 
   // Filter products for invoice creation
@@ -150,7 +191,7 @@ const InventoryManagementApp = () => {
   // Product CRUD operations
   const handleAddProduct = () => {
     setEditingProduct(null);
-    setProductForm({ name: '', sku: '', quantity: '', price: '', category: '' });
+    setProductForm({ name: '', sku: '', quantity: '', price: '', category: '', purchasePrice: '' });
     setShowProductModal(true);
   };
 
@@ -161,7 +202,8 @@ const InventoryManagementApp = () => {
       sku: product.sku,
       quantity: product.quantity.toString(),
       price: product.price.toString(),
-      category: product.category
+      category: product.category,
+      purchasePrice: product.purchasePrice?.toString() || ''
     });
     setShowProductModal(true);
   };
@@ -177,7 +219,8 @@ const InventoryManagementApp = () => {
       sku: productForm.sku,
       quantity: parseInt(productForm.quantity),
       price: parseFloat(productForm.price),
-      category: productForm.category
+      category: productForm.category,
+      ...(productForm.purchasePrice && { purchasePrice: parseFloat(productForm.purchasePrice) })
     };
 
     try {
@@ -190,7 +233,7 @@ const InventoryManagementApp = () => {
       }
       
       setShowProductModal(false);
-      setProductForm({ name: '', sku: '', quantity: '', price: '', category: '' });
+      setProductForm({ name: '', sku: '', quantity: '', price: '', category: '', purchasePrice: '' });
       loadProducts(); // Reload products from Firebase
     } catch (error) {
       console.error('Error saving product:', error);
@@ -410,7 +453,8 @@ const InventoryManagementApp = () => {
         name: product.name,
         sku: product.sku,
         price: product.price,
-        quantity: 1
+        quantity: 1,
+        purchasePrice: product.purchasePrice || 0
       }]);
     }
     toast.success(`${product.name} added to invoice`);
@@ -520,7 +564,8 @@ const InventoryManagementApp = () => {
           sku: '',
           quantity: '',
           price: '',
-          category: ''
+          category: '',
+          purchasePrice: ''
         });
         setShowColumnMappingModal(true);
         
@@ -543,7 +588,10 @@ const InventoryManagementApp = () => {
         sku: row[columnMapping.sku] || '',
         quantity: parseInt(row[columnMapping.quantity] || 0),
         price: parseFloat(row[columnMapping.price] || 0),
-        category: columnMapping.category ? (row[columnMapping.category] || 'Uncategorized') : 'Uncategorized'
+        category: columnMapping.category ? (row[columnMapping.category] || 'Uncategorized') : 'Uncategorized',
+        ...(columnMapping.purchasePrice && row[columnMapping.purchasePrice] && { 
+          purchasePrice: parseFloat(row[columnMapping.purchasePrice] || 0) 
+        })
       })).filter(product => product.name && product.sku); // Filter out invalid rows
 
       // Save all products to Firebase
@@ -644,7 +692,210 @@ const InventoryManagementApp = () => {
     }
   };
 
-  // Tab content components
+  // Dashboard calculations
+  const getFilteredInvoices = () => {
+    return invoices.filter(invoice => {
+      const invoiceDate = new Date(invoice.date);
+      const fromDate = new Date(dateFilter.from);
+      const toDate = new Date(dateFilter.to);
+      return invoiceDate >= fromDate && invoiceDate <= toDate;
+    });
+  };
+
+  const calculateDashboardMetrics = () => {
+    const filteredInvoices = getFilteredInvoices();
+    
+    let totalSales = 0;
+    let totalCosts = 0;
+    
+    filteredInvoices.forEach(invoice => {
+      totalSales += invoice.total;
+      
+      // Calculate costs based on purchase prices
+      invoice.items.forEach(item => {
+        const product = products.find(p => p.id === item.productId);
+        const purchasePrice = product?.purchasePrice || item.purchasePrice || 0;
+        totalCosts += purchasePrice * item.quantity;
+      });
+    });
+    
+    const totalProfit = totalSales - totalCosts;
+    const numberOfInvoices = filteredInvoices.length;
+    
+    return {
+      totalSales,
+      totalCosts,
+      totalProfit,
+      numberOfInvoices,
+      filteredInvoices
+    };
+  };
+
+  // Dashboard component
+  const DashboardTab = () => {
+    const metrics = calculateDashboardMetrics();
+    
+    return (
+      <div className="space-y-6 animate-fade-in">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Dashboard</h2>
+            <p className="text-muted-foreground mt-1">Sales performance and profit analysis</p>
+          </div>
+        </div>
+
+        {/* Date Filter */}
+        <Card className="p-4 shadow-card">
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
+            <Label className="whitespace-nowrap">Date Range:</Label>
+            <div className="flex gap-2 items-center">
+              <Input
+                type="date"
+                value={dateFilter.from}
+                onChange={(e) => setDateFilter({ ...dateFilter, from: e.target.value })}
+                className="w-auto"
+              />
+              <span className="text-muted-foreground">to</span>
+              <Input
+                type="date"
+                value={dateFilter.to}
+                onChange={(e) => setDateFilter({ ...dateFilter, to: e.target.value })}
+                className="w-auto"
+              />
+            </div>
+            <Button 
+              onClick={() => setDateFilter({ 
+                from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], 
+                to: new Date().toISOString().split('T')[0] 
+              })}
+              variant="outline"
+              size="sm"
+            >
+              Reset to Year
+            </Button>
+          </div>
+        </Card>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card className="p-6 shadow-card bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Total Sales</p>
+                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{metrics.totalSales.toFixed(2)} ден.</p>
+              </div>
+              <div className="p-3 bg-blue-500 rounded-full">
+                <DollarSign className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6 shadow-card bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-red-200 dark:border-red-800">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-red-600 dark:text-red-400">Total Costs</p>
+                <p className="text-2xl font-bold text-red-900 dark:text-red-100">{metrics.totalCosts.toFixed(2)} ден.</p>
+              </div>
+              <div className="p-3 bg-red-500 rounded-full">
+                <ShoppingCart className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6 shadow-card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-600 dark:text-green-400">Total Profit</p>
+                <p className="text-2xl font-bold text-green-900 dark:text-green-100">{metrics.totalProfit.toFixed(2)} ден.</p>
+              </div>
+              <div className="p-3 bg-green-500 rounded-full">
+                <TrendingUp className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6 shadow-card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Invoices</p>
+                <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">{metrics.numberOfInvoices}</p>
+              </div>
+              <div className="p-3 bg-purple-500 rounded-full">
+                <FileText className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Detailed Invoice Table */}
+        <Card className="shadow-card">
+          <div className="p-6 border-b">
+            <h3 className="text-lg font-semibold">Invoice Details</h3>
+            <p className="text-muted-foreground text-sm">
+              {metrics.filteredInvoices.length} invoices from {new Date(dateFilter.from).toLocaleDateString()} to {new Date(dateFilter.to).toLocaleDateString()}
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            {metrics.filteredInvoices.length === 0 ? (
+              <div className="text-center py-12">
+                <BarChart3 className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-xl font-semibold mb-2">No invoices in selected period</h3>
+                <p className="text-muted-foreground mb-4">Adjust the date range to see invoice data</p>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/30">
+                    <th className="text-left p-4 font-medium">Invoice Number</th>
+                    <th className="text-left p-4 font-medium">Date</th>
+                    <th className="text-left p-4 font-medium">Customer</th>
+                    <th className="text-right p-4 font-medium">Sales</th>
+                    <th className="text-right p-4 font-medium">Costs</th>
+                    <th className="text-right p-4 font-medium">Profit</th>
+                    <th className="text-center p-4 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {metrics.filteredInvoices.map(invoice => {
+                    const invoiceCosts = invoice.items.reduce((sum, item) => {
+                      const product = products.find(p => p.id === item.productId);
+                      const purchasePrice = product?.purchasePrice || item.purchasePrice || 0;
+                      return sum + (purchasePrice * item.quantity);
+                    }, 0);
+                    const invoiceProfit = invoice.total - invoiceCosts;
+                    
+                    return (
+                      <tr key={invoice.id} className="border-b hover:bg-muted/20 transition-colors">
+                        <td className="p-4 font-medium">{invoice.number}</td>
+                        <td className="p-4 text-muted-foreground">{new Date(invoice.date).toLocaleDateString()}</td>
+                        <td className="p-4">{invoice.customer.name}</td>
+                        <td className="p-4 text-right font-medium text-blue-600">{invoice.total.toFixed(2)} ден.</td>
+                        <td className="p-4 text-right font-medium text-red-600">{invoiceCosts.toFixed(2)} ден.</td>
+                        <td className={`p-4 text-right font-medium ${invoiceProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {invoiceProfit.toFixed(2)} ден.
+                        </td>
+                        <td className="p-4 text-center">
+                          <Button
+                            onClick={() => handleViewInvoice(invoice)}
+                            variant="outline"
+                            size="sm"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </Card>
+      </div>
+    );
+  };
+
   const InventoryTab = () => (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -1077,6 +1328,7 @@ const InventoryManagementApp = () => {
             </div>
             <div className="hidden sm:flex space-x-8">
               {[
+                { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
                 { key: 'inventory', label: 'Inventory', icon: Package },
                 { key: 'invoices', label: 'Invoices', icon: FileText },
                 { key: 'data', label: 'Data', icon: Upload }
@@ -1098,6 +1350,7 @@ const InventoryManagementApp = () => {
             {/* Mobile Navigation */}
             <div className="flex sm:hidden space-x-1">
               {[
+                { key: 'dashboard', icon: BarChart3 },
                 { key: 'inventory', icon: Package },
                 { key: 'invoices', icon: FileText },
                 { key: 'data', icon: Upload }
@@ -1121,6 +1374,7 @@ const InventoryManagementApp = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        {activeTab === 'dashboard' && DashboardTab()}
         {activeTab === 'inventory' && InventoryTab()}
         {activeTab === 'invoices' && InvoicesTab()}
         {activeTab === 'data' && DataTab()}
@@ -1198,6 +1452,27 @@ const InventoryManagementApp = () => {
                     onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
                     placeholder="Enter category"
                   />
+                </div>
+
+                {/* Purchase Price - Admin Only Field */}
+                <div className="bg-muted/30 p-4 rounded-lg border-dashed border-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="bg-warning/10 text-warning-foreground px-2 py-1 rounded text-xs font-medium">
+                      ADMIN ONLY
+                    </div>
+                  </div>
+                  <Label htmlFor="purchasePrice">Purchase Price (for profit calculations)</Label>
+                  <Input
+                    id="purchasePrice"
+                    type="number"
+                    step="0.01"
+                    value={productForm.purchasePrice}
+                    onChange={(e) => setProductForm({ ...productForm, purchasePrice: e.target.value })}
+                    placeholder="0.00 (optional)"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This field is only visible to admin users and used for profit calculations. Leave empty if not needed.
+                  </p>
                 </div>
               </div>
 
@@ -1799,6 +2074,24 @@ const InventoryManagementApp = () => {
                       <option key={col} value={col}>{col}</option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="purchasePrice-mapping">Purchase Price (Optional) → Excel Column</Label>
+                  <select
+                    id="purchasePrice-mapping"
+                    value={columnMapping.purchasePrice}
+                    onChange={(e) => setColumnMapping({ ...columnMapping, purchasePrice: e.target.value })}
+                    className="w-full p-2 border border-border rounded-md bg-background"
+                  >
+                    <option value="">Select column or leave empty...</option>
+                    {excelColumns.map(col => (
+                      <option key={col} value={col}>{col}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Maps to admin-only purchase price field for profit calculations
+                  </p>
                 </div>
               </div>
 
