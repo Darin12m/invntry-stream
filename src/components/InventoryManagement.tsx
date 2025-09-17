@@ -50,7 +50,7 @@ interface Invoice {
 
 const InventoryManagementApp = () => {
   // State management
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('inventory');
   const [dateFilter, setDateFilter] = useState({ 
     from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // Start of year
     to: new Date().toISOString().split('T')[0] // Today
@@ -1328,9 +1328,9 @@ const InventoryManagementApp = () => {
             </div>
             <div className="hidden sm:flex space-x-8">
               {[
-                { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
                 { key: 'inventory', label: 'Inventory', icon: Package },
                 { key: 'invoices', label: 'Invoices', icon: FileText },
+                { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
                 { key: 'data', label: 'Data', icon: Upload }
               ].map(({ key, label, icon: Icon }) => (
                 <button
@@ -1350,9 +1350,9 @@ const InventoryManagementApp = () => {
             {/* Mobile Navigation */}
             <div className="flex sm:hidden space-x-1">
               {[
-                { key: 'dashboard', icon: BarChart3 },
                 { key: 'inventory', icon: Package },
                 { key: 'invoices', icon: FileText },
+                { key: 'dashboard', icon: BarChart3 },
                 { key: 'data', icon: Upload }
               ].map(({ key, icon: Icon }) => (
                 <button
@@ -1374,9 +1374,9 @@ const InventoryManagementApp = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {activeTab === 'dashboard' && DashboardTab()}
         {activeTab === 'inventory' && InventoryTab()}
         {activeTab === 'invoices' && InvoicesTab()}
+        {activeTab === 'dashboard' && DashboardTab()}
         {activeTab === 'data' && DataTab()}
       </main>
 
