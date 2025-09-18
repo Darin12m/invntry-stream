@@ -1979,7 +1979,7 @@ const InventoryManagementApp = () => {
       {showColumnMappingModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <Card className="w-full max-w-2xl mx-4 animate-scale-in shadow-glow">
-            <div className="p-6">
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-semibold">Map Excel Columns</h3>
                 <Button
@@ -2108,7 +2108,10 @@ const InventoryManagementApp = () => {
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 mt-6">
+             
+            </div>
+            
+             <div className="sticky bottom-0 bg-background p-4 flex justify-end gap-3">
                 <Button
                   onClick={() => setShowColumnMappingModal(false)}
                   variant="outline"
@@ -2124,7 +2127,7 @@ const InventoryManagementApp = () => {
                   Import {excelData.length} Products
                 </Button>
               </div>
-            </div>
+              
           </Card>
         </div>
       )}
