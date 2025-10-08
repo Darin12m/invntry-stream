@@ -1237,7 +1237,7 @@ const InventoryManagementApp = () => {
       <Card className="p-4 shadow-card">
         <div className="space-y-4">
           {/* Search bar - Now using the new ProductSearchInput component */}
-          <ProductSearchInput onSearchTermChange={setSearchTerm} initialSearchTerm={searchTerm} />
+          <ProductSearchInput onSearchTermChange={setSearchTerm} />
           
           {/* Filters and actions */}
           <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -2916,7 +2916,7 @@ const InventoryManagementApp = () => {
                     value={columnMapping.category}
                     onChange={(e) => setColumnMapping({ ...columnMapping, category: e.target.value })}
                     className="w-full p-2 border border-border rounded-md bg-background"
-                  >
+                    >
                     <option value="">Select column or leave empty...</option>
                     {excelColumns.map(col => (
                       <option key={col} value={col}>{col}</option>
