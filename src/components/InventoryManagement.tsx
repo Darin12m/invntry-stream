@@ -1099,7 +1099,7 @@ const InventoryManagementApp = () => {
           <Card className="p-6 shadow-card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
             <div className="flex items-center justify-between">
               <div>
-                <p className className="text-sm font-medium text-purple-600 dark:text-purple-400">Фактури</p>
+                <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Фактури</p>
                 <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">{metrics.numberOfInvoices}</p>
               </div>
               <div className="p-3 bg-purple-500 rounded-full">
