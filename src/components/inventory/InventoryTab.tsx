@@ -87,7 +87,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
 
     {/* Search Bar and Bulk Actions */}
     <Card className="p-4 shadow-card space-y-4">
-      <div className="relative flex-1 w-full">
+      <div className="relative w-full">
         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search products by name, SKU, or category..."
@@ -110,7 +110,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
         </div>
       )}
 
-      <div className="flex gap-2 justify-end border-t pt-4 mt-4"> {/* Added border-t and pt-4 for separation */}
+      <div className="flex gap-2 justify-end">
         <Button
           onClick={selectAllProducts}
           variant="outline"
