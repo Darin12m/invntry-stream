@@ -18,7 +18,6 @@ import { toast } from "sonner";
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { signOut, User } from 'firebase/auth';
-// Removed import ProductSearchInput from './ProductSearchInput';
 
 // Product interface with purchase price for profit calculations
 interface Product {
@@ -109,9 +108,9 @@ const InventoryManagementApp = () => {
   const [sortColumn, setSortColumn] = useState<'name' | 'sku' | 'category' | 'quantity' | 'price'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
-  // Filter state
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [stockFilter, setStockFilter] = useState<string>('all');
+  // Removed filter states
+  // const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  // const [stockFilter, setStockFilter] = useState<string>('all');
 
   // Load data from Firebase on component mount
   useEffect(() => {
@@ -187,10 +186,10 @@ const InventoryManagementApp = () => {
     (product.category || '').toLowerCase().includes(invoiceProductSearch.toLowerCase())
   );
 
-  // Get unique categories from products
-  const categories = ['all', ...new Set(products.map(p => p.category).filter(Boolean))];
+  // Get unique categories from products (still useful for product form, but not for main inventory filter)
+  const categories = [...new Set(products.map(p => p.category).filter(Boolean))];
 
-  // Filter products based on search, category, and stock level (memoized)
+  // Filter products based on search (memoized)
   const filteredProducts = React.useMemo(() => {
     return products.filter(product => {
       // Search filter
@@ -198,19 +197,10 @@ const InventoryManagementApp = () => {
         (product.sku || '').toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
         (product.category || '').toLowerCase().includes(deferredSearchTerm.toLowerCase());
       
-      // Category filter
-      const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
-      
-      // Stock level filter
-      let matchesStock = true;
-      if (stockFilter === 'out') matchesStock = product.quantity === 0;
-      else if (stockFilter === 'low') matchesStock = product.quantity > 0 && product.quantity < 10;
-      else if (stockFilter === 'medium') matchesStock = product.quantity >= 10 && product.quantity < 30;
-      else if (stockFilter === 'in-stock') matchesStock = product.quantity >= 30;
-      
-      return matchesSearch && matchesCategory && matchesStock;
+      // Removed category and stock filters
+      return matchesSearch;
     });
-  }, [products, deferredSearchTerm, categoryFilter, stockFilter]);
+  }, [products, deferredSearchTerm]);
 
   // Sort products (memoized)
   const sortedProducts = React.useMemo(() => {
@@ -1234,104 +1224,63 @@ const InventoryManagementApp = () => {
         </div>
       </div>
 
-      {/* Search and Filters */}
+      {/* Search Bar - Re-implemented from scratch */}
       <Card className="p-4 shadow-card">
-        <div className="space-y-4">
-          {/* Search bar */}
-          <div className="relative flex-1 w-full">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search products by name, SKU, or category..."
-              value={localSearchInput}
-              onChange={(e) => setLocalSearchInput(e.target.value)}
-              className="pl-10 transition-all duration-200 focus:ring-2 focus:ring-primary"
-            />
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search products by name, SKU, or category..."
+            value={localSearchInput}
+            onChange={(e) => setLocalSearchInput(e.target.value)}
+            className="pl-10 transition-all duration-200 focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        {localSearchInput && (
+          <div className="text-sm text-muted-foreground mt-2">
+            Showing {filteredProducts.length} of {products.length} products matching "{localSearchInput}"
+            <Button
+              onClick={() => setLocalSearchInput('')}
+              variant="ghost"
+              size="sm"
+              className="ml-2 h-auto px-2 py-1 text-xs"
+            >
+              <X className="h-3 w-3 mr-1" /> Clear Search
+            </Button>
           </div>
-          
-          {/* Filters and actions */}
-          <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-            <div className="flex flex-wrap gap-2 items-center">
-              {/* Category filter */}
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-3 py-2 rounded-md border border-input bg-background text-sm transition-colors hover:bg-accent focus:ring-2 focus:ring-primary"
-              >
-                <option value="all">All Categories</option>
-                {categories.filter(c => c !== 'all').map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-              
-              {/* Stock level filter */}
-              <select
-                value={stockFilter}
-                onChange={(e) => setStockFilter(e.target.value)}
-                className="px-3 py-2 rounded-md border border-input bg-background text-sm transition-colors hover:bg-accent focus:ring-2 focus:ring-primary"
-              >
-                <option value="all">All Stock Levels</option>
-                <option value="in-stock">In Stock (30+)</option>
-                <option value="medium">Medium (10-29)</option>
-                <option value="low">Low (1-9)</option>
-                <option value="out">Out of Stock</option>
-              </select>
-              
-              {/* Clear filters button */}
-              {(categoryFilter !== 'all' || stockFilter !== 'all' || localSearchInput) && (
-                <Button
-                  onClick={() => {
-                    setCategoryFilter('all');
-                    setStockFilter('all');
-                    setLocalSearchInput(''); // Reset the local search input
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="transition-all duration-200"
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  Clear Filters
-                </Button>
-              )}
-            </div>
-            
-            <div className="flex gap-2">
-              <Button
-                onClick={selectAllProducts}
-                variant="outline"
-                size="sm"
-                className="transition-all duration-200"
-              >
-                {selectedProducts.size === sortedProducts.length && sortedProducts.length > 0 ? (
-                  <>
-                    <Square className="h-4 w-4 mr-2" />
-                    Deselect All
-                  </>
-                ) : (
-                  <>
-                    <CheckSquare className="h-4 w-4 mr-2" />
-                    Select All
-                  </>
-                )}
-              </Button>
-              {products.length > 0 && (
-                <Button
-                  onClick={handleDeleteAllProducts}
-                  variant="destructive"
-                  size="sm"
-                  className="transition-all duration-200"
-                >
-                  <Trash className="h-4 w-4 mr-2" />
-                  Delete All
-                </Button>
-              )}
-            </div>
-          </div>
-          
-          {/* Active filters summary */}
-          {filteredProducts.length < products.length && (
-            <div className="text-sm text-muted-foreground animate-fade-in">
-              Showing {filteredProducts.length} of {products.length} products
-            </div>
+        )}
+      </Card>
+
+      {/* Bulk Actions */}
+      <Card className="p-4 shadow-card">
+        <div className="flex gap-2 justify-end">
+          <Button
+            onClick={selectAllProducts}
+            variant="outline"
+            size="sm"
+            className="transition-all duration-200"
+          >
+            {selectedProducts.size === sortedProducts.length && sortedProducts.length > 0 ? (
+              <>
+                <Square className="h-4 w-4 mr-2" />
+                Deselect All
+              </>
+            ) : (
+              <>
+                <CheckSquare className="h-4 w-4 mr-2" />
+                Select All
+              </>
+            )}
+          </Button>
+          {products.length > 0 && (
+            <Button
+              onClick={handleDeleteAllProducts}
+              variant="destructive"
+              size="sm"
+              className="transition-all duration-200"
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              Delete All
+            </Button>
           )}
         </div>
       </Card>
@@ -1541,7 +1490,7 @@ const InventoryManagementApp = () => {
               {products.length === 0 
                 ? "Add your first product using the + button above to get started with your inventory." 
                 : localSearchInput 
-                  ? `No products match "${localSearchInput}". Try adjusting your search or filters.`
+                  ? `No products match "${localSearchInput}". Try adjusting your search.`
                   : "No products match the selected filters. Try different filter options."}
             </p>
             {products.length === 0 && (
