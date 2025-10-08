@@ -199,12 +199,12 @@ const InventoryManagementApp = () => {
   // Sort products (memoized)
   const sortedProducts = React.useMemo(() => {
     return [...filteredProducts].sort((a, b) => {
-      let aValue = a[sortColumn];
-      let bValue = b[sortColumn];
+      let aValue: string | number = a[sortColumn];
+      let bValue: string | number = b[sortColumn];
       
       if (sortColumn === 'name' || sortColumn === 'sku' || sortColumn === 'category') {
-        aValue = (aValue || '').toLowerCase();
-        bValue = (bValue || '').toLowerCase();
+        aValue = (aValue as string || '').toLowerCase(); // Explicitly cast to string
+        bValue = (bValue as string || '').toLowerCase(); // Explicitly cast to string
       }
       
       if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
@@ -607,7 +607,7 @@ const InventoryManagementApp = () => {
   });
   setInvoiceItems(refreshedItems);
 
-  setCustomerInfo(invoice.customer);
+  setCustomerInfo({ ...invoice.customer, phone: invoice.customer.phone || '' }); // Ensure phone is always a string
   setDiscount(invoice.discountPercentage || 0);
   setInvoiceProductSearch('');
   setShowInvoiceModal(true);
