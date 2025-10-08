@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import SalesChart from './SalesChart'; // Import the new SalesChart component
 
 interface Product {
   id: string;
@@ -68,46 +67,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
   products,
 }) => {
   const metrics = calculateDashboardMetrics();
-
-  // Prepare data for the sales chart
-  const getMonthlySalesData = () => {
-    const monthlyData: { [key: string]: { sales: number; profit: number } } = {};
-
-    metrics.filteredInvoices.forEach(invoice => {
-      const invoiceMonth = new Date(invoice.date).toLocaleString('mk-MK', { month: 'short', year: 'numeric' });
-      
-      if (!monthlyData[invoiceMonth]) {
-        monthlyData[invoiceMonth] = { sales: 0, profit: 0 };
-      }
-
-      monthlyData[invoiceMonth].sales += invoice.total;
-
-      // Calculate profit for this invoice
-      const invoiceCosts = invoice.items.reduce((sum, item) => {
-        const product = products.find(p => p.id === item.productId);
-        const purchasePrice = product?.purchasePrice || item.purchasePrice || 0;
-        return sum + (purchasePrice * item.quantity);
-      }, 0);
-      monthlyData[invoiceMonth].profit += (invoice.total - invoiceCosts);
-    });
-
-    // Sort data by date
-    const sortedMonths = Object.keys(monthlyData).sort((a, b) => {
-      const [monthA, yearA] = a.split(' ');
-      const [monthB, yearB] = b.split(' ');
-      const dateA = new Date(`${monthA} 1, ${yearA}`);
-      const dateB = new Date(`${monthB} 1, ${yearB}`);
-      return dateA.getTime() - dateB.getTime();
-    });
-
-    return sortedMonths.map(month => ({
-      month,
-      sales: parseFloat(monthlyData[month].sales.toFixed(2)),
-      profit: parseFloat(monthlyData[month].profit.toFixed(2)),
-    }));
-  };
-
-  const salesChartData = getMonthlySalesData();
   
   return (
     <div className="space-y-6 animate-fade-in">
@@ -227,9 +186,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
           </div>
         </Card>
       </div>
-
-      {/* Sales Chart */}
-      <SalesChart data={salesChartData} />
 
       {/* Detailed Invoice Table */}
       <Card className="shadow-card">
