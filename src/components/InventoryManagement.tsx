@@ -94,8 +94,8 @@ const InventoryManagementApp = () => {
   const [discount, setDiscount] = useState(0);
   const [invoiceSortBy, setInvoiceSortBy] = useState<'number' | 'date' | 'customer' | 'total'>('number');
   const [invoiceSortDirection, setInvoiceSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [selectedProducts, setSelectedProducts] = new Set<string>(); // Initialize as Set
-  const [selectedInvoices, setSelectedInvoices] = new Set<string>(); // Initialize as Set
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set()); // Corrected initialization
+  const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set()); // Corrected initialization
   const [showColumnMappingModal, setShowColumnMappingModal] = useState(false);
   const [excelData, setExcelData] = useState<any[]>([]);
   const [excelColumns, setExcelColumns] = useState<string[]>([]);
