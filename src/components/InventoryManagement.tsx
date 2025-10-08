@@ -19,6 +19,12 @@ import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { signOut, User } from 'firebase/auth';
 
+// Import the new tab components
+import InventoryTab from './inventory/InventoryTab';
+import InvoicesTab from './invoices/InvoicesTab';
+import DashboardTab from './dashboard/DashboardTab';
+import DataTab from './data/DataTab';
+
 // Product interface with purchase price for profit calculations
 interface Product {
   id: string;
@@ -66,34 +72,32 @@ const InventoryManagementApp = () => {
     from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // Start of year
     to: new Date().toISOString().split('T')[0] // Today
   });
-  const [products, setProducts] = useState([]);
-  const [invoices, setInvoices] = useState([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Search term state
+  // Search term state for InventoryTab
   const [localSearchInput, setLocalSearchInput] = useState(''); // Local state for the input field
   const deferredSearchTerm = useDeferredValue(localSearchInput); // Deferred value for actual filtering
 
   const [showProductModal, setShowProductModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showInvoiceViewer, setShowInvoiceViewer] = useState(false);
-  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
-  const [editingProduct, setEditingProduct] = useState(null);
-  const [editingInvoice, setEditingInvoice] = useState(null);
-  const [currentInvoice, setCurrentInvoice] = useState(null);
-  const [invoiceItems, setInvoiceItems] = useState([]);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
+  const [invoiceItems, setInvoiceItems] = useState<any[]>([]); // Using any[] for simplicity, could define a more specific type
   const [customerInfo, setCustomerInfo] = useState({ name: '', email: '', address: '', phone: '' });
-  const [viewingInvoice, setViewingInvoice] = useState(null);
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [invoiceProductSearch, setInvoiceProductSearch] = useState('');
-  const [customInvoiceNumber, setCustomInvoiceNumber] = useState('');
   const [discount, setDiscount] = useState(0);
   const [invoiceSortBy, setInvoiceSortBy] = useState<'number' | 'date' | 'customer' | 'total'>('number');
   const [invoiceSortDirection, setInvoiceSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set()); // Initialize as Set
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set()); // Initialize as Set
   const [showColumnMappingModal, setShowColumnMappingModal] = useState(false);
-  const [excelData, setExcelData] = useState([]);
-  const [excelColumns, setExcelColumns] = useState([]);
+  const [excelData, setExcelData] = useState<any[]>([]);
+  const [excelColumns, setExcelColumns] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState({
     name: '',
     sku: '',
@@ -102,15 +106,21 @@ const InventoryManagementApp = () => {
     category: '',
     purchasePrice: ''
   });
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Sorting state
+  // Sorting state for InventoryTab
   const [sortColumn, setSortColumn] = useState<'name' | 'sku' | 'category' | 'quantity' | 'price'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
-  // Removed filter states
-  // const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  // const [stockFilter, setStockFilter] = useState<string>('all');
+  // Product form state
+  const [productForm, setProductForm] = useState({
+    name: '',
+    sku: '',
+    quantity: '',
+    price: '',
+    category: '',
+    purchasePrice: '' // Admin-only field
+  });
 
   // Load data from Firebase on component mount
   useEffect(() => {
@@ -144,7 +154,7 @@ const InventoryManagementApp = () => {
       const productsData = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as Product[];
       setProducts(productsData);
     } catch (error) {
       console.error('Error loading products:', error);
@@ -161,23 +171,13 @@ const InventoryManagementApp = () => {
       const invoicesData = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as Invoice[];
       setInvoices(invoicesData);
     } catch (error) {
       console.error('Error loading invoices:', error);
       toast.error('Failed to load invoices');
     }
   };
-
-  // Product form state
-  const [productForm, setProductForm] = useState({
-    name: '',
-    sku: '',
-    quantity: '',
-    price: '',
-    category: '',
-    purchasePrice: '' // Admin-only field
-  });
 
   // Filter products for invoice creation
   const filteredInvoiceProducts = products.filter(product =>
@@ -186,18 +186,13 @@ const InventoryManagementApp = () => {
     (product.category || '').toLowerCase().includes(invoiceProductSearch.toLowerCase())
   );
 
-  // Get unique categories from products (still useful for product form, but not for main inventory filter)
-  const categories = [...new Set(products.map(p => p.category).filter(Boolean))];
-
   // Filter products based on search (memoized)
   const filteredProducts = React.useMemo(() => {
     return products.filter(product => {
-      // Search filter
       const matchesSearch = (product.name || '').toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
         (product.sku || '').toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
         (product.category || '').toLowerCase().includes(deferredSearchTerm.toLowerCase());
       
-      // Removed category and stock filters
       return matchesSearch;
     });
   }, [products, deferredSearchTerm]);
@@ -262,7 +257,7 @@ const InventoryManagementApp = () => {
     }
   };
 
-  const toggleInvoiceSelection = (invoiceId) => {
+  const toggleInvoiceSelection = (invoiceId: string) => {
     const newSelected = new Set(selectedInvoices);
     if (newSelected.has(invoiceId)) {
       newSelected.delete(invoiceId);
@@ -287,7 +282,7 @@ const InventoryManagementApp = () => {
     setShowProductModal(true);
   };
 
-  const handleEditProduct = (product) => {
+  const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
     setProductForm({
       name: product.name,
@@ -336,7 +331,7 @@ const InventoryManagementApp = () => {
   // DELETE FUNCTIONS - Multiple implementations
 
   // 1. Delete single product
-  const handleDeleteProduct = async (productId) => {
+  const handleDeleteProduct = async (productId: string) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
         await deleteDoc(doc(db, 'products', productId));
@@ -396,7 +391,7 @@ const InventoryManagementApp = () => {
   };
 
   // 4. Delete single invoice
-  const handleDeleteInvoice = async (invoiceId) => {
+  const handleDeleteInvoice = async (invoiceId: string) => {
     if (window.confirm('Are you sure you want to delete this invoice?')) {
       try {
         // Find the invoice to restore quantities
@@ -508,7 +503,7 @@ const InventoryManagementApp = () => {
   };
 
   // 7. Remove invoice item (in invoice creation modal)
-  const removeInvoiceItem = (productId) => {
+  const removeInvoiceItem = (productId: string) => {
     setInvoiceItems(invoiceItems.filter(item => item.productId !== productId));
     toast.success("Item removed from invoice");
   };
@@ -563,14 +558,15 @@ const InventoryManagementApp = () => {
     const year = new Date().getFullYear().toString().slice(-2);
     const nextNumber = (invoices.length + 1).toString().padStart(3, '0');
     
-    const newInvoice = {
+    const newInvoice: Invoice = {
       id: Date.now().toString(),
       number: `${nextNumber}/${year}`,
       date: new Date().toISOString().split('T')[0],
       customer: { name: '', email: '', address: '', phone: '' },
       items: [],
       subtotal: 0,
-      tax: 0,
+      discount: 0,
+      discountPercentage: 0,
       total: 0,
       status: 'draft'
     };
@@ -583,7 +579,7 @@ const InventoryManagementApp = () => {
     setShowInvoiceModal(true);
   };
 
-  const handleEditInvoice = (invoice) => {
+  const handleEditInvoice = (invoice: Invoice) => {
   setEditingInvoice(invoice);
   setCurrentInvoice({
     id: invoice.id,
@@ -592,7 +588,8 @@ const InventoryManagementApp = () => {
     customer: invoice.customer,
     items: invoice.items,
     subtotal: invoice.subtotal,
-    tax: 0,
+    discount: invoice.discount,
+    discountPercentage: invoice.discountPercentage,
     total: invoice.total,
     status: invoice.status
   });
@@ -606,11 +603,11 @@ const InventoryManagementApp = () => {
           name: latestProduct.name,
           price: latestProduct.price,
           purchasePrice: latestProduct.purchasePrice || 0,
-          currentStock: latestProduct.quantity, // optional to display or debug
+          // currentStock: latestProduct.quantity, // optional to display or debug
         }
       : {
           ...item,
-          missing: true // optional flag if product no longer exists
+          // missing: true // optional flag if product no longer exists
         };
   });
   setInvoiceItems(refreshedItems);
@@ -621,12 +618,12 @@ const InventoryManagementApp = () => {
   setShowInvoiceModal(true);
 };
 
-  const handleViewInvoice = (invoice) => {
+  const handleViewInvoice = (invoice: Invoice) => {
     setViewingInvoice(invoice);
     setShowInvoiceViewer(true);
   };
 
-  const addItemToInvoice = (product) => {
+  const addItemToInvoice = (product: Product) => {
     const existingItem = invoiceItems.find(item => item.productId === product.id);
     if (existingItem) {
       setInvoiceItems(invoiceItems.map(item =>
@@ -648,7 +645,7 @@ const InventoryManagementApp = () => {
     toast.success(`${product.name} added to invoice`);
   };
 
-  const updateInvoiceItemQuantity = (productId, quantity) => {
+  const updateInvoiceItemQuantity = (productId: string, quantity: number) => {
     // Allow negative quantities for returns/damaged items
     setInvoiceItems(invoiceItems.map(item =>
       item.productId === productId
@@ -657,7 +654,7 @@ const InventoryManagementApp = () => {
     ));
   };
 
-  const updateInvoiceItemDiscount = (productId, discount) => {
+  const updateInvoiceItemDiscount = (productId: string, discount: number) => {
     setInvoiceItems(invoiceItems.map(item =>
       item.productId === productId
         ? { ...item, discount: Math.max(0, Math.min(100, discount)) }
@@ -691,8 +688,8 @@ const InventoryManagementApp = () => {
 
     const { subtotal, discount: discountAmount, total } = calculateInvoiceTotal();
     const invoiceData = {
-      number: currentInvoice.number,
-      date: currentInvoice.date,
+      number: currentInvoice!.number,
+      date: currentInvoice!.date,
       customer: customerInfo,
       items: invoiceItems,
       subtotal,
@@ -743,9 +740,8 @@ const InventoryManagementApp = () => {
       setCurrentInvoice(null);
       setInvoiceItems([]);
       setCustomerInfo({ name: '', email: '', address: '', phone: '' });
-      setCustomInvoiceNumber('');
-      setDiscount(0);
       setInvoiceProductSearch('');
+      setDiscount(0);
       setEditingInvoice(null);
       
       toast.success(editingInvoice ? 'Invoice updated successfully!' : 'Invoice saved successfully!');
@@ -758,14 +754,14 @@ const InventoryManagementApp = () => {
   };
 
   // Import/Export functions
-  const handleImportExcel = (event) => {
-    const file = event.target.files[0];
+  const handleImportExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const workbook = XLSX.read(e.target.result, { type: 'binary' });
+        const workbook = XLSX.read(e.target?.result, { type: 'binary' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
@@ -834,7 +830,7 @@ const InventoryManagementApp = () => {
     }
   };
 
-  const exportToCSV = (data, filename) => {
+  const exportToCSV = (data: any[], filename: string) => {
     const csv = [
       Object.keys(data[0]).join(','),
       ...data.map(row => Object.values(row).join(','))
@@ -849,7 +845,7 @@ const InventoryManagementApp = () => {
     toast.success(`${filename} exported successfully`);
   };
 
-  const exportToJSON = (data, filename) => {
+  const exportToJSON = (data: any[], filename: string) => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1002,850 +998,6 @@ const InventoryManagementApp = () => {
     };
   };
 
-  // Dashboard component
-  const DashboardTab = () => {
-    const metrics = calculateDashboardMetrics();
-    
-    return (
-      <div className="space-y-6 animate-fade-in">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Контролна табла</h2>
-            <p className="text-muted-foreground mt-1">Перформанси на продажба и анализа на профит</p>
-          </div>
-        </div>
-
-        {/* Date Filter */}
-        <Card className="p-4 shadow-card">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
-            <Label className="whitespace-nowrap">Период на датум:</Label>
-            <div className="flex gap-2 items-center">
-              <Input
-                type="date"
-                value={dateFilter.from}
-                onChange={(e) => setDateFilter({ ...dateFilter, from: e.target.value })}
-                className="w-auto"
-              />
-              <span className="text-muted-foreground">до</span>
-              <Input
-                type="date"
-                value={dateFilter.to}
-                onChange={(e) => setDateFilter({ ...dateFilter, to: e.target.value })}
-                className="w-auto"
-              />
-            </div>
-            <Button 
-              onClick={() => setDateFilter({ 
-                from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], 
-                to: new Date().toISOString().split('T')[0] 
-              })}
-              variant="outline"
-              size="sm"
-            >
-              Ресетирај на година
-            </Button>
-          </div>
-        </Card>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="p-6 shadow-card bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Вкупна продажба</p>
-                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{metrics.totalSales.toFixed(2)} ден.</p>
-              </div>
-              <div className="p-3 bg-blue-500 rounded-full">
-                <DollarSign className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 shadow-card bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-red-200 dark:border-red-800">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-red-600 dark:text-red-400">Вкупни трошоци</p>
-                <p className="text-2xl font-bold text-red-900 dark:text-red-100">{metrics.totalCosts.toFixed(2)} ден.</p>
-              </div>
-              <div className="p-3 bg-red-500 rounded-full">
-                <ShoppingCart className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 shadow-card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600 dark:text-green-400">Вкупен профит</p>
-                <p className="text-2xl font-bold text-green-900 dark:text-green-100">{metrics.totalProfit.toFixed(2)} ден.</p>
-              </div>
-              <div className="p-3 bg-green-500 rounded-full">
-                <TrendingUp className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 shadow-card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Фактури</p>
-                <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">{metrics.numberOfInvoices}</p>
-              </div>
-              <div className="p-3 bg-purple-500 rounded-full">
-                <FileText className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 shadow-card bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200 dark:border-orange-800">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-orange-600 dark:text-orange-400">Негативни ставки</p>
-                <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">{metrics.totalNegativeQuantity}</p>
-                <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">Враќања/Оштетено/Бесплатно</p>
-              </div>
-              <div className="p-3 bg-orange-500 rounded-full">
-                <TrendingDown className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 shadow-card bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border-amber-200 dark:border-amber-800">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-amber-600 dark:text-amber-400">Негативна вредност</p>
-                <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">{metrics.totalNegativeValue.toFixed(2)} ден.</p>
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Вкупна загубена/вратена вредност</p>
-              </div>
-              <div className="p-3 bg-amber-500 rounded-full">
-                <DollarSign className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Detailed Invoice Table */}
-        <Card className="shadow-card">
-          <div className="p-6 border-b">
-            <h3 className="text-lg font-semibold">Детали за фактури</h3>
-            <p className="text-muted-foreground text-sm">
-              {metrics.filteredInvoices.length} фактури од {new Date(dateFilter.from).toLocaleDateString()} до {new Date(dateFilter.to).toLocaleDateString()}
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            {metrics.filteredInvoices.length === 0 ? (
-              <div className="text-center py-12">
-                <BarChart3 className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-xl font-semibold mb-2">Нема фактури во избраниот период</h3>
-                <p className="text-muted-foreground mb-4">Прилагодете го периодот за да видите податоци</p>
-              </div>
-            ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-muted/30">
-                    <th className="text-left p-4 font-medium">Број на фактура</th>
-                    <th className="text-left p-4 font-medium">Датум</th>
-                    <th className="text-left p-4 font-medium">Клиент</th>
-                    <th className="text-right p-4 font-medium">Продажба</th>
-                    <th className="text-right p-4 font-medium">Трошоци</th>
-                    <th className="text-right p-4 font-medium">Профит</th>
-                    <th className="text-center p-4 font-medium">Акции</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {metrics.filteredInvoices.map(invoice => {
-                    const invoiceCosts = invoice.items.reduce((sum, item) => {
-                      const product = products.find(p => p.id === item.productId);
-                      const purchasePrice = product?.purchasePrice || item.purchasePrice || 0;
-                      return sum + (purchasePrice * item.quantity);
-                    }, 0);
-                    const invoiceProfit = invoice.total - invoiceCosts;
-                    
-                    return (
-                      <tr key={invoice.id} className="border-b hover:bg-muted/20 transition-colors">
-                        <td className="p-4 font-medium">{invoice.number}</td>
-                        <td className="p-4 text-muted-foreground">{new Date(invoice.date).toLocaleDateString()}</td>
-                        <td className="p-4">{invoice.customer.name}</td>
-                        <td className="p-4 text-right font-medium text-blue-600">{invoice.total.toFixed(2)} ден.</td>
-                        <td className="p-4 text-right font-medium text-red-600">{invoiceCosts.toFixed(2)} ден.</td>
-                        <td className={`p-4 text-right font-medium ${invoiceProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {invoiceProfit.toFixed(2)} ден.
-                        </td>
-                        <td className="p-4 text-center">
-                          <Button
-                            onClick={() => handleViewInvoice(invoice)}
-                            variant="outline"
-                            size="sm"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </Card>
-      </div>
-    );
-  };
-
-  const InventoryTab = () => (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Inventory Management</h2>
-          <p className="text-muted-foreground mt-1">Manage your products and stock levels</p>
-        </div>
-        <div className="flex gap-3">
-          {selectedProducts.size > 0 && (
-            <>
-              <Button
-                onClick={handleBulkDeleteProducts}
-                variant="destructive"
-                className="shadow-elegant"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Selected ({selectedProducts.size})
-              </Button>
-            </>
-          )}
-          <Button
-            onClick={handleAddProduct}
-            className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Product
-          </Button>
-        </div>
-      </div>
-
-      {/* Search Bar */}
-      <Card className="p-4 shadow-card">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search products by name, SKU, or category..."
-            value={localSearchInput}
-            onChange={(e) => setLocalSearchInput(e.target.value)}
-            className="pl-10 transition-all duration-200 focus:ring-2 focus:ring-primary"
-          />
-        </div>
-        {localSearchInput && (
-          <div className="text-sm text-muted-foreground mt-2">
-            Showing {filteredProducts.length} of {products.length} products matching "{localSearchInput}"
-            <Button
-              onClick={() => setLocalSearchInput('')}
-              variant="ghost"
-              size="sm"
-              className="ml-2 h-auto px-2 py-1 text-xs"
-            >
-              <X className="h-3 w-3 mr-1" /> Clear Search
-            </Button>
-          </div>
-        )}
-      </Card>
-
-      {/* Bulk Actions */}
-      <Card className="p-4 shadow-card">
-        <div className="flex gap-2 justify-end">
-          <Button
-            onClick={selectAllProducts}
-            variant="outline"
-            size="sm"
-            className="transition-all duration-200"
-          >
-            {selectedProducts.size === sortedProducts.length && sortedProducts.length > 0 ? (
-              <>
-                <Square className="h-4 w-4 mr-2" />
-                Deselect All
-              </>
-            ) : (
-              <>
-                <CheckSquare className="h-4 w-4 mr-2" />
-                Select All
-              </>
-            )}
-          </Button>
-          {products.length > 0 && (
-            <Button
-              onClick={handleDeleteAllProducts}
-              variant="destructive"
-              size="sm"
-              className="transition-all duration-200"
-            >
-              <Trash className="h-4 w-4 mr-2" />
-              Delete All
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      {/* Desktop Table View - Hidden on mobile */}
-      <Card className="shadow-card hidden md:block overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b bg-muted/30">
-                <th className="p-4 w-12">
-                  <Checkbox
-                    checked={selectedProducts.size === sortedProducts.length && sortedProducts.length > 0}
-                    onCheckedChange={selectAllProducts}
-                  />
-                </th>
-                <th className="text-left p-4 font-medium">
-                  <button
-                    onClick={() => handleSort('name')}
-                    className="flex items-center gap-2 hover:text-primary transition-colors"
-                  >
-                    Name
-                    {sortColumn === 'name' && (
-                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                    )}
-                  </button>
-                </th>
-                <th className="text-center p-4 font-medium">
-                  <button
-                    onClick={() => handleSort('sku')}
-                    className="flex items-center gap-2 hover:text-primary transition-colors mx-auto"
-                  >
-                    SKU
-                    {sortColumn === 'sku' && (
-                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                    )}
-                  </button>
-                </th>
-                <th className="text-center p-4 font-medium">
-                  <button
-                    onClick={() => handleSort('category')}
-                    className="flex items-center gap-2 hover:text-primary transition-colors mx-auto"
-                  >
-                    Category
-                    {sortColumn === 'category' && (
-                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                    )}
-                  </button>
-                </th>
-                <th className="text-right p-4 font-medium">
-                  <button
-                    onClick={() => handleSort('quantity')}
-                    className="flex items-center gap-2 hover:text-primary transition-colors ml-auto"
-                  >
-                    Quantity
-                    {sortColumn === 'quantity' && (
-                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                    )}
-                  </button>
-                </th>
-                <th className="text-right p-4 font-medium">
-                  <button
-                    onClick={() => handleSort('price')}
-                    className="flex items-center gap-2 hover:text-primary transition-colors ml-auto"
-                  >
-                    Price
-                    {sortColumn === 'price' && (
-                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                    )}
-                  </button>
-                </th>
-                <th className="text-right p-4 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedProducts.map((product, index) => {
-                const stockStatus = getStockStatus(product.quantity);
-                return (
-                  <tr 
-                    key={product.id} 
-                    className={`border-b hover:bg-muted/50 transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}
-                  >
-                    <td className="p-4">
-                      <Checkbox
-                        checked={selectedProducts.has(product.id)}
-                        onCheckedChange={() => toggleProductSelection(product.id)}
-                      />
-                    </td>
-                    <td className="p-4">
-                      <div className="font-medium text-foreground">{product.name}</div>
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className="text-muted-foreground text-sm">{product.sku}</span>
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className="text-muted-foreground text-sm">{product.category}</span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <span className="font-medium">{product.quantity}</span>
-                        <Badge variant={stockStatus.variant} className="text-xs">
-                          {stockStatus.label}
-                        </Badge>
-                      </div>
-                    </td>
-                    <td className="p-4 text-right">
-                      <span className="font-medium text-primary">{product.price.toFixed(2)} ден.</span>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex gap-2 justify-end">
-                        <Button
-                          onClick={() => handleEditProduct(product)}
-                          variant="outline"
-                          size="sm"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          onClick={() => handleDeleteProduct(product.id)}
-                          variant="destructive"
-                          size="sm"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {/* Mobile Card View - Hidden on desktop */}
-      <div className="space-y-4 md:hidden">
-        {sortedProducts.map(product => {
-          const stockStatus = getStockStatus(product.quantity);
-          return (
-            <Card key={product.id} className="p-4 hover:shadow-lg transition-all duration-300 animate-scale-in">
-              <div className="flex items-start gap-3 mb-3">
-                <Checkbox
-                  checked={selectedProducts.has(product.id)}
-                  onCheckedChange={() => toggleProductSelection(product.id)}
-                  className="mt-1 flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-lg text-foreground mb-1">{product.name}</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">SKU:</span>
-                      <span className="font-medium">{product.sku}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Category:</span>
-                      <span className="font-medium">{product.category}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Quantity:</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{product.quantity}</span>
-                        <Badge variant={stockStatus.variant} className="text-xs">
-                          {stockStatus.label}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Price:</span>
-                      <span className="font-medium text-primary">{product.price.toFixed(2)} ден.</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2 pt-3 border-t">
-                <Button
-                  onClick={() => handleEditProduct(product)}
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit
-                </Button>
-                <Button
-                  onClick={() => handleDeleteProduct(product.id)}
-                  variant="destructive"
-                  size="sm"
-                  className="flex-1"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-
-      {sortedProducts.length === 0 && (
-        <Card className="p-12 text-center animate-scale-in">
-          <div className="max-w-md mx-auto">
-            <Package className="h-20 w-20 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="text-2xl font-bold mb-2">
-              {products.length === 0 ? 'No products yet' : 'No results found'}
-            </h3>
-            <p className="text-muted-foreground mb-6">
-              {products.length === 0 
-                ? "Add your first product using the + button above to get started with your inventory." 
-                : localSearchInput 
-                  ? `No products match "${localSearchInput}". Try adjusting your search.`
-                  : "No products match the selected filters. Try different filter options."}
-            </p>
-            {products.length === 0 && (
-              <Button onClick={handleAddProduct} className="transition-all duration-200 hover:scale-105">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Your First Product
-              </Button>
-            )}
-          </div>
-        </Card>
-      )}
-    </div>
-  );
-
-  const InvoicesTab = () => {
-    // Sort invoices
-    const sortedInvoices = [...invoices].sort((a, b) => {
-      // First, sort by whether they have invoice numbers
-      const aHasNumber = a.number && a.number.trim() !== '';
-      const bHasNumber = b.number && b.number.trim() !== '';
-      
-      if (!aHasNumber && bHasNumber) return -1;
-      if (aHasNumber && !bHasNumber) return 1;
-      
-      let aValue, bValue;
-      
-      switch (invoiceSortBy) {
-        case 'number':
-          aValue = a.number || '';
-          bValue = b.number || '';
-          break;
-        case 'date':
-          aValue = new Date(a.date).getTime();
-          bValue = new Date(b.date).getTime();
-          break;
-        case 'customer':
-          aValue = a.customer?.name?.toLowerCase() || '';
-          bValue = b.customer?.name?.toLowerCase() || '';
-          break;
-        case 'total':
-          aValue = a.total || 0;
-          bValue = b.total || 0;
-          break;
-        default:
-          return 0;
-      }
-      
-      if (aValue < bValue) return invoiceSortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return invoiceSortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    const handleInvoiceSort = (column: typeof invoiceSortBy) => {
-      if (invoiceSortBy === column) {
-        setInvoiceSortDirection(invoiceSortDirection === 'asc' ? 'desc' : 'asc');
-      } else {
-        setInvoiceSortBy(column);
-        setInvoiceSortDirection('asc');
-      }
-    };
-
-    return (
-      <div className="space-y-6 animate-fade-in">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Invoices</h2>
-            <p className="text-muted-foreground mt-1">Manage and track all invoices</p>
-          </div>
-          <div className="flex gap-3">
-            {selectedInvoices.size > 0 && (
-              <Button
-                onClick={handleBulkDeleteInvoices}
-                variant="destructive"
-                className="shadow-elegant"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Selected ({selectedInvoices.size})
-              </Button>
-            )}
-            <Button
-              onClick={handleCreateInvoice}
-              className="bg-success hover:shadow-glow transition-all duration-300"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Create Invoice
-            </Button>
-          </div>
-        </div>
-
-        {/* Sort Controls */}
-        <Card className="p-4 shadow-card">
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-sm font-medium">Sort by:</span>
-            {[
-              { key: 'number' as const, label: 'Invoice #' },
-              { key: 'date' as const, label: 'Date' },
-              { key: 'customer' as const, label: 'Customer' },
-              { key: 'total' as const, label: 'Amount' }
-            ].map(({ key, label }) => (
-              <Button
-                key={key}
-                onClick={() => handleInvoiceSort(key)}
-                variant={invoiceSortBy === key ? 'default' : 'outline'}
-                size="sm"
-                className="gap-1"
-              >
-                {label}
-                {invoiceSortBy === key && (
-                  invoiceSortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-                )}
-              </Button>
-            ))}
-          </div>
-        </Card>
-
-      {/* Invoice Actions */}
-      <Card className="p-4 shadow-card">
-        <div className="flex gap-2 justify-end">
-          <Button
-            onClick={selectAllInvoices}
-            variant="outline"
-            size="sm"
-            disabled={invoices.length === 0}
-          >
-            {selectedInvoices.size === invoices.length && invoices.length > 0 ? (
-              <>
-                <Square className="h-4 w-4 mr-2" />
-                Deselect All
-              </>
-            ) : (
-              <>
-                <CheckSquare className="h-4 w-4 mr-2" />
-                Select All
-              </>
-            )}
-          </Button>
-          {invoices.length > 0 && (
-            <Button
-              onClick={handleDeleteAllInvoices}
-              variant="destructive"
-              size="sm"
-            >
-              <Trash className="h-4 w-4 mr-2" />
-              Delete All
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      {/* Invoice History */}
-      <Card className="shadow-card">
-        <div className="p-6 border-b">
-          <h3 className="text-lg font-semibold">Invoice History</h3>
-        </div>
-        <div className="p-6">
-          {invoices.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-xl font-semibold mb-2">No invoices created yet</h3>
-              <p className="text-muted-foreground mb-4">Create your first invoice to get started</p>
-              <Button onClick={handleCreateInvoice}>
-                <FileText className="h-4 w-4 mr-2" />
-                Create Invoice
-              </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sortedInvoices.map(invoice => (
-                <Card key={invoice.id} className="p-6 hover:shadow-elegant transition-all duration-300 bg-card border-border">
-                  <div className="flex items-start gap-3 mb-4">
-                    <Checkbox
-                      checked={selectedInvoices.has(invoice.id)}
-                      onCheckedChange={() => toggleInvoiceSelection(invoice.id)}
-                      className="mt-1"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-lg mb-1 truncate">{invoice.number || 'No Number'}</h4>
-                      <div className="space-y-1 text-sm">
-                        <div className="flex items-center gap-2">
-                          <UserIcon className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-muted-foreground truncate">{invoice.customer.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-muted-foreground">{new Date(invoice.date).toLocaleDateString()}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-semibold text-primary">{invoice.total.toFixed(2)} ден.</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 justify-end pt-3 border-t">
-                    <Button
-                      onClick={() => handleViewInvoice(invoice)}
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
-                    <Button
-                      onClick={() => handleEditInvoice(invoice)}
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      onClick={() => handleDeleteInvoice(invoice.id)}
-                      variant="destructive"
-                      size="sm"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      </Card>
-    </div>
-    );
-  };
-
-  const DataTab = () => (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div>
-        <h2 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Data Management</h2>
-        <p className="text-muted-foreground mt-1">Import, export, and manage your data</p>
-      </div>
-
-      {/* Danger Zone */}
-      <Card className="border-destructive/20 shadow-card">
-        <div className="p-6 border-b border-destructive/20">
-          <h3 className="text-lg font-semibold text-destructive flex items-center">
-            <Trash className="h-5 w-5 mr-2" />
-            Danger Zone
-          </h3>
-        </div>
-        <div className="p-6 space-y-4">
-          <div className="bg-destructive/5 p-4 rounded-lg">
-            <h4 className="font-semibold text-destructive mb-2">Clear All Data</h4>
-            <p className="text-sm text-muted-foreground mb-4">
-              This will permanently delete all products and invoices. This action cannot be undone.
-            </p>
-            <Button
-              onClick={handleClearAllData}
-              variant="destructive"
-              className="shadow-elegant"
-            >
-              <Trash className="h-4 w-4 mr-2" />
-              Clear All Data
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      {/* Import Section */}
-      <Card className="shadow-card">
-        <div className="p-6 border-b">
-          <h3 className="text-lg font-semibold">Import Data</h3>
-        </div>
-        <div className="p-6 space-y-4">
-          <div>
-            <Label className="text-base font-medium">
-              Import Products from Excel (.xlsx/.xls)
-            </Label>
-            <p className="text-sm text-muted-foreground mb-3">
-              Upload an Excel file with columns: name, sku, quantity, price, category
-            </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleImportExcel}
-              className="hidden"
-            />
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              className="shadow-elegant"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Choose Excel File
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      {/* Export Section */}
-      <Card className="shadow-card">
-        <div className="p-6 border-b">
-          <h3 className="text-lg font-semibold">Export Data</h3>
-        </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <h4 className="font-medium">Inventory Exports</h4>
-              <div className="space-y-3">
-                <Button
-                  onClick={() => exportToCSV(products, 'inventory-backup.csv')}
-                  variant="outline"
-                  className="w-full justify-start"
-                  disabled={products.length === 0}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export Inventory (CSV)
-                </Button>
-                <Button
-                  onClick={() => exportToJSON(products, 'inventory-backup.json')}
-                  variant="outline"
-                  className="w-full justify-start"
-                  disabled={products.length === 0}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export Inventory (JSON)
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <h4 className="font-medium">Invoice Exports</h4>
-              <div className="space-y-3">
-                <Button
-                  onClick={() => exportToCSV(invoices, 'invoice-log.csv')}
-                  variant="outline"
-                  className="w-full justify-start"
-                  disabled={invoices.length === 0}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export Invoice Log (CSV)
-                </Button>
-                <Button
-                  onClick={() => exportToJSON(invoices, 'invoice-log.json')}
-                  variant="outline"
-                  className="w-full justify-start"
-                  disabled={invoices.length === 0}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export Invoice Log (JSON)
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-gradient-surface">
       {/* Navigation */}
@@ -1983,10 +1135,64 @@ const InventoryManagementApp = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {activeTab === 'inventory' && <InventoryTab />}
-        {activeTab === 'invoices' && <InvoicesTab />}
-        {activeTab === 'dashboard' && <DashboardTab />}
-        {activeTab === 'data' && <DataTab />}
+        {activeTab === 'inventory' && (
+          <InventoryTab
+            localSearchInput={localSearchInput}
+            setLocalSearchInput={setLocalSearchInput}
+            filteredProducts={filteredProducts}
+            products={products}
+            sortedProducts={sortedProducts}
+            selectedProducts={selectedProducts}
+            toggleProductSelection={toggleProductSelection}
+            selectAllProducts={selectAllProducts}
+            handleBulkDeleteProducts={handleBulkDeleteProducts}
+            handleDeleteAllProducts={handleDeleteAllProducts}
+            handleAddProduct={handleAddProduct}
+            handleEditProduct={handleEditProduct}
+            handleDeleteProduct={handleDeleteProduct}
+            sortColumn={sortColumn}
+            sortDirection={sortDirection}
+            handleSort={handleSort}
+            getStockStatus={getStockStatus}
+          />
+        )}
+        {activeTab === 'invoices' && (
+          <InvoicesTab
+            invoices={invoices}
+            selectedInvoices={selectedInvoices}
+            toggleInvoiceSelection={toggleInvoiceSelection}
+            selectAllInvoices={selectAllInvoices}
+            handleBulkDeleteInvoices={handleBulkDeleteInvoices}
+            handleDeleteAllInvoices={handleDeleteAllInvoices}
+            handleCreateInvoice={handleCreateInvoice}
+            handleViewInvoice={handleViewInvoice}
+            handleEditInvoice={handleEditInvoice}
+            handleDeleteInvoice={handleDeleteInvoice}
+            invoiceSortBy={invoiceSortBy}
+            invoiceSortDirection={invoiceSortDirection}
+            handleInvoiceSort={setInvoiceSortBy} // Pass setInvoiceSortBy directly
+          />
+        )}
+        {activeTab === 'dashboard' && (
+          <DashboardTab
+            dateFilter={dateFilter}
+            setDateFilter={setDateFilter}
+            calculateDashboardMetrics={calculateDashboardMetrics}
+            handleViewInvoice={handleViewInvoice}
+            products={products}
+          />
+        )}
+        {activeTab === 'data' && (
+          <DataTab
+            products={products}
+            invoices={invoices}
+            handleClearAllData={handleClearAllData}
+            handleImportExcel={handleImportExcel}
+            exportToCSV={exportToCSV}
+            exportToJSON={exportToJSON}
+            fileInputRef={fileInputRef}
+          />
+        )}
       </main>
 
       {/* Product Modal */}
