@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useDeferredValue } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Sun, Moon } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { db, auth } from '@/lib/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { signOut, User } from 'firebase/auth';
 
 // Import the new tab components
@@ -24,7 +24,6 @@ import InventoryTab from './inventory/InventoryTab';
 import InvoicesTab from './invoices/InvoicesTab';
 import DashboardTab from './dashboard/DashboardTab';
 import DataTab from './data/DataTab';
-import { ThemeToggle } from './theme-toggle'; // Import the new ThemeToggle
 
 // Product interface with purchase price for profit calculations
 interface Product {
@@ -123,48 +122,18 @@ const InventoryManagementApp = () => {
     purchasePrice: '' // Admin-only field
   });
 
+  // Load data from Firebase on component mount
+  useEffect(() => {
+    loadProducts();
+    loadInvoices();
+  }, []);
+
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       setCurrentUser(user);
     });
     return () => unsubscribe();
-  }, []);
-
-  // Real-time product loading from Firebase
-  useEffect(() => {
-    const productsQuery = query(collection(db, 'products'), orderBy('name'));
-    const unsubscribe = onSnapshot(productsQuery, (querySnapshot) => {
-      const productsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Product[];
-      setProducts(productsData);
-      setLoading(false);
-    }, (error) => {
-      console.error('Error loading products in real-time:', error);
-      toast.error('Failed to load products');
-      setLoading(false);
-    });
-
-    return () => unsubscribe(); // Cleanup listener on component unmount
-  }, []);
-
-  // Real-time invoice loading from Firebase
-  useEffect(() => {
-    const invoicesQuery = query(collection(db, 'invoices'), orderBy('date', 'desc'));
-    const unsubscribe = onSnapshot(invoicesQuery, (querySnapshot) => {
-      const invoicesData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Invoice[];
-      setInvoices(invoicesData);
-    }, (error) => {
-      console.error('Error loading invoices in real-time:', error);
-      toast.error('Failed to load invoices');
-    });
-
-    return () => unsubscribe(); // Cleanup listener on component unmount
   }, []);
 
   const handleLogout = async () => {
@@ -175,6 +144,38 @@ const InventoryManagementApp = () => {
     } catch (error) {
       console.error('Logout error:', error);
       toast.error('Failed to log out');
+    }
+  };
+
+  const loadProducts = async () => {
+    try {
+      const productsQuery = query(collection(db, 'products'), orderBy('name'));
+      const querySnapshot = await getDocs(productsQuery);
+      const productsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Product[];
+      setProducts(productsData);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      toast.error('Failed to load products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadInvoices = async () => {
+    try {
+      const invoicesQuery = query(collection(db, 'invoices'), orderBy('date', 'desc'));
+      const querySnapshot = await getDocs(invoicesQuery);
+      const invoicesData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Invoice[];
+      setInvoices(invoicesData);
+    } catch (error) {
+      console.error('Error loading invoices:', error);
+      toast.error('Failed to load invoices');
     }
   };
 
@@ -199,12 +200,12 @@ const InventoryManagementApp = () => {
   // Sort products (memoized)
   const sortedProducts = React.useMemo(() => {
     return [...filteredProducts].sort((a, b) => {
-      let aValue: string | number = a[sortColumn];
-      let bValue: string | number = b[sortColumn];
+      let aValue = a[sortColumn];
+      let bValue = b[sortColumn];
       
       if (sortColumn === 'name' || sortColumn === 'sku' || sortColumn === 'category') {
-        aValue = (aValue as string || '').toLowerCase(); // Explicitly cast to string
-        bValue = (bValue as string || '').toLowerCase(); // Explicitly cast to string
+        aValue = (aValue || '').toLowerCase();
+        bValue = (bValue || '').toLowerCase();
       }
       
       if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
@@ -320,7 +321,7 @@ const InventoryManagementApp = () => {
       
       setShowProductModal(false);
       setProductForm({ name: '', sku: '', quantity: '', price: '', category: '', purchasePrice: '' });
-      // Data will reload automatically via onSnapshot
+      loadProducts(); // Reload products from Firebase
     } catch (error) {
       console.error('Error saving product:', error);
       toast.error('Failed to save product');
@@ -335,7 +336,7 @@ const InventoryManagementApp = () => {
       try {
         await deleteDoc(doc(db, 'products', productId));
         toast.success("Product deleted successfully");
-        // Data will reload automatically via onSnapshot
+        loadProducts(); // Reload products from Firebase
       } catch (error) {
         console.error('Error deleting product:', error);
         toast.error('Failed to delete product');
@@ -358,7 +359,7 @@ const InventoryManagementApp = () => {
         await Promise.all(deletePromises);
         setSelectedProducts(new Set());
         toast.success(`${selectedProducts.size} products deleted successfully`);
-        // Data will reload automatically via onSnapshot
+        loadProducts(); // Reload products from Firebase
       } catch (error) {
         console.error('Error bulk deleting products:', error);
         toast.error('Failed to delete products');
@@ -381,7 +382,7 @@ const InventoryManagementApp = () => {
         await Promise.all(deletePromises);
         setSelectedProducts(new Set());
         toast.success("All products deleted successfully");
-        // Data will reload automatically via onSnapshot
+        loadProducts(); // Reload products from Firebase
       } catch (error) {
         console.error('Error deleting all products:', error);
         toast.error('Failed to delete all products');
@@ -411,7 +412,8 @@ const InventoryManagementApp = () => {
         // Delete the invoice
         await deleteDoc(doc(db, 'invoices', invoiceId));
         toast.success("Invoice deleted successfully");
-        // Data will reload automatically via onSnapshot
+        loadInvoices(); // Reload invoices from Firebase
+        loadProducts(); // Reload products to reflect updated quantities
       } catch (error) {
         console.error('Error deleting invoice:', error);
         toast.error('Failed to delete invoice');
@@ -451,7 +453,8 @@ const InventoryManagementApp = () => {
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
         toast.success(`${selectedInvoices.size} invoices deleted successfully`);
-        // Data will reload automatically via onSnapshot
+        loadInvoices(); // Reload invoices from Firebase
+        loadProducts(); // Reload products to reflect updated quantities
       } catch (error) {
         console.error('Error bulk deleting invoices:', error);
         toast.error('Failed to delete invoices');
@@ -490,7 +493,8 @@ const InventoryManagementApp = () => {
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
         toast.success("All invoices deleted successfully");
-        // Data will reload automatically via onSnapshot
+        loadInvoices(); // Reload invoices from Firebase
+        loadProducts(); // Reload products to reflect updated quantities
       } catch (error) {
         console.error('Error deleting all invoices:', error);
         toast.error('Failed to delete all invoices');
@@ -539,7 +543,8 @@ const InventoryManagementApp = () => {
         setSelectedProducts(new Set());
         setSelectedInvoices(new Set());
         toast.success("All data cleared successfully");
-        // Data will reload automatically via onSnapshot
+        loadProducts();
+        loadInvoices();
       } catch (error) {
         console.error('Error clearing all data:', error);
         toast.error('Failed to clear all data');
@@ -607,7 +612,7 @@ const InventoryManagementApp = () => {
   });
   setInvoiceItems(refreshedItems);
 
-  setCustomerInfo({ ...invoice.customer, phone: invoice.customer.phone || '' }); // Ensure phone is always a string
+  setCustomerInfo(invoice.customer);
   setDiscount(invoice.discountPercentage || 0);
   setInvoiceProductSearch('');
   setShowInvoiceModal(true);
@@ -740,7 +745,8 @@ const InventoryManagementApp = () => {
       setEditingInvoice(null);
       
       toast.success(editingInvoice ? 'Invoice updated successfully!' : 'Invoice saved successfully!');
-      // Data will reload automatically via onSnapshot
+      loadInvoices(); // Reload invoices from Firebase
+      loadProducts(); // Reload products to reflect updated quantities
     } catch (error) {
       console.error('Error saving invoice:', error);
       toast.error('Failed to save invoice');
@@ -817,7 +823,7 @@ const InventoryManagementApp = () => {
       setExcelColumns([]);
       
       toast.success(`Successfully imported ${importedProducts.length} products!`);
-      // Data will reload automatically via onSnapshot
+      loadProducts(); // Reload products from Firebase
     } catch (error) {
       console.error('Error importing products:', error);
       toast.error('Failed to import products');
@@ -1026,46 +1032,43 @@ const InventoryManagementApp = () => {
               ))}
             </div>
 
-            {/* User Profile Menu and Theme Toggle */}
-            <div className="flex items-center space-x-4">
-              <ThemeToggle /> {/* New Theme Toggle */}
-              {currentUser && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" className="h-10 w-10 rounded-full p-0 hidden sm:flex">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary text-primary-foreground">
+            {/* User Profile Menu */}
+            {currentUser && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" className="h-10 w-10 rounded-full p-0 hidden sm:flex">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {currentUser.email?.[0].toUpperCase() || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64" align="end">
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="bg-primary text-primary-foreground text-lg">
                           {currentUser.email?.[0].toUpperCase() || 'U'}
                         </AvatarFallback>
                       </Avatar>
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-64" align="end">
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="h-12 w-12">
-                          <AvatarFallback className="bg-primary text-primary-foreground text-lg">
-                            {currentUser.email?.[0].toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">Logged in as</p>
-                          <p className="text-sm text-muted-foreground truncate">{currentUser.email}</p>
-                        </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">Logged in as</p>
+                        <p className="text-sm text-muted-foreground truncate">{currentUser.email}</p>
                       </div>
-                      <Button 
-                        onClick={handleLogout} 
-                        variant="destructive" 
-                        className="w-full"
-                      >
-                        <LogOut className="h-4 w-4 mr-2" />
-                        Logout
-                      </Button>
                     </div>
-                  </PopoverContent>
-                </Popover>
-              )}
-            </div>
+                    <Button 
+                      onClick={handleLogout} 
+                      variant="destructive" 
+                      className="w-full"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Logout
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
 
             {/* Mobile Navigation */}
             <div className="flex sm:hidden items-center space-x-2">
@@ -1089,7 +1092,6 @@ const InventoryManagementApp = () => {
                   </button>
                 ))}
               </div>
-              <ThemeToggle /> {/* New Theme Toggle for mobile */}
               {currentUser && (
                 <Popover>
                   <PopoverTrigger asChild>
