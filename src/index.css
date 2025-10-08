@@ -17,9 +17,9 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 220 10% 15%;
 
-    --primary: 240 60% 50%; /* Medium blue-purple */
+    --primary: 210 80% 55%; /* Vibrant Electric Blue */
     --primary-foreground: 0 0% 100%; /* White */
-    --primary-glow: 240 60% 60%; /* Slightly lighter primary for glow */
+    --primary-glow: 210 80% 65%; /* Slightly lighter primary for glow */
 
     --secondary: 220 15% 90%; /* Light gray */
     --secondary-foreground: 220 10% 15%;
@@ -27,7 +27,7 @@ All colors MUST be HSL.
     --muted: 220 10% 95%; /* Very light gray */
     --muted-foreground: 220 8% 45%; /* Medium gray */
 
-    --accent: 240 60% 55%; /* Slightly lighter primary */
+    --accent: 210 80% 60%; /* Slightly lighter primary */
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 80% 50%; /* Red */
@@ -41,7 +41,7 @@ All colors MUST be HSL.
 
     --border: 220 10% 85%; /* Light gray border */
     --input: 220 10% 85%;
-    --ring: 240 60% 50%; /* Primary color */
+    --ring: 210 80% 55%; /* Primary color */
 
     --radius: 0.75rem;
 
@@ -60,12 +60,12 @@ All colors MUST be HSL.
 
     --sidebar-background: 220 15% 95%;
     --sidebar-foreground: 220 10% 20%;
-    --sidebar-primary: 240 60% 45%;
+    --sidebar-primary: 210 80% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 15% 90%;
     --sidebar-accent-foreground: 220 10% 15%;
     --sidebar-border: 220 10% 80%;
-    --sidebar-ring: 240 60% 50%;
+    --sidebar-ring: 210 80% 55%;
   }
 
   .dark {
@@ -78,9 +78,9 @@ All colors MUST be HSL.
     --popover: 220 20% 10%;
     --popover-foreground: 220 10% 90%;
 
-    --primary: 240 70% 65%; /* Vibrant blue-purple */
+    --primary: 210 80% 65%; /* Vibrant Electric Blue */
     --primary-foreground: 220 20% 15%; /* Dark text for contrast */
-    --primary-glow: 240 70% 75%; /* Lighter primary for glow */
+    --primary-glow: 210 80% 75%; /* Lighter primary for glow */
 
     --secondary: 220 15% 15%; /* Dark gray */
     --secondary-foreground: 220 10% 90%;
@@ -88,7 +88,7 @@ All colors MUST be HSL.
     --muted: 220 10% 20%; /* Slightly lighter dark gray */
     --muted-foreground: 220 8% 60%; /* Medium light gray */
 
-    --accent: 240 70% 70%; /* Slightly lighter primary */
+    --accent: 210 80% 70%; /* Slightly lighter primary */
     --accent-foreground: 220 20% 15%;
 
     --destructive: 0 70% 60%; /* Red */
@@ -102,16 +102,16 @@ All colors MUST be HSL.
 
     --border: 220 10% 25%; /* Dark gray border */
     --input: 220 10% 25%;
-    --ring: 240 70% 65%; /* Primary color */
+    --ring: 210 80% 65%; /* Primary color */
 
     --sidebar-background: 220 20% 12%;
     --sidebar-foreground: 220 10% 85%;
-    --sidebar-primary: 240 70% 60%;
+    --sidebar-primary: 210 80% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 15% 18%;
     --sidebar-accent-foreground: 220 10% 80%;
     --sidebar-border: 220 10% 25%;
-    --sidebar-ring: 240 70% 65%;
+    --sidebar-ring: 210 80% 65%;
   }
 }
 
