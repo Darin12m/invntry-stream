@@ -24,7 +24,6 @@ import InventoryTab from './inventory/InventoryTab';
 import InvoicesTab from './invoices/InvoicesTab';
 import DashboardTab from './dashboard/DashboardTab';
 import DataTab from './data/DataTab';
-import { ThemeToggle } from './theme-toggle'; // Import the new ThemeToggle
 
 // Product interface with purchase price for profit calculations
 interface Product {
@@ -1026,9 +1025,8 @@ const InventoryManagementApp = () => {
               ))}
             </div>
 
-            {/* User Profile Menu and Theme Toggle */}
+            {/* User Profile Menu */}
             <div className="flex items-center space-x-4">
-              <ThemeToggle /> {/* New Theme Toggle */}
               {currentUser && (
                 <Popover>
                   <PopoverTrigger asChild>
@@ -1089,7 +1087,6 @@ const InventoryManagementApp = () => {
                   </button>
                 ))}
               </div>
-              <ThemeToggle /> {/* New Theme Toggle for mobile */}
               {currentUser && (
                 <Popover>
                   <PopoverTrigger asChild>
@@ -1474,7 +1471,7 @@ const InventoryManagementApp = () => {
                                   </Button>
                                 </div>
                                 
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-2 gap-4">
                                   <div>
                                     <Label className="text-xs">Quantity</Label>
                                     <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
