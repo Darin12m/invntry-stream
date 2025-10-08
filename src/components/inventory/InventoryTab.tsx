@@ -85,8 +85,8 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
       </div>
     </div>
 
-    {/* Search Bar */}
-    <Card className="p-4 shadow-card">
+    {/* Search Bar and Bulk Actions */}
+    <Card className="p-4 shadow-card space-y-4">
       <div className="relative flex-1 w-full">
         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
         <Input
@@ -97,7 +97,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
         />
       </div>
       {localSearchInput && (
-        <div className="text-sm text-muted-foreground mt-2">
+        <div className="text-sm text-muted-foreground">
           Showing {filteredProducts.length} of {products.length} products matching "{localSearchInput}"
           <Button
             onClick={() => setLocalSearchInput('')}
@@ -109,11 +109,8 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
           </Button>
         </div>
       )}
-    </Card>
 
-    {/* Bulk Actions */}
-    <Card className="p-4 shadow-card">
-      <div className="flex gap-2 justify-end">
+      <div className="flex gap-2 justify-end border-t pt-4 mt-4"> {/* Added border-t and pt-4 for separation */}
         <Button
           onClick={selectAllProducts}
           variant="outline"
