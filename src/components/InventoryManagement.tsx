@@ -1,4 +1,4 @@
- import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { signOut, User } from 'firebase/auth';
+import ProductSearchInput from './ProductSearchInput'; // Import the new component
 
 // Product interface with purchase price for profit calculations
 interface Product {
@@ -69,10 +70,10 @@ const InventoryManagementApp = () => {
   const [products, setProducts] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchInput, setSearchInput] = useState('');
-  const deferredSearch = React.useDeferredValue(searchInput);
-  useEffect(() => { setSearchTerm(deferredSearch); }, [deferredSearch]);
+  
+  // Search term state, now managed by the parent and updated by ProductSearchInput
+  const [searchTerm, setSearchTerm] = useState(''); 
+
   const [showProductModal, setShowProductModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showInvoiceViewer, setShowInvoiceViewer] = useState(false);
@@ -88,8 +89,8 @@ const InventoryManagementApp = () => {
   const [discount, setDiscount] = useState(0);
   const [invoiceSortBy, setInvoiceSortBy] = useState<'number' | 'date' | 'customer' | 'total'>('number');
   const [invoiceSortDirection, setInvoiceSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
-  const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
+  const [selectedProducts, setSelectedProducts] = new Set<string>(); // Initialize as Set
+  const [selectedInvoices, setSelectedInvoices] = new Set<string>(); // Initialize as Set
   const [showColumnMappingModal, setShowColumnMappingModal] = useState(false);
   const [excelData, setExcelData] = useState([]);
   const [excelColumns, setExcelColumns] = useState([]);
@@ -188,40 +189,44 @@ const InventoryManagementApp = () => {
   // Get unique categories from products
   const categories = ['all', ...new Set(products.map(p => p.category).filter(Boolean))];
 
-  // Filter products based on search, category, and stock level
-  const filteredProducts = products.filter(product => {
-    // Search filter
-    const matchesSearch = (product.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (product.sku || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (product.category || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Category filter
-    const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
-    
-    // Stock level filter
-    let matchesStock = true;
-    if (stockFilter === 'out') matchesStock = product.quantity === 0;
-    else if (stockFilter === 'low') matchesStock = product.quantity > 0 && product.quantity < 10;
-    else if (stockFilter === 'medium') matchesStock = product.quantity >= 10 && product.quantity < 30;
-    else if (stockFilter === 'in-stock') matchesStock = product.quantity >= 30;
-    
-    return matchesSearch && matchesCategory && matchesStock;
-  });
+  // Filter products based on search, category, and stock level (memoized)
+  const filteredProducts = React.useMemo(() => {
+    return products.filter(product => {
+      // Search filter
+      const matchesSearch = (product.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.sku || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.category || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Category filter
+      const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
+      
+      // Stock level filter
+      let matchesStock = true;
+      if (stockFilter === 'out') matchesStock = product.quantity === 0;
+      else if (stockFilter === 'low') matchesStock = product.quantity > 0 && product.quantity < 10;
+      else if (stockFilter === 'medium') matchesStock = product.quantity >= 10 && product.quantity < 30;
+      else if (stockFilter === 'in-stock') matchesStock = product.quantity >= 30;
+      
+      return matchesSearch && matchesCategory && matchesStock;
+    });
+  }, [products, searchTerm, categoryFilter, stockFilter]);
 
-  // Sort products
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    let aValue = a[sortColumn];
-    let bValue = b[sortColumn];
-    
-    if (sortColumn === 'name' || sortColumn === 'sku' || sortColumn === 'category') {
-      aValue = (aValue || '').toLowerCase();
-      bValue = (bValue || '').toLowerCase();
-    }
-    
-    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
+  // Sort products (memoized)
+  const sortedProducts = React.useMemo(() => {
+    return [...filteredProducts].sort((a, b) => {
+      let aValue = a[sortColumn];
+      let bValue = b[sortColumn];
+      
+      if (sortColumn === 'name' || sortColumn === 'sku' || sortColumn === 'category') {
+        aValue = (aValue || '').toLowerCase();
+        bValue = (bValue || '').toLowerCase();
+      }
+      
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredProducts, sortColumn, sortDirection]);
 
   // Handle column sorting
   const handleSort = (column: typeof sortColumn) => {
@@ -1093,7 +1098,7 @@ const InventoryManagementApp = () => {
           <Card className="p-6 shadow-card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Фактури</p>
+                <p className className="text-sm font-medium text-purple-600 dark:text-purple-400">Фактури</p>
                 <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">{metrics.numberOfInvoices}</p>
               </div>
               <div className="p-3 bg-purple-500 rounded-full">
@@ -1231,16 +1236,8 @@ const InventoryManagementApp = () => {
       {/* Search and Filters */}
       <Card className="p-4 shadow-card">
         <div className="space-y-4">
-          {/* Search bar */}
-          <div className="relative flex-1 w-full">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search products by name, SKU, or category..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 transition-all duration-200 focus:ring-2 focus:ring-primary"
-            />
-          </div>
+          {/* Search bar - Now using the new ProductSearchInput component */}
+          <ProductSearchInput onSearchTermChange={setSearchTerm} initialSearchTerm={searchTerm} />
           
           {/* Filters and actions */}
           <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -1276,7 +1273,7 @@ const InventoryManagementApp = () => {
                   onClick={() => {
                     setCategoryFilter('all');
                     setStockFilter('all');
-                    setSearchInput('');
+                    setSearchTerm(''); // Reset the parent's searchTerm, which will propagate to ProductSearchInput
                   }}
                   variant="outline"
                   size="sm"
