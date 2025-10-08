@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useDeferredValue } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { signOut, User } from 'firebase/auth';
-import ProductSearchInput from './ProductSearchInput'; // Import the new component
+// Removed import ProductSearchInput from './ProductSearchInput';
 
 // Product interface with purchase price for profit calculations
 interface Product {
@@ -71,8 +71,9 @@ const InventoryManagementApp = () => {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Search term state, now managed by the parent and updated by ProductSearchInput
-  const [searchTerm, setSearchTerm] = useState(''); 
+  // Search term state
+  const [localSearchInput, setLocalSearchInput] = useState(''); // Local state for the input field
+  const deferredSearchTerm = useDeferredValue(localSearchInput); // Deferred value for actual filtering
 
   const [showProductModal, setShowProductModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -193,9 +194,9 @@ const InventoryManagementApp = () => {
   const filteredProducts = React.useMemo(() => {
     return products.filter(product => {
       // Search filter
-      const matchesSearch = (product.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (product.sku || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (product.category || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = (product.name || '').toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
+        (product.sku || '').toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
+        (product.category || '').toLowerCase().includes(deferredSearchTerm.toLowerCase());
       
       // Category filter
       const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
@@ -209,7 +210,7 @@ const InventoryManagementApp = () => {
       
       return matchesSearch && matchesCategory && matchesStock;
     });
-  }, [products, searchTerm, categoryFilter, stockFilter]);
+  }, [products, deferredSearchTerm, categoryFilter, stockFilter]);
 
   // Sort products (memoized)
   const sortedProducts = React.useMemo(() => {
@@ -259,9 +260,9 @@ const InventoryManagementApp = () => {
 
   const selectAllProducts = () => {
     const displayedProducts = products.filter(product =>
-      (product.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (product.sku || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (product.category || '').toLowerCase().includes(searchTerm.toLowerCase())
+      (product.name || '').toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
+      (product.sku || '').toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
+      (product.category || '').toLowerCase().includes(deferredSearchTerm.toLowerCase())
     );
     
     if (selectedProducts.size === displayedProducts.length) {
@@ -1236,8 +1237,16 @@ const InventoryManagementApp = () => {
       {/* Search and Filters */}
       <Card className="p-4 shadow-card">
         <div className="space-y-4">
-          {/* Search bar - Now using the new ProductSearchInput component */}
-          <ProductSearchInput onSearchTermChange={setSearchTerm} />
+          {/* Search bar */}
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search products by name, SKU, or category..."
+              value={localSearchInput}
+              onChange={(e) => setLocalSearchInput(e.target.value)}
+              className="pl-10 transition-all duration-200 focus:ring-2 focus:ring-primary"
+            />
+          </div>
           
           {/* Filters and actions */}
           <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -1268,12 +1277,12 @@ const InventoryManagementApp = () => {
               </select>
               
               {/* Clear filters button */}
-              {(categoryFilter !== 'all' || stockFilter !== 'all' || searchTerm) && (
+              {(categoryFilter !== 'all' || stockFilter !== 'all' || localSearchInput) && (
                 <Button
                   onClick={() => {
                     setCategoryFilter('all');
                     setStockFilter('all');
-                    setSearchTerm(''); // Reset the parent's searchTerm, which will propagate to ProductSearchInput
+                    setLocalSearchInput(''); // Reset the local search input
                   }}
                   variant="outline"
                   size="sm"
@@ -1531,8 +1540,8 @@ const InventoryManagementApp = () => {
             <p className="text-muted-foreground mb-6">
               {products.length === 0 
                 ? "Add your first product using the + button above to get started with your inventory." 
-                : searchTerm 
-                  ? `No products match "${searchTerm}". Try adjusting your search or filters.`
+                : localSearchInput 
+                  ? `No products match "${localSearchInput}". Try adjusting your search or filters.`
                   : "No products match the selected filters. Try different filter options."}
             </p>
             {products.length === 0 && (
@@ -2258,6 +2267,7 @@ const InventoryManagementApp = () => {
                         placeholder="Email"
                         value={customerInfo.email}
                         onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
+                        rows={3}
                       />
                       <Textarea
                         placeholder="Address"
