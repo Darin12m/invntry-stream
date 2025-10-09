@@ -358,7 +358,8 @@ const InventoryManagementApp = () => {
         setSelectedProducts(new Set());
         toast.success(`${selectedProducts.size} products deleted successfully`);
         // Data will reload automatically via onSnapshot
-      } catch (error) {
+      } catch (error)
+      {
         console.error('Error bulk deleting products:', error);
         toast.error('Failed to delete products');
       }
@@ -547,6 +548,16 @@ const InventoryManagementApp = () => {
   };
 
   // Invoice operations
+  const handleCloseInvoiceModal = () => {
+    setShowInvoiceModal(false);
+    setCurrentInvoice(null);
+    setInvoiceItems([]);
+    setCustomerInfo({ name: '', email: '', address: '', phone: '' });
+    setInvoiceProductSearch('');
+    setDiscount(0);
+    setEditingInvoice(null);
+  };
+
   const handleCreateInvoice = () => {
     // Generate invoice number in format 001/25, 002/25, etc.
     const year = new Date().getFullYear().toString().slice(-2);
@@ -730,13 +741,7 @@ const InventoryManagementApp = () => {
       });
       await Promise.all(updatePromises);
 
-      setShowInvoiceModal(false);
-      setCurrentInvoice(null);
-      setInvoiceItems([]);
-      setCustomerInfo({ name: '', email: '', address: '', phone: '' });
-      setInvoiceProductSearch('');
-      setDiscount(0);
-      setEditingInvoice(null);
+      handleCloseInvoiceModal(); // Reset state after successful save
       
       toast.success(editingInvoice ? 'Invoice updated successfully!' : 'Invoice saved successfully!');
       // Data will reload automatically via onSnapshot
@@ -1315,7 +1320,7 @@ const InventoryManagementApp = () => {
               {/* Header */}
               <div className="flex justify-between items-center p-6 border-b">
                 <h2 className="text-2xl font-bold">Create New Invoice</h2>
-                <Button onClick={() => setShowInvoiceModal(false)} variant="ghost">
+                <Button onClick={handleCloseInvoiceModal} variant="ghost">
                   <X className="h-6 w-6" />
                 </Button>
               </div>
@@ -1417,6 +1422,7 @@ const InventoryManagementApp = () => {
                         placeholder="Email"
                         value={customerInfo.email}
                         onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
+                        rows={3}
                       />
                       <Textarea
                         placeholder="Address"
@@ -1471,7 +1477,7 @@ const InventoryManagementApp = () => {
                                   </Button>
                                 </div>
                                 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-2 gap-2">
                                   <div>
                                     <Label className="text-xs">Quantity</Label>
                                     <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
@@ -1580,7 +1586,7 @@ const InventoryManagementApp = () => {
               {/* Footer Buttons */}
               <div className="p-6 border-t flex justify-end gap-3">
                 <Button
-                  onClick={() => setShowInvoiceModal(false)}
+                  onClick={handleCloseInvoiceModal}
                   variant="outline"
                 >
                   Cancel
