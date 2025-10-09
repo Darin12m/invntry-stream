@@ -157,4 +157,13 @@ All colors MUST be HSL.
   button:active:not(:disabled), a:active {
     @apply transform scale-[0.98];
   }
+
+  /* Skeleton loader animation */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
 }

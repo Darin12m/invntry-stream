@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useDeferredValue } from 'react';
+import React, { useState, useEffect, useRef, useDeferredValue, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Sun, Moon } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -23,7 +23,8 @@ import { signOut, User } from 'firebase/auth';
 import InventoryTab from './inventory/InventoryTab';
 import InvoicesTab from './invoices/InvoicesTab';
 import DashboardTab from './dashboard/DashboardTab';
-import DataTab from './data/DataTab';
+// Lazy load DataTab for code splitting
+const LazyDataTab = React.lazy(() => import('./data/DataTab'));
 
 // Product interface with purchase price for profit calculations
 interface Product {
@@ -1183,15 +1184,23 @@ const InventoryManagementApp = () => {
           />
         )}
         {activeTab === 'data' && (
-          <DataTab
-            products={products}
-            invoices={invoices}
-            handleClearAllData={handleClearAllData}
-            handleImportExcel={handleImportExcel}
-            exportToCSV={exportToCSV}
-            exportToJSON={exportToJSON}
-            fileInputRef={fileInputRef}
-          />
+          <Suspense fallback={
+            <Card className="p-12 text-center animate-pulse">
+              <Upload className="h-20 w-20 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <h3 className="text-2xl font-bold mb-2">Loading Data Management...</h3>
+              <p className="text-muted-foreground">Please wait while we load the data tools.</p>
+            </Card>
+          }>
+            <LazyDataTab
+              products={products}
+              invoices={invoices}
+              handleClearAllData={handleClearAllData}
+              handleImportExcel={handleImportExcel}
+              exportToCSV={exportToCSV}
+              exportToJSON={exportToJSON}
+              fileInputRef={fileInputRef}
+            />
+          </Suspense>
         )}
       </main>
 
@@ -1422,7 +1431,6 @@ const InventoryManagementApp = () => {
                         placeholder="Email"
                         value={customerInfo.email}
                         onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                        rows={3}
                       />
                       <Textarea
                         placeholder="Address"
