@@ -247,10 +247,11 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                     {/* MINI-CATALOG FEATURE: Display thumbnail */}
                     <div className="flex items-center gap-3">
                       {product.thumbnail && (
-                        <img 
-                          src={product.thumbnail} 
-                          alt={product.name} 
-                          className="w-12 h-12 object-cover rounded-md flex-shrink-0" 
+                        <img
+                          src={product.thumbnail}
+                          alt={product.name}
+                          className="w-12 h-12 object-cover rounded-md flex-shrink-0"
+                          onError={(e) => { e.currentTarget.src = '/placeholder.svg'; console.log('Image failed to load:', product.thumbnail); }}
                         />
                       )}
                       <div className="font-medium text-foreground">{product.name}</div>
@@ -315,10 +316,11 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                 {/* MINI-CATALOG FEATURE: Display thumbnail in mobile view */}
                 <div className="flex items-center gap-3 mb-2">
                   {product.thumbnail && (
-                    <img 
-                      src={product.thumbnail} 
-                      alt={product.name} 
-                      className="w-12 h-12 object-cover rounded-md flex-shrink-0" 
+                    <img
+                      src={product.thumbnail}
+                      alt={product.name}
+                      className="w-12 h-12 object-cover rounded-md flex-shrink-0"
+                      onError={(e) => { e.currentTarget.src = '/placeholder.svg'; console.log('Image failed to load:', product.thumbnail); }}
                     />
                   )}
                   <h3 className="font-bold text-lg text-foreground">{product.name}</h3>

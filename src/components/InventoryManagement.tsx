@@ -196,6 +196,8 @@ const InventoryManagementApp = () => {
       })) as Product[];
       setProducts(productsData);
       setLoading(false);
+      // Log product thumbnails for debugging
+      console.log("Product thumbnails:", productsData.map(p => p.thumbnail));
     }, (error) => {
       console.error('Error loading products in real-time:', error);
       toast.error('Failed to load products');
