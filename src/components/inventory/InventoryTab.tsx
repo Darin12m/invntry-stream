@@ -171,10 +171,10 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                   onCheckedChange={selectAllProducts}
                 />
               </th>
-              <th className="text-left p-4 font-medium">
+              <th className="text-center p-4 font-medium"> {/* Changed to text-center */}
                 <button
                   onClick={() => handleSort('name')}
-                  className="flex items-center gap-2 hover:text-primary transition-colors"
+                  className="flex items-center gap-2 hover:text-primary transition-colors mx-auto" {/* Added mx-auto to center the button */}
                 >
                   Name
                   {sortColumn === 'name' && (
@@ -243,9 +243,9 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                       onCheckedChange={() => toggleProductSelection(product.id)}
                     />
                   </td>
-                  <td className="p-4">
+                  <td className="p-4 text-center"> {/* Added text-center */}
                     {/* MINI-CATALOG FEATURE: Display thumbnail */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center gap-3"> {/* Added justify-center */}
                       {product.thumbnail && (
                         <img
                           src={product.thumbnail}
@@ -314,7 +314,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
               />
               <div className="flex-1 min-w-0">
                 {/* MINI-CATALOG FEATURE: Display thumbnail in mobile view */}
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center justify-center gap-3 mb-2"> {/* Added justify-center */}
                   {product.thumbnail && (
                     <img
                       src={product.thumbnail}
