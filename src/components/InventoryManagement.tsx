@@ -1364,144 +1364,145 @@ const InventoryManagementApp = () => {
 
       {/* Product Modal */}
       {showProductModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4 animate-scale-in shadow-glow">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold">
-                  {editingProduct ? 'Edit Product' : 'Add New Product'}
-                </h3>
-                <Button
-                  onClick={() => setShowProductModal(false)}
-                  variant="ghost"
-                  size="sm"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md max-h-[95vh] flex flex-col animate-scale-in shadow-glow">
+            {/* Header */}
+            <div className="p-6 pb-4 flex justify-between items-center border-b">
+              <h3 className="text-xl font-semibold">
+                {editingProduct ? 'Edit Product' : 'Add New Product'}
+              </h3>
+              <Button
+                onClick={() => setShowProductModal(false)}
+                variant="ghost"
+                size="sm"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div>
+                <Label htmlFor="name">Product Name *</Label>
+                <Input
+                  id="name"
+                  value={productForm.name}
+                  onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                  placeholder="Enter product name"
+                />
               </div>
 
-              <div className="space-y-4">
+              <div>
+                <Label htmlFor="sku">SKU *</Label>
+                <Input
+                  id="sku"
+                  value={productForm.sku}
+                  onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
+                  placeholder="Enter SKU"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="name">Product Name *</Label>
+                  <Label htmlFor="quantity">Quantity *</Label>
                   <Input
-                    id="name"
-                    value={productForm.name}
-                    onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                    placeholder="Enter product name"
+                    id="quantity"
+                    type="number"
+                    value={productForm.quantity}
+                    onChange={(e) => setProductForm({ ...productForm, quantity: e.target.value })}
+                    placeholder="0"
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="sku">SKU *</Label>
+                  <Label htmlFor="price">Price *</Label>
                   <Input
-                    id="sku"
-                    value={productForm.sku}
-                    onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
-                    placeholder="Enter SKU"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="quantity">Quantity *</Label>
-                    <Input
-                      id="quantity"
-                      type="number"
-                      value={productForm.quantity}
-                      onChange={(e) => setProductForm({ ...productForm, quantity: e.target.value })}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="price">Price *</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      value={productForm.price}
-                      onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="category">Category</Label>
-                  <Input
-                    id="category"
-                    value={productForm.category}
-                    onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
-                    placeholder="Enter category"
-                  />
-                </div>
-
-                {/* MINI-CATALOG FEATURE: New fields for thumbnail and short description */}
-                <div>
-                  <Label htmlFor="thumbnail">Thumbnail URL</Label>
-                  <Input
-                    id="thumbnail"
-                    value={productForm.thumbnail}
-                    onChange={(e) => setProductForm({ ...productForm, thumbnail: e.target.value })}
-                    placeholder="e.g., https://example.com/image.jpg"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    URL for a small product image (e.g., 60x60px).
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor="shortDescription">Short Description</Label>
-                  <Textarea
-                    id="shortDescription"
-                    value={productForm.shortDescription}
-                    onChange={(e) => setProductForm({ ...productForm, shortDescription: e.target.value })}
-                    placeholder="A brief description of the product (max 100 characters)"
-                    rows={3}
-                    maxLength={100}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    A short description for the mini catalog.
-                  </p>
-                </div>
-
-                {/* Purchase Price - Admin Only Field */}
-                <div className="bg-muted/30 p-4 rounded-lg border-dashed border-2">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="bg-warning/10 text-warning-foreground px-2 py-1 rounded text-xs font-medium">
-                      ADMIN ONLY
-                    </div>
-                  </div>
-                  <Label htmlFor="purchasePrice">Purchase Price (for profit calculations)</Label>
-                  <Input
-                    id="purchasePrice"
+                    id="price"
                     type="number"
                     step="0.01"
-                    value={productForm.purchasePrice}
-                    onChange={(e) => setProductForm({ ...productForm, purchasePrice: e.target.value })}
-                    placeholder="0.00 (optional)"
+                    value={productForm.price}
+                    onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                    placeholder="0.00"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This field is only visible to admin users and used for profit calculations. Leave empty if not needed.
-                  </p>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-6">
-                <Button
-                  onClick={() => setShowProductModal(false)}
-                  variant="outline"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveProduct}
-                  className="bg-gradient-primary shadow-elegant"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {editingProduct ? 'Update' : 'Add'} Product
-                </Button>
+              <div>
+                <Label htmlFor="category">Category</Label>
+                <Input
+                  id="category"
+                  value={productForm.category}
+                  onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                  placeholder="Enter category"
+                />
               </div>
+
+              {/* MINI-CATALOG FEATURE: New fields for thumbnail and short description */}
+              <div>
+                <Label htmlFor="thumbnail">Thumbnail URL</Label>
+                <Input
+                  id="thumbnail"
+                  value={productForm.thumbnail}
+                  onChange={(e) => setProductForm({ ...productForm, thumbnail: e.target.value })}
+                  placeholder="e.g., https://example.com/image.jpg"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  URL for a small product image (e.g., 60x60px).
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="shortDescription">Short Description</Label>
+                <Textarea
+                  id="shortDescription"
+                  value={productForm.shortDescription}
+                  onChange={(e) => setProductForm({ ...productForm, shortDescription: e.target.value })}
+                  placeholder="A brief description of the product (max 100 characters)"
+                  rows={3}
+                  maxLength={100}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  A short description for the mini catalog.
+                </p>
+              </div>
+
+              {/* Purchase Price - Admin Only Field */}
+              <div className="bg-muted/30 p-4 rounded-lg border-dashed border-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="bg-warning/10 text-warning-foreground px-2 py-1 rounded text-xs font-medium">
+                    ADMIN ONLY
+                  </div>
+                </div>
+                <Label htmlFor="purchasePrice">Purchase Price (for profit calculations)</Label>
+                <Input
+                  id="purchasePrice"
+                  type="number"
+                  step="0.01"
+                  value={productForm.purchasePrice}
+                  onChange={(e) => setProductForm({ ...productForm, purchasePrice: e.target.value })}
+                  placeholder="0.00 (optional)"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  This field is only visible to admin users and used for profit calculations. Leave empty if not needed.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="p-6 pt-4 border-t flex justify-end gap-3">
+              <Button
+                onClick={() => setShowProductModal(false)}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveProduct}
+                className="bg-gradient-primary shadow-elegant"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {editingProduct ? 'Update' : 'Add'} Product
+              </Button>
             </div>
           </Card>
         </div>
