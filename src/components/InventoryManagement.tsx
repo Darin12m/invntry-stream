@@ -178,7 +178,7 @@ const InventoryManagementApp = () => {
     shortDescription: ''
   });
 
-  // NEW: State for thumbnail file upload
+  // State for thumbnail file upload
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const thumbnailFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -349,6 +349,7 @@ const InventoryManagementApp = () => {
       shortDescription: ''
     });
     setThumbnailFile(null); // Clear any selected file
+    if (thumbnailFileInputRef.current) thumbnailFileInputRef.current.value = ''; // Clear file input
     setShowProductModal(true);
   };
 
@@ -365,6 +366,7 @@ const InventoryManagementApp = () => {
       shortDescription: product.shortDescription || ''
     });
     setThumbnailFile(null); // Clear any selected file, user can re-upload
+    if (thumbnailFileInputRef.current) thumbnailFileInputRef.current.value = ''; // Clear file input
     setShowProductModal(true);
   };
 
@@ -382,9 +384,10 @@ const InventoryManagementApp = () => {
       shortDescription: ''
     });
     setThumbnailFile(null); // Clear selected file on close
+    if (thumbnailFileInputRef.current) thumbnailFileInputRef.current.value = ''; // Clear file input
   };
 
-  // NEW: Handle thumbnail file selection
+  // Handle thumbnail file selection
   const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setThumbnailFile(e.target.files[0]);
@@ -394,13 +397,20 @@ const InventoryManagementApp = () => {
     }
   };
 
+  // Handle direct URL input change
+  const handleThumbnailUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setProductForm(prevForm => ({ ...prevForm, thumbnail: e.target.value }));
+    setThumbnailFile(null); // Clear file selection if URL is being typed/pasted
+    if (thumbnailFileInputRef.current) thumbnailFileInputRef.current.value = ''; // Clear file input
+  };
+
   const handleSaveProduct = async () => {
     if (!productForm.name.trim() || !productForm.sku.trim() || !productForm.price || !productForm.quantity) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    let thumbnailUrl = productForm.thumbnail; // Start with existing URL or direct input if no file is selected
+    let thumbnailUrl = productForm.thumbnail; // Start with existing URL or direct input
 
     if (thumbnailFile) {
       // Upload new file to Firebase Storage
@@ -1518,9 +1528,22 @@ const InventoryManagementApp = () => {
                 />
               </div>
 
-              {/* NEW: Thumbnail Upload Section */}
+              {/* Product Thumbnail Section - Now with both URL input and file upload */}
               <div>
-                <Label htmlFor="thumbnail-upload">Product Thumbnail</Label>
+                <Label htmlFor="thumbnail-url">Product Thumbnail URL</Label>
+                <Input
+                  id="thumbnail-url"
+                  type="text"
+                  value={productForm.thumbnail}
+                  onChange={handleThumbnailUrlChange}
+                  placeholder="Paste Google Drive link or direct image URL"
+                  disabled={!!thumbnailFile} // Disable if a file is selected
+                />
+                <p className="text-xs text-muted-foreground mt-1 mb-2">
+                  Paste a Google Drive share link (ensure it's public) or any direct image URL.
+                </p>
+
+                <Label htmlFor="thumbnail-upload" className="block mt-4">Or Upload Image File</Label>
                 <Input
                   id="thumbnail-upload"
                   type="file"
@@ -1528,7 +1551,12 @@ const InventoryManagementApp = () => {
                   ref={thumbnailFileInputRef}
                   onChange={handleThumbnailFileChange}
                   className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                  disabled={!!productForm.thumbnail} // Disable if a URL is entered
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Upload an image file directly.
+                </p>
+
                 {(thumbnailFile || productForm.thumbnail) && (
                   <div className="mt-3 flex items-center gap-3 p-2 border rounded-md bg-muted/20">
                     <img
@@ -1554,9 +1582,6 @@ const InventoryManagementApp = () => {
                     </Button>
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  Upload an image file for the product thumbnail.
-                </p>
               </div>
 
               <div>
@@ -2398,7 +2423,7 @@ const InventoryManagementApp = () => {
                   <select
                     id="purchasePrice-mapping"
                     value={columnMapping.purchasePrice}
-                    onChange={(e) => setColumnMapping({ ...columnMapping, purchasePrice: e.target.value })}
+                    onChange={(e) => setColumnMapping({ ...columnColumnMapping, purchasePrice: e.target.value })}
                     className="w-full p-2 border border-border rounded-md bg-background"
                   >
                     <option value="">Select column or leave empty...</option>
