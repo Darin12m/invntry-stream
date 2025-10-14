@@ -66,6 +66,55 @@ interface Invoice {
   status: string;
 }
 
+// --- NEW IMAGE LOADING UTILITY FUNCTION ---
+async function loadImageAsDataURL(url: string, timeout = 10000): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (!url) {
+      console.warn("loadImageAsDataURL: URL is empty.");
+      return resolve(null);
+    }
+
+    const img = new Image();
+    img.crossOrigin = "Anonymous"; // Essential for loading cross-origin images to canvas
+    img.src = url;
+
+    const timer = setTimeout(() => {
+      img.onload = null; // Clear handlers to prevent double resolution
+      img.onerror = null;
+      console.warn(`Image loading timed out for: ${url}`);
+      resolve(null);
+    }, timeout);
+
+    img.onload = () => {
+      clearTimeout(timer);
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/png')); // Use PNG for better quality and transparency
+        } else {
+          console.error("Could not get 2D context for canvas.");
+          resolve(null);
+        }
+      } catch (e) {
+        console.error(`Error processing image ${url} to canvas:`, e);
+        resolve(null);
+      }
+    };
+
+    img.onerror = (e) => {
+      clearTimeout(timer);
+      console.error(`Failed to load image: ${url}`, e);
+      resolve(null);
+    };
+  });
+}
+// --- END NEW IMAGE LOADING UTILITY FUNCTION ---
+
+
 const InventoryManagementApp = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -1048,59 +1097,36 @@ const InventoryManagementApp = () => {
 
         // Add Thumbnail
         if (product.thumbnail) {
-          try {
-            const img = new Image();
-            img.crossOrigin = "Anonymous"; // Important for CORS if images are from different domain
-            img.src = product.thumbnail;
-
-            const imgData = await new Promise<string | null>((resolve) => {
-              const timeout = setTimeout(() => {
-                console.warn(`Image loading timed out for product ${product.name} from ${product.thumbnail}`);
-                resolve(null); // Resolve with null if timeout occurs
-              }, 10000); // 10 seconds timeout
-
+          const imgData = await loadImageAsDataURL(product.thumbnail);
+          if (imgData) {
+            const img = new Image(); // Create a temporary image to get dimensions
+            img.src = imgData;
+            await new Promise<void>((resolve) => {
               img.onload = () => {
-                clearTimeout(timeout);
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                  canvas.width = img.naturalWidth;
-                  canvas.height = img.naturalHeight;
-                  ctx.drawImage(img, 0, 0);
-                  resolve(canvas.toDataURL('image/png')); // Use PNG for better quality and transparency support
-                } else {
-                  console.error("Could not get 2D context for canvas.");
-                  resolve(null);
+                const imgX = x + productWidth / 2;
+                const imgY = y + 5; // 5mm padding from top
+                const imgMaxHeight = productHeight * 0.4; // Max 40% of card height
+                const imgMaxWidth = productWidth * 0.8; // Max 80% of card width
+
+                const aspectRatio = img.width / img.height;
+                let finalImgWidth = imgMaxWidth;
+                let finalImgHeight = imgMaxWidth / aspectRatio;
+
+                if (finalImgHeight > imgMaxHeight) {
+                  finalImgHeight = imgMaxHeight;
+                  finalImgWidth = imgMaxHeight * aspectRatio;
                 }
+                
+                doc.addImage(imgData, 'PNG', imgX - finalImgWidth / 2, imgY, finalImgWidth, finalImgHeight);
+                resolve();
               };
-              img.onerror = (e) => {
-                clearTimeout(timeout);
-                console.error(`Failed to load image for product ${product.name} from ${product.thumbnail}:`, e);
-                resolve(null); // Resolve with null if image fails to load
+              img.onerror = () => {
+                console.warn(`Failed to render image data for product ${product.name}.`);
+                resolve();
               };
             });
-
-            if (imgData) {
-              const imgX = x + productWidth / 2;
-              const imgY = y + 5; // 5mm padding from top
-              const imgMaxHeight = productHeight * 0.4; // Max 40% of card height
-              const imgMaxWidth = productWidth * 0.8; // Max 80% of card width
-
-              const aspectRatio = img.width / img.height;
-              let finalImgWidth = imgMaxWidth;
-              let finalImgHeight = imgMaxWidth / aspectRatio;
-
-              if (finalImgHeight > imgMaxHeight) {
-                finalImgHeight = imgMaxHeight;
-                finalImgWidth = imgMaxHeight * aspectRatio;
-              }
-              
-              doc.addImage(imgData, 'PNG', imgX - finalImgWidth / 2, imgY, finalImgWidth, finalImgHeight);
-            } else {
-              console.warn(`Skipping image for product ${product.name} due to loading failure or timeout.`);
-            }
-          } catch (imgError) {
-            console.error("Error processing image for PDF:", imgError);
+          } else {
+            console.warn(`Skipping image for product ${product.name} due to loading failure or timeout.`);
           }
         }
 
