@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useDeferredValue, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Sun, Moon } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Sun, Moon, BookOpenText } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -35,6 +35,9 @@ interface Product {
   price: number;
   category: string;
   purchasePrice?: number; // Admin-only field for profit calculations
+  // MINI-CATALOG FEATURE: New fields
+  thumbnail?: string; // URL for a small image
+  shortDescription?: string; // Short text description
 }
 
 interface Invoice {
@@ -102,7 +105,7 @@ const InventoryManagementApp = () => {
   const [columnMapping, setColumnMapping] = useState({
     name: '',
     sku: '',
-    quantity: '',
+        quantity: '',
     price: '',
     category: '',
     purchasePrice: ''
@@ -120,7 +123,10 @@ const InventoryManagementApp = () => {
     quantity: '',
     price: '',
     category: '',
-    purchasePrice: '' // Admin-only field
+    purchasePrice: '', // Admin-only field
+    // MINI-CATALOG FEATURE: New fields
+    thumbnail: '',
+    shortDescription: ''
   });
 
   // Listen for auth state changes
@@ -277,7 +283,17 @@ const InventoryManagementApp = () => {
   // Product CRUD operations
   const handleAddProduct = () => {
     setEditingProduct(null);
-    setProductForm({ name: '', sku: '', quantity: '', price: '', category: '', purchasePrice: '' });
+    setProductForm({ 
+      name: '', 
+      sku: '', 
+      quantity: '', 
+      price: '', 
+      category: '', 
+      purchasePrice: '',
+      // MINI-CATALOG FEATURE: Initialize new fields
+      thumbnail: '',
+      shortDescription: ''
+    });
     setShowProductModal(true);
   };
 
@@ -289,7 +305,10 @@ const InventoryManagementApp = () => {
       quantity: product.quantity.toString(),
       price: product.price.toString(),
       category: product.category,
-      purchasePrice: product.purchasePrice?.toString() || ''
+      purchasePrice: product.purchasePrice?.toString() || '',
+      // MINI-CATALOG FEATURE: Populate new fields
+      thumbnail: product.thumbnail || '',
+      shortDescription: product.shortDescription || ''
     });
     setShowProductModal(true);
   };
@@ -306,7 +325,10 @@ const InventoryManagementApp = () => {
       quantity: parseInt(productForm.quantity),
       price: parseFloat(productForm.price),
       category: productForm.category,
-      ...(productForm.purchasePrice && { purchasePrice: parseFloat(productForm.purchasePrice) })
+      ...(productForm.purchasePrice && { purchasePrice: parseFloat(productForm.purchasePrice) }),
+      // MINI-CATALOG FEATURE: Save new fields
+      ...(productForm.thumbnail && { thumbnail: productForm.thumbnail }),
+      ...(productForm.shortDescription && { shortDescription: productForm.shortDescription })
     };
 
     try {
@@ -319,7 +341,17 @@ const InventoryManagementApp = () => {
       }
       
       setShowProductModal(false);
-      setProductForm({ name: '', sku: '', quantity: '', price: '', category: '', purchasePrice: '' });
+      setProductForm({ 
+        name: '', 
+        sku: '', 
+        quantity: '', 
+        price: '', 
+        category: '', 
+        purchasePrice: '',
+        // MINI-CATALOG FEATURE: Reset new fields
+        thumbnail: '',
+        shortDescription: ''
+      });
       // Data will reload automatically via onSnapshot
     } catch (error) {
       console.error('Error saving product:', error);
@@ -948,6 +980,130 @@ const InventoryManagementApp = () => {
     }
   };
 
+  // MINI-CATALOG FEATURE: New function to create a mini catalog PDF
+  const createMiniCatalog = async () => {
+    if (selectedProducts.size === 0) {
+      toast.error("Please select at least one product to create a mini catalog.");
+      return;
+    }
+
+    toast.loading("Generating mini catalog...", { id: "catalog-toast" });
+
+    try {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - 2 * margin;
+      let cursorY = margin;
+      let productsPerRow = 2; // Can be 2 or 3
+      let productWidth = (contentWidth - (productsPerRow - 1) * 10) / productsPerRow; // 10mm spacing between products
+      let productHeight = 100; // Fixed height for each product card
+      let rowHeight = productHeight + 10; // Product height + spacing
+
+      const selectedProductsData = products.filter(p => selectedProducts.has(p.id));
+
+      // Helper to add header and footer
+      const addPageHeaderFooter = (pageNumber: number) => {
+        doc.setFontSize(24);
+        doc.setFont("helvetica", "bold");
+        doc.text("КАТАЛОГ НА ПРОИЗВОДИ", pageWidth / 2, margin + 10, { align: "center" });
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "normal");
+        doc.text("Колекција Вселена", pageWidth / 2, margin + 18, { align: "center" });
+
+        doc.setFontSize(10);
+        doc.text(`Страна ${pageNumber}`, pageWidth / 2, pageHeight - margin + 5, { align: "center" });
+      };
+
+      addPageHeaderFooter(1);
+      cursorY += 30; // Space for header
+
+      let productCount = 0;
+      let currentPage = 1;
+
+      for (const product of selectedProductsData) {
+        const colIndex = productCount % productsPerRow;
+        const rowIndex = Math.floor(productCount / productsPerRow);
+
+        let x = margin + colIndex * (productWidth + 10);
+        let y = cursorY + rowIndex * rowHeight;
+
+        // Check if new page is needed
+        if (y + productHeight > pageHeight - margin - 10) { // 10mm buffer for footer
+          doc.addPage();
+          currentPage++;
+          addPageHeaderFooter(currentPage);
+          cursorY = margin + 30; // Reset cursorY for new page, accounting for header
+          y = cursorY; // Reset y for the first product on new page
+          productCount = 0; // Reset product count for new page layout
+          x = margin + colIndex * (productWidth + 10); // Recalculate x based on new productCount
+        }
+
+        // Product Card Background
+        doc.setFillColor(245, 245, 245); // Light grey background
+        doc.rect(x, y, productWidth, productHeight, 'F');
+        doc.setDrawColor(200, 200, 200); // Light grey border
+        doc.rect(x, y, productWidth, productHeight, 'S');
+
+        // Add Thumbnail
+        if (product.thumbnail) {
+          try {
+            const img = new Image();
+            img.src = product.thumbnail;
+            await new Promise((resolve, reject) => {
+              img.onload = () => {
+                const imgX = x + productWidth / 2;
+                const imgY = y + 5; // 5mm padding from top
+                const imgMaxHeight = productHeight * 0.4; // Max 40% of card height
+                const imgMaxWidth = productWidth * 0.8; // Max 80% of card width
+
+                const aspectRatio = img.width / img.height;
+                let finalImgWidth = imgMaxWidth;
+                let finalImgHeight = imgMaxWidth / aspectRatio;
+
+                if (finalImgHeight > imgMaxHeight) {
+                  finalImgHeight = imgMaxHeight;
+                  finalImgWidth = imgMaxHeight * aspectRatio;
+                }
+                
+                doc.addImage(img, 'JPEG', imgX - finalImgWidth / 2, imgY, finalImgWidth, finalImgHeight);
+                resolve(null);
+              };
+              img.onerror = (e) => {
+                console.warn(`Failed to load image for product ${product.name}:`, e);
+                resolve(null); // Resolve even if image fails to load
+              };
+            });
+          } catch (imgError) {
+            console.error("Error adding image to PDF:", imgError);
+          }
+        }
+
+        // Add Product Name
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text(product.name, x + productWidth / 2, y + productHeight * 0.55, { align: "center" });
+
+        // Add Short Description
+        if (product.shortDescription) {
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          const splitDescription = doc.splitTextToSize(product.shortDescription, productWidth - 10); // 10mm padding
+          doc.text(splitDescription, x + productWidth / 2, y + productHeight * 0.65, { align: "center" });
+        }
+        
+        productCount++;
+      }
+
+      doc.save("mini-catalog.pdf");
+      toast.success("Mini catalog generated successfully!", { id: "catalog-toast" });
+    } catch (error) {
+      console.error("Error generating mini catalog:", error);
+      toast.error("Failed to generate mini catalog.", { id: "catalog-toast" });
+    }
+  };
+
   // Dashboard calculations
   const getFilteredInvoices = () => {
     return invoices.filter(invoice => {
@@ -1155,6 +1311,8 @@ const InventoryManagementApp = () => {
             sortDirection={sortDirection}
             handleSort={handleSort}
             getStockStatus={getStockStatus}
+            // MINI-CATALOG FEATURE: Pass the new function
+            handleCreateMiniCatalog={createMiniCatalog}
           />
         )}
         {activeTab === 'invoices' && (
@@ -1276,6 +1434,35 @@ const InventoryManagementApp = () => {
                     onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
                     placeholder="Enter category"
                   />
+                </div>
+
+                {/* MINI-CATALOG FEATURE: New fields for thumbnail and short description */}
+                <div>
+                  <Label htmlFor="thumbnail">Thumbnail URL</Label>
+                  <Input
+                    id="thumbnail"
+                    value={productForm.thumbnail}
+                    onChange={(e) => setProductForm({ ...productForm, thumbnail: e.target.value })}
+                    placeholder="e.g., https://example.com/image.jpg"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    URL for a small product image (e.g., 60x60px).
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="shortDescription">Short Description</Label>
+                  <Textarea
+                    id="shortDescription"
+                    value={productForm.shortDescription}
+                    onChange={(e) => setProductForm({ ...productForm, shortDescription: e.target.value })}
+                    placeholder="A brief description of the product (max 100 characters)"
+                    rows={3}
+                    maxLength={100}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    A short description for the mini catalog.
+                  </p>
                 </div>
 
                 {/* Purchase Price - Admin Only Field */}

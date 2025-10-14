@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Plus, Edit, Trash2, Package, X, CheckSquare, Square, Trash, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, X, CheckSquare, Square, Trash, ChevronUp, ChevronDown, BookOpenText } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,9 @@ interface Product {
   price: number;
   category: string;
   purchasePrice?: number;
+  // MINI-CATALOG FEATURE: New fields
+  thumbnail?: string;
+  shortDescription?: string;
 }
 
 interface InventoryTabProps {
@@ -34,6 +37,8 @@ interface InventoryTabProps {
   sortDirection: 'asc' | 'desc';
   handleSort: (column: 'name' | 'sku' | 'category' | 'quantity' | 'price') => void;
   getStockStatus: (quantity: number) => { label: string; variant: 'destructive' | 'warning' | 'secondary' | 'default' };
+  // MINI-CATALOG FEATURE: New prop for the catalog function
+  handleCreateMiniCatalog: () => void;
 }
 
 const InventoryTab: React.FC<InventoryTabProps> = ({
@@ -54,6 +59,8 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   sortDirection,
   handleSort,
   getStockStatus,
+  // MINI-CATALOG FEATURE: Destructure new prop
+  handleCreateMiniCatalog,
 }) => (
   <div className="space-y-6 animate-fade-in">
     {/* Header */}
@@ -72,6 +79,15 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete Selected ({selectedProducts.size})
+            </Button>
+            {/* MINI-CATALOG FEATURE: New button for creating mini catalog */}
+            <Button
+              onClick={handleCreateMiniCatalog}
+              className="bg-purple-600 hover:bg-purple-700 text-white shadow-elegant transition-all duration-300"
+              disabled={selectedProducts.size === 0}
+            >
+              <BookOpenText className="h-4 w-4 mr-2" />
+              Create Mini Catalog
             </Button>
           </>
         )}
@@ -228,7 +244,17 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                     />
                   </td>
                   <td className="p-4">
-                    <div className="font-medium text-foreground">{product.name}</div>
+                    {/* MINI-CATALOG FEATURE: Display thumbnail */}
+                    <div className="flex items-center gap-3">
+                      {product.thumbnail && (
+                        <img 
+                          src={product.thumbnail} 
+                          alt={product.name} 
+                          className="w-12 h-12 object-cover rounded-md flex-shrink-0" 
+                        />
+                      )}
+                      <div className="font-medium text-foreground">{product.name}</div>
+                    </div>
                   </td>
                   <td className="p-4 text-center">
                     <span className="text-muted-foreground text-sm">{product.sku}</span>
@@ -286,7 +312,17 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                 className="mt-1 flex-shrink-0"
               />
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-lg text-foreground mb-1">{product.name}</h3>
+                {/* MINI-CATALOG FEATURE: Display thumbnail in mobile view */}
+                <div className="flex items-center gap-3 mb-2">
+                  {product.thumbnail && (
+                    <img 
+                      src={product.thumbnail} 
+                      alt={product.name} 
+                      className="w-12 h-12 object-cover rounded-md flex-shrink-0" 
+                    />
+                  )}
+                  <h3 className="font-bold text-lg text-foreground">{product.name}</h3>
+                </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">SKU:</span>
