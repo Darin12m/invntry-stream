@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { getGoogleDriveDirectLink } from '@/lib/utils'; // Import the new utility
 
 interface Product {
   id: string;
@@ -228,6 +229,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
           <tbody>
             {sortedProducts.map((product, index) => {
               const stockStatus = getStockStatus(product.quantity);
+              const imageUrl = product.thumbnail ? getGoogleDriveDirectLink(product.thumbnail) : ''; // Use utility here
               return (
                 <tr 
                   key={product.id} 
@@ -241,15 +243,15 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-3">
-                      {product.thumbnail ? (
+                      {imageUrl ? (
                         <a 
-                          href={product.thumbnail} 
+                          href={imageUrl} 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="flex-shrink-0 block hover:scale-105 transition-transform"
                         >
                           <img
-                            src={product.thumbnail}
+                            src={imageUrl}
                             alt={product.name}
                             className="w-12 h-12 object-cover rounded-md"
                             onError={(e) => { e.currentTarget.src = '/placeholder.svg'; e.currentTarget.alt = 'Image failed to load'; }}
@@ -310,6 +312,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
     <div className="space-y-4 md:hidden">
       {sortedProducts.map(product => {
         const stockStatus = getStockStatus(product.quantity);
+        const imageUrl = product.thumbnail ? getGoogleDriveDirectLink(product.thumbnail) : ''; // Use utility here
         return (
           <Card key={product.id} className="p-4 hover:shadow-lg transition-all duration-300 animate-scale-in">
             <div className="flex items-start gap-3 mb-3">
@@ -320,15 +323,15 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-2">
-                  {product.thumbnail ? (
+                  {imageUrl ? (
                     <a 
-                      href={product.thumbnail} 
+                      href={imageUrl} 
                       target="_blank" 
                       rel="noopener noreferrer" 
                       className="flex-shrink-0 block hover:scale-105 transition-transform"
                     >
                       <img
-                        src={product.thumbnail}
+                        src={imageUrl}
                         alt={product.name}
                         className="w-12 h-12 object-cover rounded-md"
                         onError={(e) => { e.currentTarget.src = '/placeholder.svg'; e.currentTarget.alt = 'Image failed to load'; }}
@@ -402,7 +405,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
             {products.length === 0 
               ? "Add your first product using the + button above to get started with your inventory." 
               : localSearchInput 
-                ? `No products match "${localSearchInput}". Try adjusting your search.`
+                ? `No products match "${localSearchSearchInput}". Try adjusting your search.`
                 : "No products match the selected filters. Try different filter options."}
           </p>
           {products.length === 0 && (

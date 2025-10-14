@@ -19,6 +19,7 @@ import { db, auth, storage } from '@/lib/firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { signOut, User } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getGoogleDriveDirectLink } from '@/lib/utils'; // Import the new utility
 
 // Import the new tab components
 import InventoryTab from './inventory/InventoryTab';
@@ -407,6 +408,9 @@ const InventoryManagementApp = () => {
       const uploadResult = await uploadBytes(storageRef, thumbnailFile);
       thumbnailUrl = await getDownloadURL(uploadResult.ref);
       toast.success("Thumbnail uploaded!");
+    } else if (productForm.thumbnail) {
+      // If a URL is provided (and no file upload), convert it if it's a Google Drive link
+      thumbnailUrl = getGoogleDriveDirectLink(productForm.thumbnail);
     } else if (editingProduct && !productForm.thumbnail) {
       // If editing and user cleared the URL, set to empty
       thumbnailUrl = '';
@@ -1129,7 +1133,8 @@ const InventoryManagementApp = () => {
 
         // Add Thumbnail
         if (product.thumbnail) {
-          const imgData = await loadImageAsDataURL(product.thumbnail);
+          const directLink = getGoogleDriveDirectLink(product.thumbnail); // Use the utility here
+          const imgData = await loadImageAsDataURL(directLink);
           if (imgData) {
             const img = new Image(); // Create a temporary image to get dimensions
             img.src = imgData;
@@ -1527,7 +1532,7 @@ const InventoryManagementApp = () => {
                 {(thumbnailFile || productForm.thumbnail) && (
                   <div className="mt-3 flex items-center gap-3 p-2 border rounded-md bg-muted/20">
                     <img
-                      src={thumbnailFile ? URL.createObjectURL(thumbnailFile) : productForm.thumbnail}
+                      src={thumbnailFile ? URL.createObjectURL(thumbnailFile) : getGoogleDriveDirectLink(productForm.thumbnail)}
                       alt="Thumbnail Preview"
                       className="w-16 h-16 object-cover rounded-md"
                       onError={(e) => { e.currentTarget.src = '/placeholder.svg'; e.currentTarget.alt = 'Image failed to load'; }}
