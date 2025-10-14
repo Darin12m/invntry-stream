@@ -173,11 +173,13 @@ const InventoryManagementApp = () => {
     price: '',
     category: '',
     purchasePrice: '', // Admin-only field
-    thumbnail: '', // Direct URL input
+    thumbnail: '', // Direct URL input (will be replaced by uploaded URL)
     shortDescription: ''
   });
 
-  // Removed thumbnail file upload states and functions
+  // NEW: State for thumbnail file upload
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const thumbnailFileInputRef = useRef<HTMLInputElement>(null);
 
   // Listen for auth state changes
   useEffect(() => {
@@ -345,6 +347,7 @@ const InventoryManagementApp = () => {
       thumbnail: '', // Direct URL input
       shortDescription: ''
     });
+    setThumbnailFile(null); // Clear any selected file
     setShowProductModal(true);
   };
 
@@ -357,9 +360,10 @@ const InventoryManagementApp = () => {
       price: product.price.toString(),
       category: product.category,
       purchasePrice: product.purchasePrice?.toString() || '',
-      thumbnail: product.thumbnail || '', // Direct URL input
+      thumbnail: product.thumbnail || '', // Existing thumbnail URL
       shortDescription: product.shortDescription || ''
     });
+    setThumbnailFile(null); // Clear any selected file, user can re-upload
     setShowProductModal(true);
   };
 
@@ -376,14 +380,36 @@ const InventoryManagementApp = () => {
       thumbnail: '',
       shortDescription: ''
     });
+    setThumbnailFile(null); // Clear selected file on close
   };
 
-  // Removed thumbnail file change and upload functions
+  // NEW: Handle thumbnail file selection
+  const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setThumbnailFile(e.target.files[0]);
+      setProductForm(prevForm => ({ ...prevForm, thumbnail: '' })); // Clear direct URL if file is selected
+    } else {
+      setThumbnailFile(null);
+    }
+  };
 
   const handleSaveProduct = async () => {
     if (!productForm.name.trim() || !productForm.sku.trim() || !productForm.price || !productForm.quantity) {
       toast.error("Please fill in all required fields");
       return;
+    }
+
+    let thumbnailUrl = productForm.thumbnail; // Start with existing URL or direct input if no file is selected
+
+    if (thumbnailFile) {
+      // Upload new file to Firebase Storage
+      const storageRef = ref(storage, `thumbnails/${thumbnailFile.name}-${Date.now()}`);
+      const uploadResult = await uploadBytes(storageRef, thumbnailFile);
+      thumbnailUrl = await getDownloadURL(uploadResult.ref);
+      toast.success("Thumbnail uploaded!");
+    } else if (editingProduct && !productForm.thumbnail) {
+      // If editing and user cleared the URL, set to empty
+      thumbnailUrl = '';
     }
 
     const productData = {
@@ -393,7 +419,7 @@ const InventoryManagementApp = () => {
       price: parseFloat(productForm.price),
       category: productForm.category,
       ...(productForm.purchasePrice && { purchasePrice: parseFloat(productForm.purchasePrice) }),
-      ...(productForm.thumbnail && { thumbnail: productForm.thumbnail }),
+      thumbnail: thumbnailUrl, // Use the uploaded URL or direct URL
       ...(productForm.shortDescription && { shortDescription: productForm.shortDescription })
     };
 
@@ -1487,31 +1513,36 @@ const InventoryManagementApp = () => {
                 />
               </div>
 
-              {/* Simplified Thumbnail Input Section */}
+              {/* NEW: Thumbnail Upload Section */}
               <div>
-                <Label htmlFor="thumbnail-url">Product Thumbnail URL</Label>
+                <Label htmlFor="thumbnail-upload">Product Thumbnail</Label>
                 <Input
-                  id="thumbnail-url"
-                  type="url"
-                  value={productForm.thumbnail}
-                  onChange={(e) => setProductForm(prevForm => ({ ...prevForm, thumbnail: e.target.value }))}
-                  placeholder="Paste image URL here (e.g., https://example.com/image.jpg)"
+                  id="thumbnail-upload"
+                  type="file"
+                  accept="image/*"
+                  ref={thumbnailFileInputRef}
+                  onChange={handleThumbnailFileChange}
+                  className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                 />
-                {productForm.thumbnail && (
+                {(thumbnailFile || productForm.thumbnail) && (
                   <div className="mt-3 flex items-center gap-3 p-2 border rounded-md bg-muted/20">
                     <img
-                      src={productForm.thumbnail}
+                      src={thumbnailFile ? URL.createObjectURL(thumbnailFile) : productForm.thumbnail}
                       alt="Thumbnail Preview"
                       className="w-16 h-16 object-cover rounded-md"
-                      onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
+                      onError={(e) => { e.currentTarget.src = '/placeholder.svg'; e.currentTarget.alt = 'Image failed to load'; }}
                     />
                     <span className="text-sm text-muted-foreground truncate">
-                      {productForm.thumbnail.length > 50 ? productForm.thumbnail.substring(0, 47) + '...' : productForm.thumbnail}
+                      {thumbnailFile ? thumbnailFile.name : (productForm.thumbnail?.length > 50 ? productForm.thumbnail.substring(0, 47) + '...' : productForm.thumbnail)}
                     </span>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setProductForm(prev => ({ ...prev, thumbnail: '' }))}
+                      onClick={() => {
+                        setThumbnailFile(null);
+                        setProductForm(prev => ({ ...prev, thumbnail: '' }));
+                        if (thumbnailFileInputRef.current) thumbnailFileInputRef.current.value = '';
+                      }}
                       className="ml-auto"
                     >
                       <X className="h-4 w-4" />
@@ -1519,7 +1550,7 @@ const InventoryManagementApp = () => {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  Enter a direct URL to the product image.
+                  Upload an image file for the product thumbnail.
                 </p>
               </div>
 
