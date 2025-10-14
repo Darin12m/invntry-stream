@@ -14,7 +14,6 @@ interface Product {
   price: number;
   category: string;
   purchasePrice?: number;
-  // MINI-CATALOG FEATURE: New fields
   thumbnail?: string;
   shortDescription?: string;
 }
@@ -37,7 +36,6 @@ interface InventoryTabProps {
   sortDirection: 'asc' | 'desc';
   handleSort: (column: 'name' | 'sku' | 'category' | 'quantity' | 'price') => void;
   getStockStatus: (quantity: number) => { label: string; variant: 'destructive' | 'warning' | 'secondary' | 'default' };
-  // MINI-CATALOG FEATURE: New prop for the catalog function
   handleCreateMiniCatalog: () => void;
 }
 
@@ -59,7 +57,6 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   sortDirection,
   handleSort,
   getStockStatus,
-  // MINI-CATALOG FEATURE: Destructure new prop
   handleCreateMiniCatalog,
 }) => (
   <div className="space-y-6 animate-fade-in">
@@ -80,7 +77,6 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
               <Trash2 className="h-4 w-4 mr-2" />
               Delete Selected ({selectedProducts.size})
             </Button>
-            {/* MINI-CATALOG FEATURE: New button for creating mini catalog */}
             <Button
               onClick={handleCreateMiniCatalog}
               className="bg-purple-600 hover:bg-purple-700 text-white shadow-elegant transition-all duration-300"
@@ -244,17 +240,14 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                     />
                   </td>
                   <td className="p-4">
-                    {/* MINI-CATALOG FEATURE: Display thumbnail */}
                     <div className="flex items-center gap-3">
                       {product.thumbnail ? (
-                        <a href={product.thumbnail} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                          <img
-                            src={product.thumbnail}
-                            alt={product.name}
-                            className="w-12 h-12 object-cover rounded-md"
-                            onError={(e) => { e.currentTarget.src = '/placeholder.svg'; console.log('Image failed to load:', product.thumbnail); }}
-                          />
-                        </a>
+                        <img
+                          src={product.thumbnail}
+                          alt={product.name}
+                          className="w-12 h-12 object-cover rounded-md flex-shrink-0"
+                          onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
+                        />
                       ) : (
                         <div className="w-12 h-12 object-cover rounded-md flex-shrink-0 bg-muted flex items-center justify-center text-muted-foreground text-xs">
                           No Img
@@ -319,17 +312,14 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                 className="mt-1 flex-shrink-0"
               />
               <div className="flex-1 min-w-0">
-                {/* MINI-CATALOG FEATURE: Display thumbnail in mobile view */}
                 <div className="flex items-center gap-3 mb-2">
                   {product.thumbnail ? (
-                    <a href={product.thumbnail} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                      <img
-                        src={product.thumbnail}
-                        alt={product.name}
-                        className="w-12 h-12 object-cover rounded-md"
-                        onError={(e) => { e.currentTarget.src = '/placeholder.svg'; console.log('Image failed to load:', product.thumbnail); }}
-                      />
-                    </a>
+                    <img
+                      src={product.thumbnail}
+                      alt={product.name}
+                      className="w-12 h-12 object-cover rounded-md flex-shrink-0"
+                      onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
+                    />
                   ) : (
                     <div className="w-12 h-12 object-cover rounded-md flex-shrink-0 bg-muted flex items-center justify-center text-muted-foreground text-xs">
                       No Img

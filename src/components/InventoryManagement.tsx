@@ -15,10 +15,10 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { db, auth, storage } from '@/lib/firebase'; // Import storage
+import { db, auth, storage } from '@/lib/firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { signOut, User } from 'firebase/auth';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Import storage functions
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // Import the new tab components
 import InventoryTab from './inventory/InventoryTab';
@@ -36,7 +36,6 @@ interface Product {
   price: number;
   category: string;
   purchasePrice?: number; // Admin-only field for profit calculations
-  // MINI-CATALOG FEATURE: New fields
   thumbnail?: string; // URL for a small image
   shortDescription?: string; // Short text description
 }
@@ -67,7 +66,7 @@ interface Invoice {
   status: string;
 }
 
-// --- NEW IMAGE LOADING UTILITY FUNCTION ---
+// --- NEW IMAGE LOADING UTILITY FUNCTION (kept for PDF generation) ---
 async function loadImageAsDataURL(url: string, timeout = 10000): Promise<string | null> {
   return new Promise((resolve) => {
     if (!url) {
@@ -174,16 +173,11 @@ const InventoryManagementApp = () => {
     price: '',
     category: '',
     purchasePrice: '', // Admin-only field
-    // MINI-CATALOG FEATURE: New fields
-    thumbnail: '',
+    thumbnail: '', // Direct URL input
     shortDescription: ''
   });
 
-  // New state for thumbnail upload
-  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
-  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
-  const thumbnailFileInputRef = useRef<HTMLInputElement>(null);
-
+  // Removed thumbnail file upload states and functions
 
   // Listen for auth state changes
   useEffect(() => {
@@ -348,12 +342,9 @@ const InventoryManagementApp = () => {
       price: '', 
       category: '', 
       purchasePrice: '',
-      // MINI-CATALOG FEATURE: Initialize new fields
-      thumbnail: '',
+      thumbnail: '', // Direct URL input
       shortDescription: ''
     });
-    setThumbnailFile(null); // Clear selected file
-    setIsUploadingThumbnail(false); // Reset upload status
     setShowProductModal(true);
   };
 
@@ -366,12 +357,9 @@ const InventoryManagementApp = () => {
       price: product.price.toString(),
       category: product.category,
       purchasePrice: product.purchasePrice?.toString() || '',
-      // MINI-CATALOG FEATURE: Populate new fields
-      thumbnail: product.thumbnail || '',
+      thumbnail: product.thumbnail || '', // Direct URL input
       shortDescription: product.shortDescription || ''
     });
-    setThumbnailFile(null); // Clear selected file
-    setIsUploadingThumbnail(false); // Reset upload status
     setShowProductModal(true);
   };
 
@@ -388,42 +376,9 @@ const InventoryManagementApp = () => {
       thumbnail: '',
       shortDescription: ''
     });
-    setThumbnailFile(null);
-    setIsUploadingThumbnail(false);
   };
 
-  const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setThumbnailFile(e.target.files[0]);
-    } else {
-      setThumbnailFile(null);
-    }
-  };
-
-  const uploadThumbnail = async () => {
-    if (!thumbnailFile) {
-      toast.error("Please select an image file to upload.");
-      return;
-    }
-
-    setIsUploadingThumbnail(true);
-    const uploadToastId = toast.loading("Uploading thumbnail...");
-
-    try {
-      const storageRef = ref(storage, `product_thumbnails/${thumbnailFile.name}-${Date.now()}`);
-      const snapshot = await uploadBytes(storageRef, thumbnailFile);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-
-      setProductForm(prevForm => ({ ...prevForm, thumbnail: downloadURL }));
-      toast.success("Thumbnail uploaded successfully!", { id: uploadToastId });
-      setThumbnailFile(null); // Clear the file input after successful upload
-    } catch (error) {
-      console.error("Error uploading thumbnail:", error);
-      toast.error("Failed to upload thumbnail.", { id: uploadToastId });
-    } finally {
-      setIsUploadingThumbnail(false);
-    }
-  };
+  // Removed thumbnail file change and upload functions
 
   const handleSaveProduct = async () => {
     if (!productForm.name.trim() || !productForm.sku.trim() || !productForm.price || !productForm.quantity) {
@@ -438,7 +393,6 @@ const InventoryManagementApp = () => {
       price: parseFloat(productForm.price),
       category: productForm.category,
       ...(productForm.purchasePrice && { purchasePrice: parseFloat(productForm.purchasePrice) }),
-      // MINI-CATALOG FEATURE: Save new fields
       ...(productForm.thumbnail && { thumbnail: productForm.thumbnail }),
       ...(productForm.shortDescription && { shortDescription: productForm.shortDescription })
     };
@@ -1187,13 +1141,7 @@ const InventoryManagementApp = () => {
         doc.setFont("helvetica", "bold");
         doc.text(product.name, x + productWidth / 2, y + productHeight * 0.55, { align: "center" });
 
-        // Add Short Description
-        if (product.shortDescription) {
-          doc.setFontSize(9);
-          doc.setFont("helvetica", "normal");
-          const splitDescription = doc.splitTextToSize(product.shortDescription, productWidth - 10); // 10mm padding
-          doc.text(splitDescription, x + productWidth / 2, y + productHeight * 0.65, { align: "center" });
-        }
+        // Removed short description from mini-catalog display
         
         productCount++;
       }
@@ -1539,26 +1487,16 @@ const InventoryManagementApp = () => {
                 />
               </div>
 
-              {/* Thumbnail Upload Section */}
+              {/* Simplified Thumbnail Input Section */}
               <div>
-                <Label htmlFor="thumbnail-upload">Product Thumbnail</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <Input
-                    id="thumbnail-upload"
-                    type="file"
-                    accept="image/*"
-                    ref={thumbnailFileInputRef}
-                    onChange={handleThumbnailFileChange}
-                    className="flex-1"
-                  />
-                  <Button
-                    onClick={uploadThumbnail}
-                    disabled={!thumbnailFile || isUploadingThumbnail}
-                    className="shrink-0"
-                  >
-                    {isUploadingThumbnail ? 'Uploading...' : 'Upload'}
-                  </Button>
-                </div>
+                <Label htmlFor="thumbnail-url">Product Thumbnail URL</Label>
+                <Input
+                  id="thumbnail-url"
+                  type="url"
+                  value={productForm.thumbnail}
+                  onChange={(e) => setProductForm(prevForm => ({ ...prevForm, thumbnail: e.target.value }))}
+                  placeholder="Paste image URL here (e.g., https://example.com/image.jpg)"
+                />
                 {productForm.thumbnail && (
                   <div className="mt-3 flex items-center gap-3 p-2 border rounded-md bg-muted/20">
                     <img
@@ -1568,7 +1506,7 @@ const InventoryManagementApp = () => {
                       onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
                     />
                     <span className="text-sm text-muted-foreground truncate">
-                      {productForm.thumbnail.split('/').pop()}
+                      {productForm.thumbnail.length > 50 ? productForm.thumbnail.substring(0, 47) + '...' : productForm.thumbnail}
                     </span>
                     <Button
                       variant="ghost"
@@ -1580,16 +1518,8 @@ const InventoryManagementApp = () => {
                     </Button>
                   </div>
                 )}
-                {!productForm.thumbnail && thumbnailFile && (
-                  <div className="mt-3 flex items-center gap-3 p-2 border rounded-md bg-muted/20">
-                    <ImageIcon className="w-16 h-16 text-muted-foreground p-2" />
-                    <span className="text-sm text-muted-foreground truncate">
-                      {thumbnailFile.name} (Pending Upload)
-                    </span>
-                  </div>
-                )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  Upload an image for the product thumbnail.
+                  Enter a direct URL to the product image.
                 </p>
               </div>
 
@@ -1641,7 +1571,6 @@ const InventoryManagementApp = () => {
               <Button
                 onClick={handleSaveProduct}
                 className="bg-gradient-primary shadow-elegant"
-                disabled={isUploadingThumbnail}
               >
                 <Save className="h-4 w-4 mr-2" />
                 {editingProduct ? 'Update' : 'Add'} Product
