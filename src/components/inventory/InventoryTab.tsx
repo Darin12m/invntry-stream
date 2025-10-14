@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Plus, Edit, Trash2, Package, X, CheckSquare, Square, Trash, ChevronUp, ChevronDown, BookOpenText } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, X, CheckSquare, Square, Trash, ChevronUp, ChevronDown, BookOpenText, Image as ImageIcon } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -242,15 +242,22 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       {product.thumbnail ? (
-                        <img
-                          src={product.thumbnail}
-                          alt={product.name}
-                          className="w-12 h-12 object-cover rounded-md flex-shrink-0"
-                          onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
-                        />
+                        <a 
+                          href={product.thumbnail} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="flex-shrink-0 block hover:scale-105 transition-transform"
+                        >
+                          <img
+                            src={product.thumbnail}
+                            alt={product.name}
+                            className="w-12 h-12 object-cover rounded-md"
+                            onError={(e) => { e.currentTarget.src = '/placeholder.svg'; e.currentTarget.alt = 'Image failed to load'; }}
+                          />
+                        </a>
                       ) : (
                         <div className="w-12 h-12 object-cover rounded-md flex-shrink-0 bg-muted flex items-center justify-center text-muted-foreground text-xs">
-                          No Img
+                          <ImageIcon className="h-6 w-6 opacity-50" />
                         </div>
                       )}
                       <div className="font-medium text-foreground">{product.name}</div>
@@ -314,15 +321,22 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-2">
                   {product.thumbnail ? (
-                    <img
-                      src={product.thumbnail}
-                      alt={product.name}
-                      className="w-12 h-12 object-cover rounded-md flex-shrink-0"
-                      onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
-                    />
+                    <a 
+                      href={product.thumbnail} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="flex-shrink-0 block hover:scale-105 transition-transform"
+                    >
+                      <img
+                        src={product.thumbnail}
+                        alt={product.name}
+                        className="w-12 h-12 object-cover rounded-md"
+                        onError={(e) => { e.currentTarget.src = '/placeholder.svg'; e.currentTarget.alt = 'Image failed to load'; }}
+                      />
+                    </a>
                   ) : (
                     <div className="w-12 h-12 object-cover rounded-md flex-shrink-0 bg-muted flex items-center justify-center text-muted-foreground text-xs">
-                      No Img
+                      <ImageIcon className="h-6 w-6 opacity-50" />
                     </div>
                   )}
                   <h3 className="font-bold text-lg text-foreground">{product.name}</h3>
