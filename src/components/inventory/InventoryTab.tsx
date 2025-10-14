@@ -246,13 +246,19 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                   <td className="p-4">
                     {/* MINI-CATALOG FEATURE: Display thumbnail */}
                     <div className="flex items-center gap-3">
-                      {product.thumbnail && (
-                        <img
-                          src={product.thumbnail}
-                          alt={product.name}
-                          className="w-12 h-12 object-cover rounded-md flex-shrink-0"
-                          onError={(e) => { e.currentTarget.src = '/placeholder.svg'; console.log('Image failed to load:', product.thumbnail); }}
-                        />
+                      {product.thumbnail ? (
+                        <a href={product.thumbnail} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                          <img
+                            src={product.thumbnail}
+                            alt={product.name}
+                            className="w-12 h-12 object-cover rounded-md"
+                            onError={(e) => { e.currentTarget.src = '/placeholder.svg'; console.log('Image failed to load:', product.thumbnail); }}
+                          />
+                        </a>
+                      ) : (
+                        <div className="w-12 h-12 object-cover rounded-md flex-shrink-0 bg-muted flex items-center justify-center text-muted-foreground text-xs">
+                          No Img
+                        </div>
                       )}
                       <div className="font-medium text-foreground">{product.name}</div>
                     </div>
@@ -315,13 +321,19 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
               <div className="flex-1 min-w-0">
                 {/* MINI-CATALOG FEATURE: Display thumbnail in mobile view */}
                 <div className="flex items-center gap-3 mb-2">
-                  {product.thumbnail && (
-                    <img
-                      src={product.thumbnail}
-                      alt={product.name}
-                      className="w-12 h-12 object-cover rounded-md flex-shrink-0"
-                      onError={(e) => { e.currentTarget.src = '/placeholder.svg'; console.log('Image failed to load:', product.thumbnail); }}
-                    />
+                  {product.thumbnail ? (
+                    <a href={product.thumbnail} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                      <img
+                        src={product.thumbnail}
+                        alt={product.name}
+                        className="w-12 h-12 object-cover rounded-md"
+                        onError={(e) => { e.currentTarget.src = '/placeholder.svg'; console.log('Image failed to load:', product.thumbnail); }}
+                      />
+                    </a>
+                  ) : (
+                    <div className="w-12 h-12 object-cover rounded-md flex-shrink-0 bg-muted flex items-center justify-center text-muted-foreground text-xs">
+                      No Img
+                    </div>
                   )}
                   <h3 className="font-bold text-lg text-foreground">{product.name}</h3>
                 </div>
