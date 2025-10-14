@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useDeferredValue, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Sun, Moon, BookOpenText } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Sun, Moon, BookOpenText, Image as ImageIcon } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -15,9 +15,10 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { db, auth } from '@/lib/firebase';
+import { db, auth, storage } from '@/lib/firebase'; // Import storage
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { signOut, User } from 'firebase/auth';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Import storage functions
 
 // Import the new tab components
 import InventoryTab from './inventory/InventoryTab';
@@ -177,6 +178,12 @@ const InventoryManagementApp = () => {
     thumbnail: '',
     shortDescription: ''
   });
+
+  // New state for thumbnail upload
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
+  const thumbnailFileInputRef = useRef<HTMLInputElement>(null);
+
 
   // Listen for auth state changes
   useEffect(() => {
@@ -345,6 +352,8 @@ const InventoryManagementApp = () => {
       thumbnail: '',
       shortDescription: ''
     });
+    setThumbnailFile(null); // Clear selected file
+    setIsUploadingThumbnail(false); // Reset upload status
     setShowProductModal(true);
   };
 
@@ -361,7 +370,59 @@ const InventoryManagementApp = () => {
       thumbnail: product.thumbnail || '',
       shortDescription: product.shortDescription || ''
     });
+    setThumbnailFile(null); // Clear selected file
+    setIsUploadingThumbnail(false); // Reset upload status
     setShowProductModal(true);
+  };
+
+  const handleCloseProductModal = () => {
+    setShowProductModal(false);
+    setEditingProduct(null);
+    setProductForm({ 
+      name: '', 
+      sku: '', 
+      quantity: '', 
+      price: '', 
+      category: '', 
+      purchasePrice: '',
+      thumbnail: '',
+      shortDescription: ''
+    });
+    setThumbnailFile(null);
+    setIsUploadingThumbnail(false);
+  };
+
+  const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setThumbnailFile(e.target.files[0]);
+    } else {
+      setThumbnailFile(null);
+    }
+  };
+
+  const uploadThumbnail = async () => {
+    if (!thumbnailFile) {
+      toast.error("Please select an image file to upload.");
+      return;
+    }
+
+    setIsUploadingThumbnail(true);
+    const uploadToastId = toast.loading("Uploading thumbnail...");
+
+    try {
+      const storageRef = ref(storage, `product_thumbnails/${thumbnailFile.name}-${Date.now()}`);
+      const snapshot = await uploadBytes(storageRef, thumbnailFile);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      setProductForm(prevForm => ({ ...prevForm, thumbnail: downloadURL }));
+      toast.success("Thumbnail uploaded successfully!", { id: uploadToastId });
+      setThumbnailFile(null); // Clear the file input after successful upload
+    } catch (error) {
+      console.error("Error uploading thumbnail:", error);
+      toast.error("Failed to upload thumbnail.", { id: uploadToastId });
+    } finally {
+      setIsUploadingThumbnail(false);
+    }
   };
 
   const handleSaveProduct = async () => {
@@ -391,18 +452,7 @@ const InventoryManagementApp = () => {
         toast.success("Product added successfully");
       }
       
-      setShowProductModal(false);
-      setProductForm({ 
-        name: '', 
-        sku: '', 
-        quantity: '', 
-        price: '', 
-        category: '', 
-        purchasePrice: '',
-        // MINI-CATALOG FEATURE: Reset new fields
-        thumbnail: '',
-        shortDescription: ''
-      });
+      handleCloseProductModal(); // Use the new close handler
       // Data will reload automatically via onSnapshot
     } catch (error) {
       console.error('Error saving product:', error);
@@ -1424,7 +1474,7 @@ const InventoryManagementApp = () => {
                 {editingProduct ? 'Edit Product' : 'Add New Product'}
               </h3>
               <Button
-                onClick={() => setShowProductModal(false)}
+                onClick={handleCloseProductModal}
                 variant="ghost"
                 size="sm"
               >
@@ -1489,17 +1539,57 @@ const InventoryManagementApp = () => {
                 />
               </div>
 
-              {/* MINI-CATALOG FEATURE: New fields for thumbnail and short description */}
+              {/* Thumbnail Upload Section */}
               <div>
-                <Label htmlFor="thumbnail">Thumbnail URL</Label>
-                <Input
-                  id="thumbnail"
-                  value={productForm.thumbnail}
-                  onChange={(e) => setProductForm({ ...productForm, thumbnail: e.target.value })}
-                  placeholder="e.g., https://example.com/image.jpg"
-                />
+                <Label htmlFor="thumbnail-upload">Product Thumbnail</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Input
+                    id="thumbnail-upload"
+                    type="file"
+                    accept="image/*"
+                    ref={thumbnailFileInputRef}
+                    onChange={handleThumbnailFileChange}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={uploadThumbnail}
+                    disabled={!thumbnailFile || isUploadingThumbnail}
+                    className="shrink-0"
+                  >
+                    {isUploadingThumbnail ? 'Uploading...' : 'Upload'}
+                  </Button>
+                </div>
+                {productForm.thumbnail && (
+                  <div className="mt-3 flex items-center gap-3 p-2 border rounded-md bg-muted/20">
+                    <img
+                      src={productForm.thumbnail}
+                      alt="Thumbnail Preview"
+                      className="w-16 h-16 object-cover rounded-md"
+                      onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
+                    />
+                    <span className="text-sm text-muted-foreground truncate">
+                      {productForm.thumbnail.split('/').pop()}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setProductForm(prev => ({ ...prev, thumbnail: '' }))}
+                      className="ml-auto"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                {!productForm.thumbnail && thumbnailFile && (
+                  <div className="mt-3 flex items-center gap-3 p-2 border rounded-md bg-muted/20">
+                    <ImageIcon className="w-16 h-16 text-muted-foreground p-2" />
+                    <span className="text-sm text-muted-foreground truncate">
+                      {thumbnailFile.name} (Pending Upload)
+                    </span>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  URL for a small product image (e.g., 60x60px).
+                  Upload an image for the product thumbnail.
                 </p>
               </div>
 
@@ -1543,7 +1633,7 @@ const InventoryManagementApp = () => {
             {/* Footer Buttons */}
             <div className="p-6 pt-4 border-t flex justify-end gap-3">
               <Button
-                onClick={() => setShowProductModal(false)}
+                onClick={handleCloseProductModal}
                 variant="outline"
               >
                 Cancel
@@ -1551,6 +1641,7 @@ const InventoryManagementApp = () => {
               <Button
                 onClick={handleSaveProduct}
                 className="bg-gradient-primary shadow-elegant"
+                disabled={isUploadingThumbnail}
               >
                 <Save className="h-4 w-4 mr-2" />
                 {editingProduct ? 'Update' : 'Add'} Product
