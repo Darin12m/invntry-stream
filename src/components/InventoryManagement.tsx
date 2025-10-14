@@ -1050,29 +1050,40 @@ const InventoryManagementApp = () => {
         if (product.thumbnail) {
           try {
             const img = new Image();
+            img.crossOrigin = "Anonymous"; // Important for CORS if images are from different domain
             img.src = product.thumbnail;
-            await new Promise((resolve, reject) => {
+
+            await new Promise<void>((resolve) => {
               img.onload = () => {
-                const imgX = x + productWidth / 2;
-                const imgY = y + 5; // 5mm padding from top
-                const imgMaxHeight = productHeight * 0.4; // Max 40% of card height
-                const imgMaxWidth = productWidth * 0.8; // Max 80% of card width
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                  canvas.width = img.naturalWidth;
+                  canvas.height = img.naturalHeight;
+                  ctx.drawImage(img, 0, 0);
+                  const imgData = canvas.toDataURL('image/png'); // Use PNG for better quality and transparency support
 
-                const aspectRatio = img.width / img.height;
-                let finalImgWidth = imgMaxWidth;
-                let finalImgHeight = imgMaxWidth / aspectRatio;
+                  const imgX = x + productWidth / 2;
+                  const imgY = y + 5; // 5mm padding from top
+                  const imgMaxHeight = productHeight * 0.4; // Max 40% of card height
+                  const imgMaxWidth = productWidth * 0.8; // Max 80% of card width
 
-                if (finalImgHeight > imgMaxHeight) {
-                  finalImgHeight = imgMaxHeight;
-                  finalImgWidth = imgMaxHeight * aspectRatio;
+                  const aspectRatio = img.width / img.height;
+                  let finalImgWidth = imgMaxWidth;
+                  let finalImgHeight = imgMaxWidth / aspectRatio;
+
+                  if (finalImgHeight > imgMaxHeight) {
+                    finalImgHeight = imgMaxHeight;
+                    finalImgWidth = imgMaxHeight * aspectRatio;
+                  }
+                  
+                  doc.addImage(imgData, 'PNG', imgX - finalImgWidth / 2, imgY, finalImgWidth, finalImgHeight);
                 }
-                
-                doc.addImage(img, 'JPEG', imgX - finalImgWidth / 2, imgY, finalImgWidth, finalImgHeight);
-                resolve(null);
+                resolve();
               };
               img.onerror = (e) => {
-                console.warn(`Failed to load image for product ${product.name}:`, e);
-                resolve(null); // Resolve even if image fails to load
+                console.warn(`Failed to load image for product ${product.name} from ${product.thumbnail}:`, e);
+                resolve(); // Resolve even if image fails to load
               };
             });
           } catch (imgError) {
@@ -1619,7 +1630,7 @@ const InventoryManagementApp = () => {
                         placeholder="Email"
                         value={customerInfo.email}
                         onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                      />
+                        />
                       <Textarea
                         placeholder="Address"
                         value={customerInfo.address}
