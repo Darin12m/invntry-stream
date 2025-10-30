@@ -189,11 +189,45 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
 
     const { subtotal, discount: discountAmount, total } = calculateInvoiceTotal();
+    
+    let finalInvoiceItems = invoiceItems;
+
+    // Prepare finalInvoiceItems with baseQuantity
+    if (!editingInvoice) {
+      // For new invoices, fetch baseQuantity for each item
+      finalInvoiceItems = await Promise.all(invoiceItems.map(async (item) => {
+        const productRef = doc(db, 'products', item.productId);
+        const productSnap = await getDoc(productRef);
+        const productData = productSnap.data();
+        return {
+          ...item,
+          baseQuantity: productData?.quantity || 0, // stock before invoice creation
+        };
+      }));
+    } else {
+      // For editing invoices, ensure baseQuantity is correctly set for all items.
+      // If an item was part of the original invoice and has baseQuantity, use it.
+      // If it's an old invoice item without baseQuantity, or a new item added during this edit,
+      // fetch the *current* product quantity as its base for this calculation.
+      finalInvoiceItems = await Promise.all(invoiceItems.map(async (item) => {
+        if (item.baseQuantity === undefined || item.baseQuantity === null) {
+          const productRef = doc(db, 'products', item.productId);
+          const productSnap = await getDoc(productRef);
+          const productData = productSnap.data();
+          return {
+            ...item,
+            baseQuantity: productData?.quantity || 0,
+          };
+        }
+        return item; // Item already has a baseQuantity from a previous save
+      }));
+    }
+
     const invoiceData = {
       number: currentInvoice!.number,
       date: currentInvoice!.date,
       customer: customerInfo,
-      items: invoiceItems,
+      items: finalInvoiceItems, // Use the items with baseQuantity
       subtotal,
       discount: discountAmount,
       discountPercentage: discount,
@@ -204,101 +238,42 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
     try {
       if (editingInvoice) {
-        const oldRef = doc(db, 'invoices', editingInvoice.id);
-        const oldSnap = await getDoc(oldRef);
-        if (oldSnap.exists()) {
-          const oldData = oldSnap.data() as Invoice; // Cast to Invoice type
-          const oldType = oldData.invoiceType || 'sale';
-          const newType = selectedInvoiceType;
-
-          // Only adjust stock if the invoice type has changed
-          if (oldType !== newType) {
-            for (const newItem of invoiceItems) {
-              const productRef = doc(db, 'products', newItem.productId);
-              const productSnap = await getDoc(productRef);
-              if (!productSnap.exists()) continue;
-              const product = productSnap.data();
-              const absQty = Math.abs(Number(newItem.quantity)); // Use absolute quantity for calculations
-
-              let adjustment = 0;
-
-              // Determine the stock adjustment based on type change
-              if (oldType === 'sale' && newType === 'refund') {
-                adjustment = absQty; // Sale (stock -qty) -> Refund (stock +qty). Net change from current stock: +qty
-              } else if (oldType === 'refund' && newType === 'sale') {
-                adjustment = -absQty; // Refund (stock +qty) -> Sale (stock -qty). Net change from current stock: -qty
-              } else if (oldType === 'writeoff' && newType === 'refund') {
-                adjustment = absQty; // Writeoff (no change) -> Refund (stock +qty). Net change from current stock: +qty
-              } else if (oldType === 'refund' && newType === 'writeoff') {
-                adjustment = -absQty; // Refund (stock +qty) -> Writeoff (no change). Net change from current stock: -qty
-              }
-              // Other combinations (e.g., sale -> writeoff, writeoff -> sale) imply no stock change.
-
-              await updateDoc(productRef, { quantity: Math.max(0, product.quantity + adjustment) });
-            }
-          } else {
-            // If invoice type hasn't changed, but quantities/items might have,
-            // we need to calculate the net change between old and new items.
-            const productNetStockChange: { [productId: string]: number } = {};
-
-            // Undo old invoice items' effect
-            oldData.items.forEach(item => {
-              const qty = Number(item.quantity) || 0;
-              if (oldType === 'sale') {
-                productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) + qty;
-              } else if (oldType === 'refund') {
-                productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) - qty;
-              }
-              // 'writeoff' has no stock effect
-            });
-
-            // Apply new invoice items' effect
-            invoiceItems.forEach(item => {
-              const qty = Number(item.quantity) || 0;
-              if (newType === 'sale') {
-                productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) - qty;
-              } else if (newType === 'refund') {
-                productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) + qty;
-              }
-              // 'writeoff' has no stock effect
-            });
-
-            // Apply net changes to products in Firestore
-            const stockUpdatePromises = Object.entries(productNetStockChange).map(async ([productId, change]) => {
-              const productRef = doc(db, 'products', productId);
-              const productSnap = await getDoc(productRef);
-              if (productSnap.exists()) {
-                const currentProduct = productSnap.data();
-                await updateDoc(productRef, { quantity: Math.max(0, currentProduct.quantity + change) });
-              }
-            });
-            await Promise.all(stockUpdatePromises);
-          }
-        }
-
+        // Update the invoice document
         await updateDoc(doc(db, 'invoices', editingInvoice.id), invoiceData);
 
+        // Update each product based on baseline stock and invoice type
+        const updatePromises = finalInvoiceItems.map(async (item) => {
+          const productRef = doc(db, 'products', item.productId);
+          const qty = Math.abs(Number(item.quantity));
+          const baseQty = Number(item.baseQuantity || 0); // Use stored baseQuantity
+          let newStock = baseQty;
+
+          if (selectedInvoiceType === 'sale') newStock = baseQty - qty;
+          else if (selectedInvoiceType === 'refund') newStock = baseQty + qty;
+          else if (selectedInvoiceType === 'writeoff') newStock = baseQty - qty;
+
+          await updateDoc(productRef, { quantity: Math.max(0, newStock) });
+        });
+        await Promise.all(updatePromises);
+
       } else {
+        // Add new invoice document
         await addDoc(collection(db, 'invoices'), invoiceData);
 
-        const newInvoiceStockUpdatePromises = invoiceItems.map(async (item) => {
+        // Update each product based on baseline stock and invoice type (same logic as edit)
+        const updatePromises = finalInvoiceItems.map(async (item) => {
           const productRef = doc(db, 'products', item.productId);
-          const productSnap = await getDoc(productRef);
-          if (productSnap.exists()) {
-            const currentProduct = productSnap.data();
-            const qty = Number(item.quantity) || 0;
-            let newQuantity = currentProduct.quantity;
+          const qty = Math.abs(Number(item.quantity));
+          const baseQty = Number(item.baseQuantity || 0); // Use stored baseQuantity
+          let newStock = baseQty;
 
-            if (selectedInvoiceType === 'sale') {
-              newQuantity -= qty;
-            } else if (selectedInvoiceType === 'refund') {
-              newQuantity += qty;
-            }
+          if (selectedInvoiceType === 'sale') newStock = baseQty - qty;
+          else if (selectedInvoiceType === 'refund') newStock = baseQty + qty;
+          else if (selectedInvoiceType === 'writeoff') newStock = baseQty - qty;
 
-            await updateDoc(productRef, { quantity: Math.max(0, newQuantity) });
-          }
+          await updateDoc(productRef, { quantity: Math.max(0, newStock) });
         });
-        await Promise.all(newInvoiceStockUpdatePromises);
+        await Promise.all(updatePromises);
       }
 
       handleCloseInvoiceModal();

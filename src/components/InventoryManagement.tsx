@@ -63,6 +63,7 @@ export interface Invoice {
     quantity: number;
     purchasePrice?: number;
     discount?: number; // Per-item discount percentage
+    baseQuantity?: number; // NEW: Stock before this invoice was applied
   }[];
   subtotal: number;
   discount: number;
@@ -317,28 +318,33 @@ const InventoryManagementApp = () => {
         // Restore product quantities before deleting invoice based on invoiceType
         if (invoice && invoice.items) {
           const restorePromises = invoice.items.map(async (item) => {
-            const product = products.find(p => p.id === item.productId);
-            if (!product) return;
-            const qty = Number(item.quantity) || 0;
-            const absQty = Math.abs(qty);
-            const invoiceType = (invoice as any).invoiceType || 'sale'; // Default to 'sale' for old invoices
+            const productRef = doc(db, 'products', item.productId);
+            const productSnap = await getDoc(productRef);
+            if (!productSnap.exists()) return;
+            const currentProductData = productSnap.data();
+            const currentProductQuantity = currentProductData.quantity || 0;
 
-            if (invoiceType === 'sale') {
-              // normal sale → deleting restores stock
-              await updateDoc(doc(db,'products',item.productId),
-                { quantity: Math.max(0, product.quantity + absQty) });
-              return;
+            const qty = Math.abs(Number(item.quantity));
+            const invoiceType = invoice.invoiceType || 'sale'; // Default for old invoices
+
+            let finalQuantity = currentProductQuantity; // Start with current quantity
+
+            if (item.baseQuantity !== undefined && item.baseQuantity !== null) {
+              // This invoice item has a stored baseQuantity (new system)
+              // When deleting, we want to revert the product's stock to this baseQuantity.
+              finalQuantity = Number(item.baseQuantity);
+            } else {
+              // This is an old invoice item without a stored baseQuantity.
+              // We must reverse the effect of this specific item from the *current* product stock.
+              if (invoiceType === 'sale') {
+                finalQuantity = currentProductQuantity + qty; // Sale reduced stock, so add back
+              } else if (invoiceType === 'refund') {
+                finalQuantity = currentProductQuantity - qty; // Refund increased stock, so subtract
+              } else if (invoiceType === 'writeoff') {
+                finalQuantity = currentProductQuantity + qty; // Writeoff reduced stock, so add back
+              }
             }
-            if (invoiceType === 'refund') {
-              // refund (negative qty) → deleting reverses refund (removes stock)
-              await updateDoc(doc(db,'products',item.productId),
-                { quantity: Math.max(0, product.quantity - absQty) });
-              return;
-            }
-            if (invoiceType === 'writeoff') return; // damaged/free → do nothing
-            // Fallback for any other unexpected type or old invoices without type
-            await updateDoc(doc(db,'products',item.productId),
-              { quantity: Math.max(0, product.quantity + qty) });
+            await updateDoc(productRef, { quantity: Math.max(0, finalQuantity) });
           });
           await Promise.all(restorePromises);
         }
@@ -368,25 +374,31 @@ const InventoryManagementApp = () => {
           const invoice = invoices.find(inv => inv.id === invoiceId);
           if (invoice && invoice.items) {
             return invoice.items.map(async (item) => {
-              const product = products.find(p => p.id === item.productId);
-              if (!product) return;
-              const qty = Number(item.quantity) || 0;
-              const absQty = Math.abs(qty);
-              const invoiceType = (invoice as any).invoiceType || 'sale'; // Default to 'sale' for old invoices
+              const productRef = doc(db, 'products', item.productId);
+              const productSnap = await getDoc(productRef);
+              if (!productSnap.exists()) return;
+              const currentProductData = productSnap.data();
+              const currentProductQuantity = currentProductData.quantity || 0;
 
-              if (invoiceType === 'sale') {
-                await updateDoc(doc(db,'products',item.productId),
-                  { quantity: Math.max(0, product.quantity + absQty) });
-                return;
+              const qty = Math.abs(Number(item.quantity));
+              const invoiceType = invoice.invoiceType || 'sale'; // Default for old invoices
+
+              let finalQuantity = currentProductQuantity; // Start with current quantity
+
+              if (item.baseQuantity !== undefined && item.baseQuantity !== null) {
+                // This invoice item has a stored baseQuantity (new system)
+                finalQuantity = Number(item.baseQuantity);
+              } else {
+                // This is an old invoice item without a stored baseQuantity.
+                if (invoiceType === 'sale') {
+                  finalQuantity = currentProductQuantity + qty;
+                } else if (invoiceType === 'refund') {
+                  finalQuantity = currentProductQuantity - qty;
+                } else if (invoiceType === 'writeoff') {
+                  finalQuantity = currentProductQuantity + qty;
+                }
               }
-              if (invoiceType === 'refund') {
-                await updateDoc(doc(db,'products',item.productId),
-                  { quantity: Math.max(0, product.quantity - absQty) });
-                return;
-              }
-              if (invoiceType === 'writeoff') return;
-              await updateDoc(doc(db,'products',item.productId),
-                { quantity: Math.max(0, product.quantity + qty) });
+              await updateDoc(productRef, { quantity: Math.max(0, finalQuantity) });
             });
           }
           return [];
@@ -421,25 +433,31 @@ const InventoryManagementApp = () => {
         const restorePromises = invoices.flatMap((invoice) => {
           if (invoice && invoice.items) {
             return invoice.items.map(async (item) => {
-              const product = products.find(p => p.id === item.productId);
-              if (!product) return;
-              const qty = Number(item.quantity) || 0;
-              const absQty = Math.abs(qty);
-              const invoiceType = (invoice as any).invoiceType || 'sale'; // Default to 'sale' for old invoices
+              const productRef = doc(db, 'products', item.productId);
+              const productSnap = await getDoc(productRef);
+              if (!productSnap.exists()) return;
+              const currentProductData = productSnap.data();
+              const currentProductQuantity = currentProductData.quantity || 0;
 
-              if (invoiceType === 'sale') {
-                await updateDoc(doc(db,'products',item.productId),
-                  { quantity: Math.max(0, product.quantity + absQty) });
-                return;
+              const qty = Math.abs(Number(item.quantity));
+              const invoiceType = invoice.invoiceType || 'sale'; // Default for old invoices
+
+              let finalQuantity = currentProductQuantity; // Start with current quantity
+
+              if (item.baseQuantity !== undefined && item.baseQuantity !== null) {
+                // This invoice item has a stored baseQuantity (new system)
+                finalQuantity = Number(item.baseQuantity);
+              } else {
+                // This is an old invoice item without a stored baseQuantity.
+                if (invoiceType === 'sale') {
+                  finalQuantity = currentProductQuantity + qty;
+                } else if (invoiceType === 'refund') {
+                  finalQuantity = currentProductQuantity - qty;
+                } else if (invoiceType === 'writeoff') {
+                  finalQuantity = currentProductQuantity + qty;
+                }
               }
-              if (invoiceType === 'refund') {
-                await updateDoc(doc(db,'products',item.productId),
-                  { quantity: Math.max(0, product.quantity - absQty) });
-                return;
-              }
-              if (invoiceType === 'writeoff') return;
-              await updateDoc(doc(db,'products',item.productId),
-                { quantity: Math.max(0, product.quantity + qty) });
+              await updateDoc(productRef, { quantity: Math.max(0, finalQuantity) });
             });
           }
           return [];
