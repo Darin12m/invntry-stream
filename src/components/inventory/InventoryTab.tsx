@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Plus, Edit, Trash2, Package, X, ChevronUp, ChevronDown, Image as ImageIcon } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, X, ChevronUp, ChevronDown, Image as ImageIcon, Trash } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
