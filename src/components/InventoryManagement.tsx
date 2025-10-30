@@ -112,10 +112,14 @@ const InventoryManagementApp = () => {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Sorting state for InventoryTab
+  // Sorting state for InventoryTab (products)
   const [sortColumn, setSortColumn] = useState<'name' | 'sku' | 'category' | 'quantity' | 'price'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
+  // Sorting state for InvoicesTab (invoices)
+  const [invoiceSortBy, setInvoiceSortBy] = useState<'number' | 'date' | 'customer' | 'total'>('number');
+  const [invoiceSortDirection, setInvoiceSortDirection] = useState<'asc' | 'desc'>('asc');
+
   // Invoice selection state
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
 
@@ -202,13 +206,23 @@ const InventoryManagementApp = () => {
     });
   }, [filteredProducts, sortColumn, sortDirection]);
 
-  // Handle column sorting
+  // Handle column sorting for products
   const handleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortColumn(column);
       setSortDirection('asc');
+    }
+  };
+
+  // Handle column sorting for invoices
+  const handleInvoiceSort = (column: typeof invoiceSortBy) => {
+    if (invoiceSortBy === column) {
+      setInvoiceSortDirection(invoiceSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setInvoiceSortBy(column);
+      setInvoiceSortDirection('asc');
     }
   };
 
@@ -777,8 +791,8 @@ const InventoryManagementApp = () => {
             handleEditInvoice={handleEditInvoice}
             handleDeleteInvoice={handleDeleteInvoice}
             invoiceSortBy={invoiceSortBy}
-            invoiceSortDirection={sortDirection} // Changed to use top-level sortDirection
-            handleInvoiceSort={setSortColumn} // Changed to use top-level setSortColumn
+            invoiceSortDirection={invoiceSortDirection}
+            handleInvoiceSort={handleInvoiceSort}
           />
         )}
         {activeTab === 'dashboard' && (
