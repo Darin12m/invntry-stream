@@ -342,18 +342,35 @@ const InventoryManagementApp = () => {
 
     if (window.confirm('Are you sure you want to delete this invoice?')) {
       try {
-        // 🧩 STEP 1: Collect all product IDs from this invoice BEFORE deleting it
-        const productIds = invoice.items.map((item) => item.productId);
+        // 1️⃣  Revert the stock impact of this invoice itself BEFORE deleting
+        for (const item of invoice.items) {
+          const productRef = doc(db, "products", item.productId);
+          const productSnap = await getDoc(productRef);
+          if (!productSnap.exists()) continue;
 
-        // 🗑️ STEP 2: Delete the invoice document
-        await deleteDoc(doc(db, "invoices", invoice.id));
+          const product = productSnap.data();
+          const currentQty = Number(product.quantity || 0);
+          const qty = Math.abs(Number(item.quantity) || 0);
+          const type = invoice.invoiceType || "sale";
 
-        // 🔁 STEP 3: Recalculate stock for each affected product
-        for (const productId of productIds) {
-          await recalcProductStock(productId);
+          let restoredQty = currentQty;
+
+          // Reverse the invoice’s effect on stock
+          if (type === "sale" || type === "writeoff") {
+            // These reduced stock → add back
+            restoredQty = currentQty + qty;
+          } else if (type === "refund") {
+            // Refund increased stock → subtract it back
+            restoredQty = Math.max(0, currentQty - qty);
+          }
+
+          await updateDoc(productRef, { quantity: restoredQty });
         }
+
+        // 2️⃣  Delete the invoice document
+        await deleteDoc(doc(db, "invoices", invoice.id));
         toast.success("Invoice deleted successfully");
-        console.log("✅ Invoice deleted and stock restored to correct value.");
+        console.log("✅ Invoice deleted and stock restored to its pre-invoice value.");
 
       } catch (error) {
         console.error('Error deleting invoice:', error);
