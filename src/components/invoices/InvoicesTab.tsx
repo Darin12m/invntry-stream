@@ -1,24 +1,28 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileText, Trash2, Plus, Eye, Edit, Trash, CheckSquare, Square, ChevronUp, ChevronDown, User as UserIcon, Calendar, DollarSign } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Invoice } from '../InventoryManagement'; // Import Invoice interface
+import { collection, query, where, onSnapshot, updateDoc, doc, deleteDoc, getDoc, serverTimestamp } from 'firebase/firestore'; // Import Firestore functions
 
 interface InvoicesTabProps {
   invoices: Invoice[];
   selectedInvoices: Set<string>;
   toggleInvoiceSelection: (invoiceId: string) => void;
   selectAllInvoices: () => void;
-  handleBulkDeleteInvoices: () => Promise<void>;
-  handleDeleteAllInvoices: () => Promise<void>;
+  handleBulkDeleteInvoices: () => Promise<void>; // Now soft delete
+  handleDeleteAllInvoices: () => Promise<void>; // Now soft delete
   handleCreateInvoice: () => void;
   handleViewInvoice: (invoice: Invoice) => void;
   handleEditInvoice: (invoice: Invoice) => void;
-  handleDeleteInvoice: (invoice: Invoice) => Promise<void>; // Updated prop type
+  handleDeleteInvoice: (invoice: Invoice) => Promise<void>; // Now soft delete
   invoiceSortBy: 'number' | 'date' | 'customer' | 'total';
   invoiceSortDirection: 'asc' | 'desc';
   handleInvoiceSort: (column: 'number' | 'date' | 'customer' | 'total') => void;
+  db: any; // Firebase Firestore instance
+  toast: any; // Sonner toast instance
+  recalcProductStock: (productId: string) => Promise<void>; // For restoring stock
 }
 
 const InvoicesTab: React.FC<InvoicesTabProps> = ({
@@ -35,7 +39,23 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
   invoiceSortBy,
   invoiceSortDirection,
   handleInvoiceSort,
+  db, // Destructure db
+  toast, // Destructure toast
+  recalcProductStock, // Destructure recalcProductStock
 }) => {
+  const [showTrash, setShowTrash] = useState(false);
+  const [deletedInvoices, setDeletedInvoices] = useState<Invoice[]>([]);
+
+  // Fetch deleted invoices in real-time
+  useEffect(() => {
+    const q = query(collection(db, "invoices"), where("deleted", "==", true));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Invoice[];
+      setDeletedInvoices(list);
+    });
+    return () => unsub();
+  }, [db]); // Add db to dependency array
+
   // Sort invoices
   const sortedInvoices = [...invoices].sort((a, b) => {
     // First, sort by whether they have invoice numbers
@@ -73,32 +93,81 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
     return 0;
   });
 
+  // Restore Logic
+  async function handleRestoreInvoice(invoice: Invoice) {
+    if (!invoice || !invoice.id) return;
+
+    try {
+      await updateDoc(doc(db, "invoices", invoice.id), {
+        deleted: false,
+        deletedAt: null, // Clear deletedAt timestamp
+        restoredAt: serverTimestamp(),
+      });
+
+      // Re-apply stock change
+      for (const item of invoice.items) {
+        const productRef = doc(db, "products", item.productId);
+        const productSnap = await getDoc(productRef);
+        if (!productSnap.exists()) continue;
+
+        const product = productSnap.data();
+        const currentQty = Number(product.quantity || 0);
+        const qty = Math.abs(Number(item.quantity) || 0);
+        const type = invoice.invoiceType || "sale";
+
+        let newQty = currentQty;
+        if (type === "sale" || type === "writeoff") newQty = Math.max(0, currentQty - qty);
+        else if (type === "refund") newQty = currentQty + qty;
+
+        await updateDoc(productRef, { quantity: newQty });
+        await recalcProductStock(item.productId); // Ensure full recalculation for robustness
+      }
+      toast.success("♻️ Invoice restored and stock re-applied.");
+    } catch (error) {
+      console.error('Error restoring invoice:', error);
+      toast.error('Failed to restore invoice');
+    }
+  }
+
+  // Delete Forever Logic
+  async function handleDeleteForever(invoice: Invoice) {
+    if (!invoice || !invoice.id) return;
+
+    const confirmDel = window.confirm(
+      `⚠️ Permanently delete invoice for ${invoice.customer?.name || "Unnamed"}?\nThis action cannot be undone.`
+    );
+    if (!confirmDel) return;
+
+    try {
+      await deleteDoc(doc(db, "invoices", invoice.id));
+      toast.success("🔥 Invoice permanently deleted.");
+    } catch (error) {
+      console.error('Error permanently deleting invoice:', error);
+      toast.error('Failed to permanently delete invoice');
+    }
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Invoices</h2>
-          <p className="text-muted-foreground mt-1">Manage and track all invoices</p>
-        </div>
-        <div className="flex gap-3">
-          {selectedInvoices.size > 0 && (
-            <Button
-              onClick={handleBulkDeleteInvoices}
-              variant="destructive"
-              className="shadow-elegant"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Selected ({selectedInvoices.size})
-            </Button>
-          )}
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">Invoices</h2>
+        <div className="flex gap-2 items-center">
           <Button
-            onClick={handleCreateInvoice}
-            className="bg-success hover:shadow-glow transition-all duration-300"
+            variant="destructive"
+            onClick={handleDeleteAllInvoices} // This now soft-deletes all active invoices
+            className="bg-red-500 hover:bg-red-600 text-white"
           >
-            <FileText className="h-4 w-4 mr-2" />
-            Create Invoice
+            Delete All
           </Button>
+
+          <button
+            onClick={() => setShowTrash(true)}
+            title="View Deleted Invoices"
+            className="p-2 rounded-full hover:bg-gray-100 transition"
+          >
+            🗑️
+          </button>
         </div>
       </div>
 
@@ -149,16 +218,23 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
               </>
             )}
           </Button>
-          {invoices.length > 0 && (
+          {selectedInvoices.size > 0 && (
             <Button
-              onClick={handleDeleteAllInvoices}
+              onClick={handleBulkDeleteInvoices} // This now soft-deletes selected active invoices
               variant="destructive"
               size="sm"
             >
               <Trash className="h-4 w-4 mr-2" />
-              Delete All
+              Move Selected to Trash ({selectedInvoices.size})
             </Button>
           )}
+          <Button
+            onClick={handleCreateInvoice}
+            className="bg-success hover:shadow-glow transition-all duration-300"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Create Invoice
+          </Button>
         </div>
       </Card>
 
@@ -244,7 +320,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
                       Edit
                     </Button>
                     <Button
-                      onClick={() => handleDeleteInvoice(invoice)} // Updated call site
+                      onClick={() => handleDeleteInvoice(invoice)} // Now soft delete
                       variant="destructive"
                       size="sm"
                     >
@@ -257,6 +333,66 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
           )}
         </div>
       </Card>
+
+      {showTrash && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-[90%] max-w-3xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">🗑️ Deleted Invoices</h3>
+              <button
+                onClick={() => setShowTrash(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-[400px] overflow-y-auto">
+              {deletedInvoices.length === 0 && (
+                <p className="text-gray-500 text-center">No deleted invoices.</p>
+              )}
+
+              {deletedInvoices.map((inv) => (
+                <div
+                  key={inv.id}
+                  className="flex justify-between items-center border p-3 rounded-md"
+                >
+                  <div>
+                    <p className="font-semibold">
+                      {inv.customer?.name || "Unnamed"}{" "}
+                      <span className="text-xs text-gray-500">
+                        • {inv.invoiceType?.toUpperCase()}
+                      </span>
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {inv.deletedAt?.seconds
+                        ? new Date(inv.deletedAt.seconds * 1000).toLocaleDateString()
+                        : inv.createdAt?.seconds
+                        ? new Date(inv.createdAt.seconds * 1000).toLocaleDateString()
+                        : ""}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleRestoreInvoice(inv)}
+                      className="text-green-600 hover:text-green-700 font-medium"
+                    >
+                      ♻️ Restore
+                    </button>
+                    <button
+                      onClick={() => handleDeleteForever(inv)}
+                      className="text-red-600 hover:text-red-700 font-medium"
+                    >
+                      🔥 Delete Forever
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
