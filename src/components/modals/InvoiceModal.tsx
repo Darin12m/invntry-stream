@@ -234,28 +234,31 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         await addDoc(collection(db, 'invoices'), invoiceData);
       }
 
-      // --- DEBUGGING STOCK LOGIC ---
-      let debugCounter = 0;
-      for (const item of itemsToSave) { // Changed from invoiceItems to itemsToSave
-        debugCounter++;
+      // --- CORRECTED STOCK LOGIC ---
+      for (const item of itemsToSave) {
         const productRef = doc(db, 'products', item.productId);
 
-        const base = Number(item.baseQuantity ?? 0);
+        const base = Number(item.baseQuantity ?? 0);  // true stock before invoice
         const qty = Math.abs(Number(item.quantity));
+        const oldType = editingInvoice ? editingInvoice.invoiceType || 'sale' : null;
         const newType = selectedInvoiceType;
 
         let finalStock = base;
-        if (newType === 'sale') finalStock = base - qty;
-        else if (newType === 'refund') finalStock = base + qty;
-        else if (newType === 'writeoff') finalStock = base - qty;
 
-        // 🔍 Display debug info on screen
-        toast(`[#${debugCounter}] base=${base}, qty=${qty}, type=${newType}, result=${finalStock}`, { duration: 6000 });
+        // Step 1️⃣: Undo the previous type’s effect (only if editing an existing invoice)
+        if (editingInvoice && oldType) { // Only undo if it's an existing invoice
+          if (oldType === 'sale') finalStock += qty;     // undo stock decrease
+          else if (oldType === 'refund') finalStock -= qty; // undo stock increase
+          else if (oldType === 'writeoff') finalStock += qty; // undo write-off
+        }
+
+        // Step 2️⃣: Apply the new type’s effect (fresh)
+        if (newType === 'sale') finalStock -= qty;
+        else if (newType === 'refund') finalStock += qty;
+        else if (newType === 'writeoff') finalStock -= qty;
 
         await updateDoc(productRef, { quantity: Math.max(0, finalStock) });
       }
-
-      toast.success("Stock recalculated with debug info visible!");
 
       handleCloseInvoiceModal();
       toast.success(editingInvoice ? 'Invoice updated successfully!' : 'Invoice saved successfully!');
