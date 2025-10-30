@@ -122,7 +122,8 @@ const InventoryManagementApp = () => {
   const [invoiceSortBy, setInvoiceSortBy] = useState<'number' | 'date' | 'customer' | 'total'>('number');
   const [invoiceSortDirection, setInvoiceSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  // Invoice selection state
+  // Product and Invoice selection states
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
 
   // Listen for auth state changes
@@ -236,7 +237,25 @@ const InventoryManagementApp = () => {
     return { label: 'In Stock', variant: 'default' as const };
   };
 
-  // Selection handlers (for invoices only now)
+  // Selection handlers
+  const toggleProductSelection = (productId: string) => {
+    const newSelected = new Set(selectedProducts);
+    if (newSelected.has(productId)) {
+      newSelected.delete(productId);
+    } else {
+      newSelected.add(productId);
+    }
+    setSelectedProducts(newSelected);
+  };
+
+  const selectAllProducts = () => {
+    if (selectedProducts.size === filteredProducts.length && filteredProducts.length > 0) {
+      setSelectedProducts(new Set());
+    } else {
+      setSelectedProducts(new Set(filteredProducts.map(p => p.id)));
+    }
+  };
+
   const toggleInvoiceSelection = (invoiceId: string) => {
     const newSelected = new Set(selectedInvoices);
     if (newSelected.has(invoiceId)) {
@@ -309,9 +328,26 @@ const InventoryManagementApp = () => {
     }
   };
 
-  // 2. Bulk delete products (no longer applicable without selection)
+  // 2. Bulk delete products
   const handleBulkDeleteProducts = async () => {
-    toast.error("Bulk delete is not available without product selection.");
+    if (selectedProducts.size === 0) {
+      toast.error("Please select products to delete.");
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to delete ${selectedProducts.size} selected product(s)? This action cannot be undone.`)) {
+      try {
+        const deletePromises = Array.from(selectedProducts).map((productId) =>
+          deleteDoc(doc(db, 'products', productId))
+        );
+        await Promise.all(deletePromises);
+        setSelectedProducts(new Set()); // Clear selection after deletion
+        toast.success(`${selectedProducts.size} products deleted successfully`);
+      } catch (error) {
+        console.error('Error bulk deleting products:', error);
+        toast.error('Failed to delete selected products');
+      }
+    }
   };
 
   // 3. Delete all products
@@ -764,6 +800,9 @@ const InventoryManagementApp = () => {
             sortDirection={sortDirection}
             handleSort={handleSort}
             getStockStatus={getStockStatus}
+            selectedProducts={selectedProducts}
+            toggleProductSelection={toggleProductSelection}
+            selectAllProducts={selectAllProducts}
           />
         )}
         {activeTab === 'invoices' && (

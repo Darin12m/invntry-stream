@@ -115,6 +115,11 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   );
 
   const addItemToInvoice = (product: Product) => {
+    if (product.quantity <= 0) {
+      toast.error(`"${product.name}" is out of stock and cannot be added to the invoice.`);
+      return;
+    }
+
     const existingItem = invoiceItems.find(item => item.productId === product.id);
     if (existingItem) {
       setInvoiceItems(invoiceItems.map(item =>
@@ -288,7 +293,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       <Card
                         key={product.id}
                         onClick={() => addItemToInvoice(product)}
-                        className="p-4 cursor-pointer hover:shadow-elegant transition-all duration-300 hover:border-primary/50"
+                        className={`p-4 cursor-pointer hover:shadow-elegant transition-all duration-300 ${product.quantity <= 0 ? 'opacity-50 cursor-not-allowed border-destructive/50' : 'hover:border-primary/50'}`}
                       >
                         <div className="flex justify-between items-center">
                           <div>
@@ -298,7 +303,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                           </div>
                           <div className="text-right">
                             <p className="text-sm text-muted-foreground">Stock: {product.quantity}</p>
-                            <div className="bg-primary text-primary-foreground rounded-full p-2 mt-2">
+                            <div className={`rounded-full p-2 mt-2 ${product.quantity <= 0 ? 'bg-gray-400' : 'bg-primary text-primary-foreground'}`}>
                               <Plus className="h-4 w-4" />
                             </div>
                           </div>

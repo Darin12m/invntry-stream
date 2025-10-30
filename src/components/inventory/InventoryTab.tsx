@@ -1,10 +1,10 @@
 import React from 'react';
-import { Search, Plus, Edit, Trash2, Package, X, ChevronUp, ChevronDown, Trash } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Trash, X, ChevronUp, ChevronDown, Package, CheckSquare, Square } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-// Removed getGoogleDriveDirectLink import
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Product {
   id: string;
@@ -14,7 +14,6 @@ interface Product {
   price: number;
   category: string;
   purchasePrice?: number;
-  // Removed thumbnail?: string;
   shortDescription?: string;
 }
 
@@ -33,6 +32,9 @@ interface InventoryTabProps {
   sortDirection: 'asc' | 'desc';
   handleSort: (column: 'name' | 'sku' | 'category' | 'quantity' | 'price') => void;
   getStockStatus: (quantity: number) => { label: string; variant: 'destructive' | 'warning' | 'secondary' | 'default' };
+  selectedProducts: Set<string>;
+  toggleProductSelection: (productId: string) => void;
+  selectAllProducts: () => void;
 }
 
 const InventoryTab: React.FC<InventoryTabProps> = ({
@@ -50,6 +52,9 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   sortDirection,
   handleSort,
   getStockStatus,
+  selectedProducts,
+  toggleProductSelection,
+  selectAllProducts,
 }) => (
   <div className="space-y-6 animate-fade-in">
     {/* Header */}
@@ -59,15 +64,16 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
         <p className="text-muted-foreground mt-1">Manage your products and stock levels</p>
       </div>
       <div className="flex gap-3">
-        <Button
-          onClick={handleBulkDeleteProducts}
-          variant="destructive"
-          className="shadow-elegant"
-          disabled={true} // Always disabled as selection is removed
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Delete Selected (0)
-        </Button>
+        {selectedProducts.size > 0 && (
+          <Button
+            onClick={handleBulkDeleteProducts}
+            variant="destructive"
+            className="shadow-elegant"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Selected ({selectedProducts.size})
+          </Button>
+        )}
         <Button
           onClick={handleAddProduct}
           className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
@@ -105,15 +111,35 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
 
       <div className="flex gap-2 justify-end">
         {products.length > 0 && (
-          <Button
-            onClick={handleDeleteAllProducts}
-            variant="destructive"
-            size="sm"
-            className="transition-all duration-200"
-          >
-            <Trash className="h-4 w-4 mr-2" />
-            Delete All
-          </Button>
+          <>
+            <Button
+              onClick={selectAllProducts}
+              variant="outline"
+              size="sm"
+              disabled={filteredProducts.length === 0}
+            >
+              {selectedProducts.size === filteredProducts.length && filteredProducts.length > 0 ? (
+                <>
+                  <Square className="h-4 w-4 mr-2" />
+                  Deselect All
+                </>
+              ) : (
+                <>
+                  <CheckSquare className="h-4 w-4 mr-2" />
+                  Select All
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={handleDeleteAllProducts}
+              variant="destructive"
+              size="sm"
+              className="transition-all duration-200"
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              Delete All
+            </Button>
+          </>
         )}
       </div>
     </Card>
@@ -124,6 +150,13 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
         <table className="w-full">
           <thead>
             <tr className="border-b bg-muted/30">
+              <th className="text-left p-4 font-medium w-12">
+                <Checkbox
+                  checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
+                  onCheckedChange={selectAllProducts}
+                  disabled={filteredProducts.length === 0}
+                />
+              </th>
               <th className="text-left p-4 font-medium">
                 <button
                   onClick={() => handleSort('name')}
@@ -191,6 +224,12 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                   className={`border-b hover:bg-muted/50 transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}
                 >
                   <td className="p-4">
+                    <Checkbox
+                      checked={selectedProducts.has(product.id)}
+                      onCheckedChange={() => toggleProductSelection(product.id)}
+                    />
+                  </td>
+                  <td className="p-4">
                     <div className="flex items-center gap-3">
                       <div className="font-medium text-foreground">{product.name}</div>
                     </div>
@@ -245,6 +284,11 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
         return (
           <Card key={product.id} className="p-4 hover:shadow-lg transition-all duration-300 animate-scale-in">
             <div className="flex items-start gap-3 mb-3">
+              <Checkbox
+                checked={selectedProducts.has(product.id)}
+                onCheckedChange={() => toggleProductSelection(product.id)}
+                className="mt-1"
+              />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-2">
                   <h3 className="font-bold text-lg text-foreground">{product.name}</h3>
