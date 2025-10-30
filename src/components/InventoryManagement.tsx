@@ -89,8 +89,8 @@ const InventoryManagementApp = () => {
   
   // Search term state for InventoryTab
   const [localSearchInput, setLocalSearchInput] = useState(''); // Local state for the input field
-  const deferredSearchTerm = useDeferredValue(localSearchSearchInput); // Deferred value for actual filtering
-
+  const deferredSearchTerm = useDeferredValue(localSearchInput); // Corrected: use localSearchInput
+  
   // Modal visibility states
   const [showProductModal, setShowProductModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
