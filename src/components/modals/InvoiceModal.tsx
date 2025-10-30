@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Search, Plus, Trash, X, Save } from 'lucide-react';
-import { collection, addDoc, updateDoc, doc, getDoc, getDocs, query, where } from 'firebase/firestore'; // Added getDocs, query, where
+import { collection, addDoc, updateDoc, doc, getDoc, query, where, serverTimestamp } from 'firebase/firestore'; // Added serverTimestamp
 import { Product, Invoice } from '../InventoryManagement'; // Import interfaces
 import { toast } from "sonner"; // Correct import for sonner toast
 
@@ -178,35 +178,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
   };
 
-  // Helper function to recalculate product stock
-  const recalcProductStock = async (productId: string) => {
-    const productRef = doc(db, "products", productId);
-    
-    // Fetch all invoices that contain this product
-    // Note: Firestore's array-contains query requires an exact match for objects.
-    // For a more robust solution if 'items' objects vary, consider a subcollection or client-side filtering.
-    const invoicesQuery = query(collection(db, "invoices"), where("itemsIds", "array-contains", productId)); // Assuming 'itemsIds' is an array of product IDs for easier querying
-    const invoicesSnap = await getDocs(invoicesQuery);
-
-    let totalSold = 0;
-    for (const invDoc of invoicesSnap.docs) {
-      const data = invDoc.data();
-      const type = data.invoiceType || "sale"; // Default to 'sale' for older invoices
-      const item = (data.items || []).find((i: any) => i.productId === productId);
-      if (!item) continue;
-      const qty = Number(item.quantity) || 0;
-
-      if (type === "sale") totalSold += qty;
-      else if (type === "writeoff") totalSold += qty;
-      else if (type === "refund") totalSold -= qty;
-    }
-
-    const productSnap = await getDoc(productRef);
-    const initialStock = productSnap.data()?.initialStock || 0; // Get initialStock
-    const finalStock = Math.max(0, initialStock - totalSold);
-    await updateDoc(productRef, { quantity: finalStock });
-  };
-
   const handleSaveInvoice = async () => {
     if (!customerInfo.name.trim()) {
       toast.error('Please enter customer name');
@@ -220,53 +191,79 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
     const { subtotal, discount: discountAmount, total } = calculateInvoiceTotal();
     
-    // Ensure all items have baseQuantity captured if it's a new invoice or a new item
-    const itemsToSave = await Promise.all(invoiceItems.map(async (item) => {
-      if (item.baseQuantity === undefined || item.baseQuantity === null) {
-        const productRef = doc(db, 'products', item.productId);
-        const productSnap = await getDoc(productRef);
-        const productData = productSnap.data();
-        return {
-          ...item,
-          baseQuantity: productData?.quantity || 0, // record true starting stock for new/legacy items
-        };
-      }
-      return item; // For existing items with baseQuantity, keep it as is
-    }));
+    // Create an array of product IDs for easier querying
+    const itemsIds = invoiceItems.map(item => item.productId);
 
-    // Also create an array of product IDs for easier querying
-    const itemsIds = itemsToSave.map(item => item.productId);
-
-    const invoiceData = {
+    const baseInvoiceData = {
       number: currentInvoice!.number,
       date: currentInvoice!.date,
       customer: customerInfo,
-      items: itemsToSave,
-      itemsIds: itemsIds, // Added for easier querying
+      itemsIds: itemsIds,
       subtotal,
       discount: discountAmount,
       discountPercentage: discount,
       total,
       status: 'saved',
-      invoiceType: selectedInvoiceType, // Save the selected invoice type
+      invoiceType: selectedInvoiceType,
     };
 
     try {
       if (editingInvoice) {
-        await updateDoc(doc(db, 'invoices', editingInvoice.id), invoiceData);
-      } else {
-        await addDoc(collection(db, 'invoices'), invoiceData);
-      }
+        // --- EDITING INVOICE LOGIC ---
+        // Re-apply stock changes based on the stored beforeStock and new invoice type/quantities
+        for (const item of invoiceItems) {
+          const productRef = doc(db, "products", item.productId);
+          const qty = Math.abs(Number(item.quantity));
+          const beforeStock = Number(item.beforeStock || 0); // Use the stored beforeStock
+          const newType = selectedInvoiceType;
 
-      // --- NEW STOCK UPDATE LOGIC ---
-      // Recalculate stock for each product involved in the invoice
-      for (const item of itemsToSave) {
-        await recalcProductStock(item.productId);
+          let newQty = beforeStock;
+          if (newType === "sale" || newType === "writeoff") newQty -= qty;
+          else if (newType === "refund") newQty += qty;
+
+          await updateDoc(productRef, { quantity: Math.max(0, newQty) });
+        }
+
+        await updateDoc(doc(db, 'invoices', editingInvoice.id), {
+          ...baseInvoiceData,
+          items: invoiceItems, // Save current items (which should include beforeStock if it was there)
+        });
+        toast.success('Invoice updated successfully!');
+
+      } else {
+        // --- CREATING NEW INVOICE LOGIC ---
+        const itemsWithBaseline = await Promise.all(invoiceItems.map(async (item) => {
+          const productRef = doc(db, "products", item.productId);
+          const productSnap = await getDoc(productRef);
+          const productData = productSnap.data() || {};
+          const beforeStock = Number(productData.quantity || 0); // Snapshot current stock
+
+          return { ...item, beforeStock }; // Save snapshot BEFORE change
+        }));
+
+        const invoiceData = {
+          ...baseInvoiceData,
+          items: itemsWithBaseline,
+          createdAt: serverTimestamp(), // Add createdAt timestamp
+        };
+
+        await addDoc(collection(db, "invoices"), invoiceData);
+
+        // Apply effect once
+        for (const item of itemsWithBaseline) {
+          const productRef = doc(db, "products", item.productId);
+          const qty = Math.abs(Number(item.quantity));
+          let newQty = item.beforeStock; // Use the snapshot
+
+          if (selectedInvoiceType === "sale" || selectedInvoiceType === "writeoff") newQty -= qty;
+          else if (selectedInvoiceType === "refund") newQty += qty;
+
+          await updateDoc(productRef, { quantity: Math.max(0, newQty) });
+        }
+        toast.success('Invoice saved successfully!');
       }
-      console.log("✅ Stock updated once, baseline logic applied");
 
       handleCloseInvoiceModal();
-      toast.success(editingInvoice ? 'Invoice updated successfully!' : 'Invoice saved successfully!');
     } catch (error) {
       console.error('Error saving invoice:', error);
       toast.error('Failed to save invoice');
@@ -373,9 +370,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                     onChange={(e) => setSelectedInvoiceType(e.target.value as 'sale' | 'refund' | 'writeoff')}
                     className="w-full border rounded-md p-2 bg-background text-foreground"
                   >
-                    <option value="sale">Sale / Outgoing</option>
-                    <option value="refund">Refund / Return</option>
-                    <option value="writeoff">Free / Damaged / Promo</option>
+                    <option value="sale">Sale</option>
+                    <option value="refund">Refund</option>
+                    <option value="writeoff">Write-off</option>
                   </select>
                 </div>
 
