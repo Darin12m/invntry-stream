@@ -1,10 +1,10 @@
 import React from 'react';
-import { Search, Plus, Edit, Trash2, Package, X, ChevronUp, ChevronDown, Image as ImageIcon, Trash } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, X, ChevronUp, ChevronDown, Trash } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { getGoogleDriveDirectLink } from '@/lib/utils'; // Import the new utility
+// Removed getGoogleDriveDirectLink import
 
 interface Product {
   id: string;
@@ -14,7 +14,7 @@ interface Product {
   price: number;
   category: string;
   purchasePrice?: number;
-  thumbnail?: string;
+  // Removed thumbnail?: string;
   shortDescription?: string;
 }
 
@@ -197,7 +197,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
           <tbody>
             {sortedProducts.map((product, index) => {
               const stockStatus = getStockStatus(product.quantity);
-              const imageUrl = product.thumbnail ? getGoogleDriveDirectLink(product.thumbnail) : ''; // Use utility here
+              // Removed imageUrl variable
               return (
                 <tr 
                   key={product.id} 
@@ -206,25 +206,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                   {/* Removed checkbox */}
                   <td className="p-4">
                     <div className="flex items-center gap-3">
-                      {imageUrl ? (
-                        <a 
-                          href={imageUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="flex-shrink-0 block hover:scale-105 transition-transform"
-                        >
-                          <img
-                            src={imageUrl}
-                            alt={product.name}
-                            className="w-12 h-12 object-cover rounded-md"
-                            onError={(e) => { e.currentTarget.src = '/placeholder.svg'; e.currentTarget.alt = 'Image failed to load'; }}
-                          />
-                        </a>
-                      ) : (
-                        <div className="w-12 h-12 object-cover rounded-md flex-shrink-0 bg-muted flex items-center justify-center text-muted-foreground text-xs">
-                          <ImageIcon className="h-6 w-6 opacity-50" />
-                        </div>
-                      )}
+                      {/* Removed thumbnail image display */}
                       <div className="font-medium text-foreground">{product.name}</div>
                     </div>
                   </td>
@@ -275,32 +257,14 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
     <div className="space-y-4 md:hidden">
       {sortedProducts.map(product => {
         const stockStatus = getStockStatus(product.quantity);
-        const imageUrl = product.thumbnail ? getGoogleDriveDirectLink(product.thumbnail) : ''; // Use utility here
+        // Removed imageUrl variable
         return (
           <Card key={product.id} className="p-4 hover:shadow-lg transition-all duration-300 animate-scale-in">
             <div className="flex items-start gap-3 mb-3">
               {/* Removed checkbox */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-2">
-                  {imageUrl ? (
-                    <a 
-                      href={imageUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="flex-shrink-0 block hover:scale-105 transition-transform"
-                    >
-                      <img
-                        src={imageUrl}
-                        alt={product.name}
-                        className="w-12 h-12 object-cover rounded-md"
-                        onError={(e) => { e.currentTarget.src = '/placeholder.svg'; e.currentTarget.alt = 'Image failed to load'; }}
-                      />
-                    </a>
-                  ) : (
-                    <div className="w-12 h-12 object-cover rounded-md flex-shrink-0 bg-muted flex items-center justify-center text-muted-foreground text-xs">
-                      <ImageIcon className="h-6 w-6 opacity-50" />
-                    </div>
-                  )}
+                  {/* Removed thumbnail image display */}
                   <h3 className="font-bold text-lg text-foreground">{product.name}</h3>
                 </div>
                 <div className="space-y-2 text-sm">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useDeferredValue, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Sun, Moon, Image as ImageIcon } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Sun, Moon } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -19,7 +19,7 @@ import { db, auth, storage } from '@/lib/firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc } from 'firebase/firestore'; // Added getDoc
 import { signOut, User } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { getGoogleDriveDirectLink } from '@/lib/utils'; // Import the new utility
+// Removed getGoogleDriveDirectLink import
 
 // Import the new tab components
 import InventoryTab from './inventory/InventoryTab';
@@ -37,7 +37,7 @@ interface Product {
   price: number;
   category: string;
   purchasePrice?: number; // Admin-only field for profit calculations
-  thumbnail?: string; // URL for a small image
+  // Removed thumbnail?: string;
   shortDescription?: string; // Short text description
 }
 
@@ -68,53 +68,7 @@ interface Invoice {
   invoiceType?: 'sale' | 'refund' | 'writeoff'; // NEW: Invoice Type
 }
 
-// --- NEW IMAGE LOADING UTILITY FUNCTION (kept for PDF generation) ---
-async function loadImageAsDataURL(url: string, timeout = 10000): Promise<string | null> {
-  return new Promise((resolve) => {
-    if (!url) {
-      console.warn("loadImageAsDataURL: URL is empty.");
-      return resolve(null);
-    }
-
-    const img = new Image();
-    img.crossOrigin = "Anonymous"; // Essential for loading cross-origin images to canvas
-    img.src = url;
-
-    const timer = setTimeout(() => {
-      img.onload = null; // Clear handlers to prevent double resolution
-      img.onerror = null;
-      console.warn(`Image loading timed out for: ${url}`);
-      resolve(null);
-    }, timeout);
-
-    img.onload = () => {
-      clearTimeout(timer);
-      try {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          ctx.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL('image/png')); // Use PNG for better quality and transparency
-        } else {
-          console.error("Could not get 2D context for canvas.");
-          resolve(null);
-        }
-      } catch (e) {
-        console.error(`Error processing image ${url} to canvas:`, e);
-        resolve(null);
-      }
-    };
-
-    img.onerror = (e) => {
-      clearTimeout(timer);
-      console.error(`Failed to load image: ${url}`, e);
-      resolve(null);
-    };
-  });
-}
-// --- END NEW IMAGE LOADING UTILITY FUNCTION ---
+// --- Removed loadImageAsDataURL utility function ---
 
 
 const InventoryManagementApp = () => {
@@ -174,13 +128,12 @@ const InventoryManagementApp = () => {
     price: '',
     category: '',
     purchasePrice: '', // Admin-only field
-    thumbnail: '', // Direct URL input (will be replaced by uploaded URL)
+    // Removed thumbnail: '',
     shortDescription: ''
   });
 
-  // State for thumbnail file upload
-  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
-  const thumbnailFileInputRef = useRef<HTMLInputElement>(null);
+  // Removed State for thumbnail file upload
+  // Removed thumbnailFileInputRef ref
 
   // NEW: Invoice Type state
   const [selectedInvoiceType, setSelectedInvoiceType] = useState<'sale' | 'refund' | 'writeoff'>('sale');
@@ -324,11 +277,11 @@ const InventoryManagementApp = () => {
       price: '', 
       category: '', 
       purchasePrice: '',
-      thumbnail: '', // Direct URL input
+      // Removed thumbnail: '',
       shortDescription: ''
     });
-    setThumbnailFile(null); // Clear any selected file
-    if (thumbnailFileInputRef.current) thumbnailFileInputRef.current.value = ''; // Clear file input
+    // Removed setThumbnailFile(null);
+    // Removed if (thumbnailFileInputRef.current) thumbnailFileInputRef.current.value = '';
     setShowProductModal(true);
   };
 
@@ -341,11 +294,11 @@ const InventoryManagementApp = () => {
       price: product.price.toString(),
       category: product.category,
       purchasePrice: product.purchasePrice?.toString() || '',
-      thumbnail: product.thumbnail || '', // Existing thumbnail URL
+      // Removed thumbnail: product.thumbnail || '',
       shortDescription: product.shortDescription || ''
     });
-    setThumbnailFile(null); // Clear any selected file, user can re-upload
-    if (thumbnailFileInputRef.current) thumbnailFileInputRef.current.value = ''; // Clear file input
+    // Removed setThumbnailFile(null);
+    // Removed if (thumbnailFileInputRef.current) thumbnailFileInputRef.current.value = '';
     setShowProductModal(true);
   };
 
@@ -359,29 +312,15 @@ const InventoryManagementApp = () => {
       price: '', 
       category: '', 
       purchasePrice: '',
-      thumbnail: '',
+      // Removed thumbnail: '',
       shortDescription: ''
     });
-    setThumbnailFile(null); // Clear selected file on close
-    if (thumbnailFileInputRef.current) thumbnailFileInputRef.current.value = ''; // Clear file input
+    // Removed setThumbnailFile(null);
+    // Removed if (thumbnailFileInputRef.current) thumbnailFileInputRef.current.value = '';
   };
 
-  // Handle thumbnail file selection
-  const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setThumbnailFile(e.target.files[0]);
-      setProductForm(prevForm => ({ ...prevForm, thumbnail: '' })); // Clear direct URL if file is selected
-    } else {
-      setThumbnailFile(null);
-    }
-  };
-
-  // Handle direct URL input change
-  const handleThumbnailUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProductForm(prevForm => ({ ...prevForm, thumbnail: e.target.value }));
-    setThumbnailFile(null); // Clear file selection if URL is being typed/pasted
-    if (thumbnailFileInputRef.current) thumbnailFileInputRef.current.value = ''; // Clear file input
-  };
+  // Removed Handle thumbnail file selection
+  // Removed Handle direct URL input change
 
   const handleSaveProduct = async () => {
     if (!productForm.name.trim() || !productForm.sku.trim() || !productForm.price || !productForm.quantity) {
@@ -389,21 +328,7 @@ const InventoryManagementApp = () => {
       return;
     }
 
-    let thumbnailUrl = productForm.thumbnail; // Start with existing URL or direct input
-
-    if (thumbnailFile) {
-      // Upload new file to Firebase Storage
-      const storageRef = ref(storage, `thumbnails/${thumbnailFile.name}-${Date.now()}`);
-      const uploadResult = await uploadBytes(storageRef, thumbnailFile);
-      thumbnailUrl = await getDownloadURL(uploadResult.ref);
-      toast.success("Thumbnail uploaded!");
-    } else if (productForm.thumbnail) {
-      // If a URL is provided (and no file upload), convert it if it's a Google Drive link
-      thumbnailUrl = getGoogleDriveDirectLink(productForm.thumbnail);
-    } else if (editingProduct && !productForm.thumbnail) {
-      // If editing and user cleared the URL, set to empty
-      thumbnailUrl = '';
-    }
+    // Removed thumbnail processing logic
 
     const productData = {
       name: productForm.name,
@@ -412,7 +337,7 @@ const InventoryManagementApp = () => {
       price: parseFloat(productForm.price),
       category: productForm.category,
       ...(productForm.purchasePrice && { purchasePrice: parseFloat(productForm.purchasePrice) }),
-      thumbnail: thumbnailUrl, // Use the uploaded URL or direct URL
+      // Removed thumbnail: thumbnailUrl,
       ...(productForm.shortDescription && { shortDescription: productForm.shortDescription })
     };
 
@@ -1459,61 +1384,7 @@ const InventoryManagementApp = () => {
                 />
               </div>
 
-              {/* Product Thumbnail Section - Now with both URL input and file upload */}
-              <div>
-                <Label htmlFor="thumbnail-url">Product Thumbnail URL</Label>
-                <Input
-                  id="thumbnail-url"
-                  type="text"
-                  value={productForm.thumbnail}
-                  onChange={handleThumbnailUrlChange}
-                  placeholder="Paste Google Drive link or direct image URL"
-                  disabled={!!thumbnailFile} // Disable if a file is selected
-                />
-                <p className="text-xs text-muted-foreground mt-1 mb-2">
-                  Paste a Google Drive share link (ensure it's public) or any direct image URL.
-                </p>
-
-                <Label htmlFor="thumbnail-upload" className="block mt-4">Or Upload Image File</Label>
-                <Input
-                  id="thumbnail-upload"
-                  type="file"
-                  accept="image/*"
-                  ref={thumbnailFileInputRef}
-                  onChange={handleThumbnailFileChange}
-                  className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                  disabled={!!productForm.thumbnail} // Disable if a URL is entered
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Upload an image file directly.
-                </p>
-
-                {(thumbnailFile || productForm.thumbnail) && (
-                  <div className="mt-3 flex items-center gap-3 p-2 border rounded-md bg-muted/20">
-                    <img
-                      src={thumbnailFile ? URL.createObjectURL(thumbnailFile) : getGoogleDriveDirectLink(productForm.thumbnail)}
-                      alt="Thumbnail Preview"
-                      className="w-16 h-16 object-cover rounded-md"
-                      onError={(e) => { e.currentTarget.src = '/placeholder.svg'; e.currentTarget.alt = 'Image failed to load'; }}
-                    />
-                    <span className="text-sm text-muted-foreground truncate">
-                      {thumbnailFile ? thumbnailFile.name : (productForm.thumbnail?.length > 50 ? productForm.thumbnail.substring(0, 47) + '...' : productForm.thumbnail)}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setThumbnailFile(null);
-                        setProductForm(prev => ({ ...prev, thumbnail: '' }));
-                        if (thumbnailFileInputRef.current) thumbnailFileInputRef.current.value = '';
-                      }}
-                      className="ml-auto"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
+              {/* Removed Product Thumbnail Section */}
 
               <div>
                 <Label htmlFor="shortDescription">Short Description</Label>
