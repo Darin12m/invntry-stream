@@ -267,9 +267,7 @@ const InventoryManagementApp = () => {
     setShowProductModal(true);
   };
 
-  // DELETE FUNCTIONS - Multiple implementations
-
-  // Helper function to recalculate product stock (copied from InvoiceModal for consistency)
+  // Helper function to recalculate product stock
   const recalcProductStock = async (productId: string) => {
     const productRef = doc(db, "products", productId);
     
@@ -284,8 +282,7 @@ const InventoryManagementApp = () => {
       if (!item) continue;
       const qty = Number(item.quantity) || 0;
 
-      if (type === "sale") totalSold += qty;
-      else if (type === "writeoff") totalSold += qty;
+      if (type === "sale" || type === "writeoff") totalSold += qty;
       else if (type === "refund") totalSold -= qty;
     }
 
@@ -337,23 +334,20 @@ const InventoryManagementApp = () => {
   };
 
   // 4. Delete single invoice
-  const handleDeleteInvoice = async (invoiceId: string) => {
+  const handleDeleteInvoice = async (invoice: Invoice) => {
+    if (!invoice || !invoice.items) return;
+
     if (window.confirm('Are you sure you want to delete this invoice?')) {
       try {
-        const invoice = invoices.find(inv => inv.id === invoiceId);
-        const productIdsToRecalculate = new Set<string>();
+        // 1️⃣ Delete the invoice document
+        await deleteDoc(doc(db, "invoices", invoice.id));
 
-        if (invoice && invoice.items) {
-          invoice.items.forEach(item => productIdsToRecalculate.add(item.productId));
+        // 2️⃣ Re-calculate stock for every product listed in that invoice
+        for (const item of invoice.items) {
+          await recalcProductStock(item.productId);
         }
-        
-        await deleteDoc(doc(db, 'invoices', invoiceId));
         toast.success("Invoice deleted successfully");
-
-        // Recalculate stock for affected products after deletion
-        for (const productId of productIdsToRecalculate) {
-          await recalcProductStock(productId);
-        }
+        console.log("✅ Invoice deleted and stock recalculated.");
 
       } catch (error) {
         console.error('Error deleting invoice:', error);

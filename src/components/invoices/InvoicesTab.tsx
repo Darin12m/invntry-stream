@@ -3,33 +3,7 @@ import { FileText, Trash2, Plus, Eye, Edit, Trash, CheckSquare, Square, ChevronU
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-
-interface Invoice {
-  id: string;
-  number: string;
-  date: string;
-  customer: {
-    name: string;
-    email: string;
-    address: string;
-    phone?: string;
-  };
-  items: {
-    productId: string;
-    name: string;
-    sku: string;
-    price: number;
-    quantity: number;
-    purchasePrice?: number;
-    discount?: number;
-  }[];
-  subtotal: number;
-  discount: number;
-  discountPercentage: number;
-  total: number;
-  status: string;
-  invoiceType?: 'sale' | 'refund' | 'writeoff'; // NEW: Invoice Type
-}
+import { Invoice } from '../InventoryManagement'; // Import Invoice interface
 
 interface InvoicesTabProps {
   invoices: Invoice[];
@@ -41,7 +15,7 @@ interface InvoicesTabProps {
   handleCreateInvoice: () => void;
   handleViewInvoice: (invoice: Invoice) => void;
   handleEditInvoice: (invoice: Invoice) => void;
-  handleDeleteInvoice: (invoiceId: string) => Promise<void>;
+  handleDeleteInvoice: (invoice: Invoice) => Promise<void>; // Updated prop type
   invoiceSortBy: 'number' | 'date' | 'customer' | 'total';
   invoiceSortDirection: 'asc' | 'desc';
   handleInvoiceSort: (column: 'number' | 'date' | 'customer' | 'total') => void;
@@ -270,7 +244,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
                       Edit
                     </Button>
                     <Button
-                      onClick={() => handleDeleteInvoice(invoice.id)}
+                      onClick={() => handleDeleteInvoice(invoice)} // Updated call site
                       variant="destructive"
                       size="sm"
                     >
