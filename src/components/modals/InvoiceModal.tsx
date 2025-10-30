@@ -20,6 +20,13 @@ interface InvoiceModalProps {
   toast: any; // Sonner toast instance
 }
 
+// Declare global property for the guard
+declare global {
+  interface Window {
+    __stockUpdateRunning: boolean;
+  }
+}
+
 const InvoiceModal: React.FC<InvoiceModalProps> = ({
   showInvoiceModal,
   setShowInvoiceModal,
@@ -234,30 +241,44 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         await addDoc(collection(db, 'invoices'), invoiceData);
       }
 
-      // --- CORRECTED STOCK LOGIC ---
-      for (const item of itemsToSave) {
-        const productRef = doc(db, 'products', item.productId);
+      // --- STOCK UPDATE LOGIC WITH SINGLE-EXECUTION GUARD ---
+      if (window.__stockUpdateRunning) {
+        console.warn("Stock update skipped – already running");
+        return;
+      }
+      window.__stockUpdateRunning = true;
 
-        const base = Number(item.baseQuantity ?? 0);  // true stock before invoice
-        const qty = Math.abs(Number(item.quantity));
-        const oldType = editingInvoice ? editingInvoice.invoiceType || 'sale' : null;
-        const newType = selectedInvoiceType;
+      try {
+        for (const item of itemsToSave) {
+          const productRef = doc(db, 'products', item.productId);
 
-        let finalStock = base;
+          const base = Number(item.baseQuantity ?? 0);     // true stock before invoice
+          const qty = Math.abs(Number(item.quantity));
+          const oldType = editingInvoice ? editingInvoice.invoiceType || 'sale' : null;
+          const newType = selectedInvoiceType;
 
-        // Step 1️⃣: Undo the previous type’s effect (only if editing an existing invoice)
-        if (editingInvoice && oldType) { // Only undo if it's an existing invoice
-          if (oldType === 'sale') finalStock += qty;     // undo stock decrease
-          else if (oldType === 'refund') finalStock -= qty; // undo stock increase
-          else if (oldType === 'writeoff') finalStock += qty; // undo write-off
+          // Start from baseline
+          let finalStock = base;
+
+          // Step 1️⃣: Undo previous invoice type (only if editing)
+          if (oldType) {
+            if (oldType === 'sale') finalStock += qty;         // undo previous decrease
+            else if (oldType === 'refund') finalStock -= qty;  // undo previous increase
+            else if (oldType === 'writeoff') finalStock += qty;
+          }
+
+          // Step 2️⃣: Apply new invoice type
+          if (newType === 'sale') finalStock -= qty;
+          else if (newType === 'refund') finalStock += qty;
+          else if (newType === 'writeoff') finalStock -= qty;
+
+          await updateDoc(productRef, { quantity: Math.max(0, finalStock) });
         }
 
-        // Step 2️⃣: Apply the new type’s effect (fresh)
-        if (newType === 'sale') finalStock -= qty;
-        else if (newType === 'refund') finalStock += qty;
-        else if (newType === 'writeoff') finalStock -= qty;
-
-        await updateDoc(productRef, { quantity: Math.max(0, finalStock) });
+        console.log("✅ Stock updated once, baseline logic applied");
+      } finally {
+        // Reset guard after execution
+        window.__stockUpdateRunning = false;
       }
 
       handleCloseInvoiceModal();
