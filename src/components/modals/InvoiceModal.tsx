@@ -190,36 +190,24 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
     const { subtotal, discount: discountAmount, total } = calculateInvoiceTotal();
     
-    let finalInvoiceItems = invoiceItems;
+    let itemsToSave = invoiceItems; // Start with the current state of items in the modal
 
-    // Prepare finalInvoiceItems with baseQuantity
-    if (!editingInvoice) {
-      // For new invoices, fetch baseQuantity for each item
-      finalInvoiceItems = await Promise.all(invoiceItems.map(async (item) => {
-        const productRef = doc(db, 'products', item.productId);
-        const productSnap = await getDoc(productRef);
-        const productData = productSnap.data();
-        return {
-          ...item,
-          baseQuantity: productData?.quantity || 0, // stock before invoice creation
-        };
-      }));
-    } else {
-      // For editing invoices, ensure baseQuantity is correctly set for all items.
-      // If an item was part of the original invoice and has baseQuantity, use it.
-      // If it's an old invoice item without baseQuantity, or a new item added during this edit,
-      // fetch the *current* product quantity as its base for this calculation.
-      finalInvoiceItems = await Promise.all(invoiceItems.map(async (item) => {
+    // If it's a new invoice, or if any item in an existing invoice doesn't have baseQuantity
+    // (e.g., newly added item during edit, or legacy invoice item from before baseQuantity was implemented)
+    const needsBaseQuantityCapture = !editingInvoice || invoiceItems.some(item => item.baseQuantity === undefined || item.baseQuantity === null);
+
+    if (needsBaseQuantityCapture) {
+      itemsToSave = await Promise.all(invoiceItems.map(async (item) => {
         if (item.baseQuantity === undefined || item.baseQuantity === null) {
           const productRef = doc(db, 'products', item.productId);
           const productSnap = await getDoc(productRef);
           const productData = productSnap.data();
           return {
             ...item,
-            baseQuantity: productData?.quantity || 0,
+            baseQuantity: productData?.quantity || 0, // record true starting stock for new/legacy items
           };
         }
-        return item; // Item already has a baseQuantity from a previous save
+        return item; // For existing items with baseQuantity, keep it as is
       }));
     }
 
@@ -227,7 +215,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       number: currentInvoice!.number,
       date: currentInvoice!.date,
       customer: customerInfo,
-      items: finalInvoiceItems, // Use the items with baseQuantity
+      items: itemsToSave, // Use the processed items with baseQuantity
       subtotal,
       discount: discountAmount,
       discountPercentage: discount,
@@ -240,41 +228,25 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       if (editingInvoice) {
         // Update the invoice document
         await updateDoc(doc(db, 'invoices', editingInvoice.id), invoiceData);
-
-        // Update each product based on baseline stock and invoice type
-        const updatePromises = finalInvoiceItems.map(async (item) => {
-          const productRef = doc(db, 'products', item.productId);
-          const qty = Math.abs(Number(item.quantity));
-          const baseQty = Number(item.baseQuantity || 0); // Use stored baseQuantity
-          let newStock = baseQty;
-
-          if (selectedInvoiceType === 'sale') newStock = baseQty - qty;
-          else if (selectedInvoiceType === 'refund') newStock = baseQty + qty;
-          else if (selectedInvoiceType === 'writeoff') newStock = baseQty - qty;
-
-          await updateDoc(productRef, { quantity: Math.max(0, newStock) });
-        });
-        await Promise.all(updatePromises);
-
       } else {
         // Add new invoice document
         await addDoc(collection(db, 'invoices'), invoiceData);
-
-        // Update each product based on baseline stock and invoice type (same logic as edit)
-        const updatePromises = finalInvoiceItems.map(async (item) => {
-          const productRef = doc(db, 'products', item.productId);
-          const qty = Math.abs(Number(item.quantity));
-          const baseQty = Number(item.baseQuantity || 0); // Use stored baseQuantity
-          let newStock = baseQty;
-
-          if (selectedInvoiceType === 'sale') newStock = baseQty - qty;
-          else if (selectedInvoiceType === 'refund') newStock = baseQty + qty;
-          else if (selectedInvoiceType === 'writeoff') newStock = baseQty - qty;
-
-          await updateDoc(productRef, { quantity: Math.max(0, newStock) });
-        });
-        await Promise.all(updatePromises);
       }
+
+      // Unified stock update logic for both new and edited invoices
+      const updatePromises = itemsToSave.map(async (item) => {
+        const productRef = doc(db, 'products', item.productId);
+        const baseQty = Number(item.baseQuantity || 0); // Always use the stored baseQuantity
+        const qty = Math.abs(Number(item.quantity));
+
+        let finalStock = baseQty;
+        if (selectedInvoiceType === 'sale') finalStock = baseQty - qty;
+        else if (selectedInvoiceType === 'refund') finalStock = baseQty + qty;
+        else if (selectedInvoiceType === 'writeoff') finalStock = baseQty - qty;
+
+        await updateDoc(productRef, { quantity: Math.max(0, finalStock) });
+      });
+      await Promise.all(updatePromises);
 
       handleCloseInvoiceModal();
       toast.success(editingInvoice ? 'Invoice updated successfully!' : 'Invoice saved successfully!');
@@ -340,7 +312,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                             <p className="text-primary font-semibold">{product.price.toFixed(2)} ден.</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm text-muted-foreground">Stock: {product.quantity}</p>
+                            <p className className="text-sm text-muted-foreground">Stock: {product.quantity}</p>
                             <div className="bg-primary text-primary-foreground rounded-full p-2 mt-2">
                               <Plus className="h-4 w-4" />
                             </div>

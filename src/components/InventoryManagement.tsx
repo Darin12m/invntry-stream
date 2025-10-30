@@ -89,7 +89,7 @@ const InventoryManagementApp = () => {
   
   // Search term state for InventoryTab
   const [localSearchInput, setLocalSearchInput] = useState(''); // Local state for the input field
-  const deferredSearchTerm = useDeferredValue(localSearchInput); // Deferred value for actual filtering
+  const deferredSearchTerm = useDeferredValue(localSearchSearchInput); // Deferred value for actual filtering
 
   // Modal visibility states
   const [showProductModal, setShowProductModal] = useState(false);
@@ -312,47 +312,40 @@ const InventoryManagementApp = () => {
   const handleDeleteInvoice = async (invoiceId: string) => {
     if (window.confirm('Are you sure you want to delete this invoice?')) {
       try {
-        // Find the invoice to restore quantities
         const invoice = invoices.find(inv => inv.id === invoiceId);
         
-        // Restore product quantities before deleting invoice based on invoiceType
         if (invoice && invoice.items) {
           const restorePromises = invoice.items.map(async (item) => {
             const productRef = doc(db, 'products', item.productId);
-            const productSnap = await getDoc(productRef);
-            if (!productSnap.exists()) return;
-            const currentProductData = productSnap.data();
-            const currentProductQuantity = currentProductData.quantity || 0;
-
-            const qty = Math.abs(Number(item.quantity));
+            const base = Number(item.baseQuantity || 0); // Use stored baseQuantity
+            const qty = Math.abs(Number(item.quantity)); // Quantity from the invoice item
             const invoiceType = invoice.invoiceType || 'sale'; // Default for old invoices
 
-            let finalQuantity = currentProductQuantity; // Start with current quantity
+            let finalQuantity = base; // Default to baseline for new system
 
-            if (item.baseQuantity !== undefined && item.baseQuantity !== null) {
-              // This invoice item has a stored baseQuantity (new system)
-              // When deleting, we want to revert the product's stock to this baseQuantity.
-              finalQuantity = Number(item.baseQuantity);
-            } else {
-              // This is an old invoice item without a stored baseQuantity.
-              // We must reverse the effect of this specific item from the *current* product stock.
+            // For old invoices without baseQuantity, reverse based on current stock
+            if (item.baseQuantity === undefined || item.baseQuantity === null) {
+              const productSnap = await getDoc(productRef);
+              if (!productSnap.exists()) return; // Product might have been deleted
+              const currentProductQuantity = productSnap.data().quantity || 0;
+
               if (invoiceType === 'sale') {
-                finalQuantity = currentProductQuantity + qty; // Sale reduced stock, so add back
+                finalQuantity = currentProductQuantity + qty;
               } else if (invoiceType === 'refund') {
-                finalQuantity = currentProductQuantity - qty; // Refund increased stock, so subtract
+                finalQuantity = currentProductQuantity - qty;
               } else if (invoiceType === 'writeoff') {
-                finalQuantity = currentProductQuantity + qty; // Writeoff reduced stock, so add back
+                finalQuantity = currentProductQuantity + qty;
               }
             }
+            // For new invoices with baseQuantity, finalQuantity is already 'base'
+
             await updateDoc(productRef, { quantity: Math.max(0, finalQuantity) });
           });
           await Promise.all(restorePromises);
         }
         
-        // Delete the invoice
         await deleteDoc(doc(db, 'invoices', invoiceId));
         toast.success("Invoice deleted successfully");
-        // Data will reload automatically via onSnapshot
       } catch (error) {
         console.error('Error deleting invoice:', error);
         toast.error('Failed to delete invoice');
@@ -369,27 +362,22 @@ const InventoryManagementApp = () => {
     
     if (window.confirm(`Are you sure you want to delete ${selectedInvoices.size} selected invoice(s)?`)) {
       try {
-        // Restore product quantities for all selected invoices based on invoiceType
         const restorePromises = Array.from(selectedInvoices).flatMap((invoiceId) => {
           const invoice = invoices.find(inv => inv.id === invoiceId);
           if (invoice && invoice.items) {
             return invoice.items.map(async (item) => {
               const productRef = doc(db, 'products', item.productId);
-              const productSnap = await getDoc(productRef);
-              if (!productSnap.exists()) return;
-              const currentProductData = productSnap.data();
-              const currentProductQuantity = currentProductData.quantity || 0;
-
+              const base = Number(item.baseQuantity || 0);
               const qty = Math.abs(Number(item.quantity));
-              const invoiceType = invoice.invoiceType || 'sale'; // Default for old invoices
+              const invoiceType = invoice.invoiceType || 'sale';
 
-              let finalQuantity = currentProductQuantity; // Start with current quantity
+              let finalQuantity = base;
 
-              if (item.baseQuantity !== undefined && item.baseQuantity !== null) {
-                // This invoice item has a stored baseQuantity (new system)
-                finalQuantity = Number(item.baseQuantity);
-              } else {
-                // This is an old invoice item without a stored baseQuantity.
+              if (item.baseQuantity === undefined || item.baseQuantity === null) {
+                const productSnap = await getDoc(productRef);
+                if (!productSnap.exists()) return;
+                const currentProductQuantity = productSnap.data().quantity || 0;
+
                 if (invoiceType === 'sale') {
                   finalQuantity = currentProductQuantity + qty;
                 } else if (invoiceType === 'refund') {
@@ -405,14 +393,12 @@ const InventoryManagementApp = () => {
         });
         await Promise.all(restorePromises);
         
-        // Delete the invoices
         const deletePromises = Array.from(selectedInvoices).map((invoiceId) =>
           deleteDoc(doc(db, 'invoices', invoiceId))
         );
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
         toast.success(`${selectedInvoices.size} invoices deleted successfully`);
-        // Data will reload automatically via onSnapshot
       } catch (error) {
         console.error('Error bulk deleting invoices:', error);
         toast.error('Failed to delete invoices');
@@ -429,26 +415,21 @@ const InventoryManagementApp = () => {
     
     if (window.confirm(`Are you sure you want to delete ALL ${invoices.length} invoices? This action cannot be undone.`)) {
       try {
-        // Restore product quantities for all invoices based on invoiceType
         const restorePromises = invoices.flatMap((invoice) => {
           if (invoice && invoice.items) {
             return invoice.items.map(async (item) => {
               const productRef = doc(db, 'products', item.productId);
-              const productSnap = await getDoc(productRef);
-              if (!productSnap.exists()) return;
-              const currentProductData = productSnap.data();
-              const currentProductQuantity = currentProductData.quantity || 0;
-
+              const base = Number(item.baseQuantity || 0);
               const qty = Math.abs(Number(item.quantity));
-              const invoiceType = invoice.invoiceType || 'sale'; // Default for old invoices
+              const invoiceType = invoice.invoiceType || 'sale';
 
-              let finalQuantity = currentProductQuantity; // Start with current quantity
+              let finalQuantity = base;
 
-              if (item.baseQuantity !== undefined && item.baseQuantity !== null) {
-                // This invoice item has a stored baseQuantity (new system)
-                finalQuantity = Number(item.baseQuantity);
-              } else {
-                // This is an old invoice item without a stored baseQuantity.
+              if (item.baseQuantity === undefined || item.baseQuantity === null) {
+                const productSnap = await getDoc(productRef);
+                if (!productSnap.exists()) return;
+                const currentProductQuantity = productSnap.data().quantity || 0;
+
                 if (invoiceType === 'sale') {
                   finalQuantity = currentProductQuantity + qty;
                 } else if (invoiceType === 'refund') {
@@ -464,14 +445,12 @@ const InventoryManagementApp = () => {
         });
         await Promise.all(restorePromises);
         
-        // Delete all invoices
         const deletePromises = invoices.map((invoice) =>
           deleteDoc(doc(db, 'invoices', invoice.id))
         );
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
         toast.success("All invoices deleted successfully");
-        // Data will reload automatically via onSnapshot
       } catch (error) {
         console.error('Error deleting all invoices:', error);
         toast.error('Failed to delete all data');
@@ -500,7 +479,6 @@ const InventoryManagementApp = () => {
         
         setSelectedInvoices(new Set());
         toast.success("All data cleared successfully");
-        // Data will reload automatically via onSnapshot
       } catch (error) {
         console.error('Error clearing all data:', error);
         toast.error('Failed to clear all data');
