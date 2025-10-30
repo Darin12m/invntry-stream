@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Search, Plus, Trash, X, Save } from 'lucide-react';
-import { collection, addDoc, updateDoc, doc, getDoc, query, where, serverTimestamp } from 'firebase/firestore'; // Added serverTimestamp
+import { collection, addDoc, updateDoc, doc, getDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { Product, Invoice } from '../InventoryManagement'; // Import interfaces
 import { toast } from "sonner"; // Correct import for sonner toast
 
@@ -18,6 +18,7 @@ interface InvoiceModalProps {
   invoices: Invoice[]; // All invoices for generating new number
   db: any; // Firebase Firestore instance
   toast: any; // Sonner toast instance
+  recalcProductStock: (productId: string) => Promise<void>; // New prop for recalc function
 }
 
 const InvoiceModal: React.FC<InvoiceModalProps> = ({
@@ -29,6 +30,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   invoices,
   db,
   toast,
+  recalcProductStock, // Destructure new prop
 }) => {
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
@@ -205,62 +207,31 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       total,
       status: 'saved',
       invoiceType: selectedInvoiceType,
+      items: invoiceItems, // Always save current items
     };
 
     try {
       if (editingInvoice) {
         // --- EDITING INVOICE LOGIC ---
-        // Re-apply stock changes based on the stored beforeStock and new invoice type/quantities
-        for (const item of invoiceItems) {
-          const productRef = doc(db, "products", item.productId);
-          const qty = Math.abs(Number(item.quantity));
-          const beforeStock = Number(item.beforeStock || 0); // Use the stored beforeStock
-          const newType = selectedInvoiceType;
-
-          let newQty = beforeStock;
-          if (newType === "sale" || newType === "writeoff") newQty -= qty;
-          else if (newType === "refund") newQty += qty;
-
-          await updateDoc(productRef, { quantity: Math.max(0, newQty) });
-        }
-
         await updateDoc(doc(db, 'invoices', editingInvoice.id), {
           ...baseInvoiceData,
-          items: invoiceItems, // Save current items (which should include beforeStock if it was there)
         });
         toast.success('Invoice updated successfully!');
 
       } else {
         // --- CREATING NEW INVOICE LOGIC ---
-        const itemsWithBaseline = await Promise.all(invoiceItems.map(async (item) => {
-          const productRef = doc(db, "products", item.productId);
-          const productSnap = await getDoc(productRef);
-          const productData = productSnap.data() || {};
-          const beforeStock = Number(productData.quantity || 0); // Snapshot current stock
-
-          return { ...item, beforeStock }; // Save snapshot BEFORE change
-        }));
-
         const invoiceData = {
           ...baseInvoiceData,
-          items: itemsWithBaseline,
           createdAt: serverTimestamp(), // Add createdAt timestamp
         };
 
         await addDoc(collection(db, "invoices"), invoiceData);
-
-        // Apply effect once
-        for (const item of itemsWithBaseline) {
-          const productRef = doc(db, "products", item.productId);
-          const qty = Math.abs(Number(item.quantity));
-          let newQty = item.beforeStock; // Use the snapshot
-
-          if (selectedInvoiceType === "sale" || selectedInvoiceType === "writeoff") newQty -= qty;
-          else if (selectedInvoiceType === "refund") newQty += qty;
-
-          await updateDoc(productRef, { quantity: Math.max(0, newQty) });
-        }
         toast.success('Invoice saved successfully!');
+      }
+
+      // After saving (create or edit), recalculate stock for all affected products
+      for (const item of invoiceItems) {
+        await recalcProductStock(item.productId);
       }
 
       handleCloseInvoiceModal();
@@ -370,9 +341,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                     onChange={(e) => setSelectedInvoiceType(e.target.value as 'sale' | 'refund' | 'writeoff')}
                     className="w-full border rounded-md p-2 bg-background text-foreground"
                   >
-                    <option value="sale">Sale</option>
-                    <option value="refund">Refund</option>
-                    <option value="writeoff">Write-off</option>
+                    <option value="sale">Sale / Outgoing</option>
+                    <option value="refund">Refund / Return</option>
+                    <option value="writeoff">Write-off / Damaged / Free</option>
                   </select>
                 </div>
 
