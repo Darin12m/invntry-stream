@@ -24,9 +24,6 @@ interface InventoryTabProps {
   filteredProducts: Product[];
   products: Product[];
   sortedProducts: Product[];
-  // Removed selectedProducts: Set<string>;
-  // Removed toggleProductSelection: (productId: string) => void;
-  // Removed selectAllProducts: () => void;
   handleBulkDeleteProducts: () => Promise<void>;
   handleDeleteAllProducts: () => Promise<void>;
   handleAddProduct: () => void;
@@ -36,7 +33,6 @@ interface InventoryTabProps {
   sortDirection: 'asc' | 'desc';
   handleSort: (column: 'name' | 'sku' | 'category' | 'quantity' | 'price') => void;
   getStockStatus: (quantity: number) => { label: string; variant: 'destructive' | 'warning' | 'secondary' | 'default' };
-  // Removed handleCreateMiniCatalog: () => void;
 }
 
 const InventoryTab: React.FC<InventoryTabProps> = ({
@@ -45,9 +41,6 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   filteredProducts,
   products,
   sortedProducts,
-  // Removed selectedProducts,
-  // Removed toggleProductSelection,
-  // Removed selectAllProducts,
   handleBulkDeleteProducts,
   handleDeleteAllProducts,
   handleAddProduct,
@@ -57,7 +50,6 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   sortDirection,
   handleSort,
   getStockStatus,
-  // Removed handleCreateMiniCatalog,
 }) => (
   <div className="space-y-6 animate-fade-in">
     {/* Header */}
@@ -67,8 +59,6 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
         <p className="text-muted-foreground mt-1">Manage your products and stock levels</p>
       </div>
       <div className="flex gap-3">
-        {/* Removed selectedProducts.size > 0 check and Create Mini Catalog button */}
-        {/* The bulk delete button will now always be disabled as there's no selection mechanism */}
         <Button
           onClick={handleBulkDeleteProducts}
           variant="destructive"
@@ -114,7 +104,6 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
       )}
 
       <div className="flex gap-2 justify-end">
-        {/* Removed Select All/Deselect All button */}
         {products.length > 0 && (
           <Button
             onClick={handleDeleteAllProducts}
@@ -135,7 +124,6 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
         <table className="w-full">
           <thead>
             <tr className="border-b bg-muted/30">
-              {/* Removed checkbox column */}
               <th className="text-left p-4 font-medium">
                 <button
                   onClick={() => handleSort('name')}
@@ -197,16 +185,13 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
           <tbody>
             {sortedProducts.map((product, index) => {
               const stockStatus = getStockStatus(product.quantity);
-              // Removed imageUrl variable
               return (
                 <tr 
                   key={product.id} 
                   className={`border-b hover:bg-muted/50 transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}
                 >
-                  {/* Removed checkbox */}
                   <td className="p-4">
                     <div className="flex items-center gap-3">
-                      {/* Removed thumbnail image display */}
                       <div className="font-medium text-foreground">{product.name}</div>
                     </div>
                   </td>
@@ -257,14 +242,11 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
     <div className="space-y-4 md:hidden">
       {sortedProducts.map(product => {
         const stockStatus = getStockStatus(product.quantity);
-        // Removed imageUrl variable
         return (
           <Card key={product.id} className="p-4 hover:shadow-lg transition-all duration-300 animate-scale-in">
             <div className="flex items-start gap-3 mb-3">
-              {/* Removed checkbox */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-2">
-                  {/* Removed thumbnail image display */}
                   <h3 className="font-bold text-lg text-foreground">{product.name}</h3>
                 </div>
                 <div className="space-y-2 text-sm">
