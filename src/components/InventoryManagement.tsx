@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useDeferredValue, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Sun, Moon } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Sun, Moon, Settings } from 'lucide-react'; // Added Settings icon
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { db, auth, storage } from '@/lib/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, getDocs, where } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, getDocs, where, serverTimestamp } from 'firebase/firestore'; // Added serverTimestamp
 import { signOut, User } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -32,6 +32,7 @@ import ProductModal from './modals/ProductModal';
 import InvoiceModal from './modals/InvoiceModal';
 import InvoiceViewerModal from './modals/InvoiceViewerModal';
 import ColumnMappingModal from './modals/ColumnMappingModal';
+import SettingsPage from '@/pages/SettingsPage'; // Import SettingsPage
 
 // Product interface with purchase price for profit calculations
 export interface Product {
@@ -72,6 +73,7 @@ export interface Invoice {
   total: number;
   status: string;
   invoiceType?: 'sale' | 'refund' | 'writeoff'; // NEW: Invoice Type
+  deleted?: boolean; // NEW: Soft delete flag
 }
 
 const InventoryManagementApp = () => {
@@ -153,9 +155,9 @@ const InventoryManagementApp = () => {
     return () => unsubscribe(); // Cleanup listener on component unmount
   }, []);
 
-  // Real-time invoice loading from Firebase
+  // Real-time invoice loading from Firebase (only active invoices)
   useEffect(() => {
-    const invoicesQuery = query(collection(db, 'invoices'), orderBy('date', 'desc'));
+    const invoicesQuery = query(collection(db, 'invoices'), where("deleted", "!=", true), orderBy('date', 'desc')); // Filter out deleted
     const unsubscribe = onSnapshot(invoicesQuery, (querySnapshot) => {
       const invoicesData = querySnapshot.docs.map(doc => ({
         id: doc.id,
@@ -292,8 +294,8 @@ const InventoryManagementApp = () => {
   async function recalcProductStock(productId: string) {
     const productRef = doc(db, "products", productId);
 
-    // Get all invoices containing this product
-    const invoicesQuery = query(collection(db, "invoices"), where("itemsIds", "array-contains", productId));
+    // Get all ACTIVE invoices containing this product
+    const invoicesQuery = query(collection(db, "invoices"), where("itemsIds", "array-contains", productId), where("deleted", "!=", true));
     const invoicesSnap = await getDocs(invoicesQuery);
 
     let totalSold = 0;
@@ -372,13 +374,13 @@ const InventoryManagementApp = () => {
     }
   };
 
-  // 4. Delete single invoice
+  // 4. Delete single invoice (now soft delete)
   async function handleDeleteInvoice(invoice: Invoice) {
     if (!invoice || !invoice.items) return;
 
-    if (window.confirm('Are you sure you want to delete this invoice?')) {
+    if (window.confirm('Are you sure you want to move this invoice to trash?')) {
       try {
-        // 1️⃣  Revert the stock impact of this invoice itself BEFORE deleting
+        // 1️⃣  Revert the stock impact of this invoice itself BEFORE marking as deleted
         for (const item of invoice.items) {
           const productRef = doc(db, "products", item.productId);
           const productSnap = await getDoc(productRef);
@@ -403,85 +405,123 @@ const InventoryManagementApp = () => {
           await updateDoc(productRef, { quantity: restoredQty });
         }
 
-        // 2️⃣  Delete the invoice document
-        await deleteDoc(doc(db, "invoices", invoice.id));
-        toast.success("Invoice deleted successfully");
-        console.log("✅ Invoice deleted and stock restored to its pre-invoice value.");
+        // 2️⃣  Mark the invoice document as deleted
+        await updateDoc(doc(db, "invoices", invoice.id), {
+          deleted: true,
+          deletedAt: serverTimestamp(), // Add a timestamp for when it was deleted
+        });
+        toast.success("Invoice moved to trash.");
+        console.log("✅ Invoice moved to trash and stock restored to its pre-invoice value.");
 
       } catch (error) {
-        console.error('Error deleting invoice:', error);
-        toast.error('Failed to delete invoice');
+        console.error('Error moving invoice to trash:', error);
+        toast.error('Failed to move invoice to trash');
       }
     }
   }
 
-  // 5. Bulk delete invoices
+  // 5. Bulk delete invoices (now soft delete)
   const handleBulkDeleteInvoices = async () => {
     if (selectedInvoices.size === 0) {
-      toast.error("Please select invoices to delete");
+      toast.error("Please select invoices to move to trash");
       return;
     }
     
-    if (window.confirm(`Are you sure you want to delete ${selectedInvoices.size} selected invoice(s)?`)) {
+    if (window.confirm(`Are you sure you want to move ${selectedInvoices.size} selected invoice(s) to trash?`)) {
       try {
         const productIdsToRecalculate = new Set<string>();
 
         const deletePromises = Array.from(selectedInvoices).map(async (invoiceId) => {
           const invoice = invoices.find(inv => inv.id === invoiceId);
           if (invoice && invoice.items) {
-            invoice.items.forEach(item => productIdsToRecalculate.add(item.productId));
+            // Revert stock for each item in the invoice
+            for (const item of invoice.items) {
+              const productRef = doc(db, "products", item.productId);
+              const productSnap = await getDoc(productRef);
+              if (!productSnap.exists()) continue;
+
+              const product = productSnap.data();
+              const currentQty = Number(product.quantity || 0);
+              const qty = Math.abs(Number(item.quantity) || 0);
+              const type = invoice.invoiceType || "sale";
+
+              let restoredQty = currentQty;
+              if (type === "sale" || type === "writeoff") {
+                restoredQty = currentQty + qty;
+              } else if (type === "refund") {
+                restoredQty = Math.max(0, currentQty - qty);
+              }
+              await updateDoc(productRef, { quantity: restoredQty });
+            }
+            productIdsToRecalculate.add(invoice.id); // Add invoice ID to recalculate list
           }
-          return deleteDoc(doc(db, 'invoices', invoiceId));
+          return updateDoc(doc(db, 'invoices', invoiceId), { deleted: true, deletedAt: serverTimestamp() });
         });
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
-        toast.success(`${selectedInvoices.size} invoices deleted successfully`);
+        toast.success(`${selectedInvoices.size} invoices moved to trash`);
 
         // Recalculate stock for affected products after bulk deletion
         for (const productId of productIdsToRecalculate) {
-          await recalcProductStock(productId);
+          await recalcProductStock(productId); // This will re-evaluate stock based on *active* invoices
         }
-        console.log("✅ Bulk invoices deleted and stock restored to correct values.");
+        console.log("✅ Bulk invoices moved to trash and stock restored to correct values.");
 
       } catch (error) {
-        console.error('Error bulk deleting invoices:', error);
-        toast.error('Failed to delete invoices');
+        console.error('Error bulk moving invoices to trash:', error);
+        toast.error('Failed to move invoices to trash');
       }
     }
   };
 
-  // 6. Delete all invoices
+  // 6. Delete all invoices (now soft delete)
   const handleDeleteAllInvoices = async () => {
     if (invoices.length === 0) {
-      toast.error("No invoices to delete");
+      toast.error("No invoices to move to trash");
       return;
     }
     
-    if (window.confirm(`Are you sure you want to delete ALL ${invoices.length} invoices? This action cannot be undone.`)) {
+    if (window.confirm(`Are you sure you want to move ALL ${invoices.length} invoices to trash? This action cannot be undone.`)) {
       try {
         const productIdsToRecalculate = new Set<string>();
-        invoices.forEach(invoice => {
+        const deletePromises = invoices.map(async (invoice) => {
           if (invoice.items) {
-            invoice.items.forEach(item => productIdsToRecalculate.add(item.productId));
-          }
-        });
+            // Revert stock for each item in the invoice
+            for (const item of invoice.items) {
+              const productRef = doc(db, "products", item.productId);
+              const productSnap = await getDoc(productRef);
+              if (!productSnap.exists()) continue;
 
-        const deletePromises = invoices.map((invoice) =>
-          deleteDoc(doc(db, 'invoices', invoice.id))
-        );
+              const product = productSnap.data();
+              const currentQty = Number(product.quantity || 0);
+              const qty = Math.abs(Number(item.quantity) || 0);
+              const type = invoice.invoiceType || "sale";
+
+              let restoredQty = currentQty;
+              if (type === "sale" || type === "writeoff") {
+                restoredQty = currentQty + qty;
+              } else if (type === "refund") {
+                restoredQty = Math.max(0, currentQty - qty);
+              }
+              await updateDoc(productRef, { quantity: restoredQty });
+            }
+            productIdsToRecalculate.add(invoice.id); // Add invoice ID to recalculate list
+          }
+          return updateDoc(doc(db, 'invoices', invoice.id), { deleted: true, deletedAt: serverTimestamp() });
+        });
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
-        toast.success("All invoices deleted successfully");
+        toast.success("All invoices moved to trash");
 
         // Recalculate stock for all products that were ever in an invoice
         for (const productId of productIdsToRecalculate) {
           await recalcProductStock(productId);
         }
-        console.log("✅ All invoices deleted and stock restored to correct values.");
+        console.log("✅ All invoices moved to trash and stock restored to correct values.");
 
       } catch (error) {
-        console.error('Error deleting all invoices:', error);
-        toast.error('Failed to delete all data');
+        console.error('Error moving all invoices to trash:', error);
+        toast.error('Failed to move all invoices to trash');
       }
     }
   };
@@ -662,7 +702,8 @@ const InventoryManagementApp = () => {
                 { key: 'inventory', label: 'Inventory', icon: Package },
                 { key: 'invoices', label: 'Invoices', icon: FileText },
                 { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-                { key: 'data', label: 'Data', icon: Upload }
+                { key: 'data', label: 'Data', icon: Upload },
+                { key: 'settings', label: 'Settings', icon: Settings } // New Settings tab
               ].map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
@@ -726,7 +767,8 @@ const InventoryManagementApp = () => {
                   { key: 'inventory', icon: Package },
                   { key: 'invoices', icon: FileText },
                   { key: 'dashboard', icon: BarChart3 },
-                  { key: 'data', icon: Upload }
+                  { key: 'data', icon: Upload },
+                  { key: 'settings', icon: Settings } // New Settings tab
                 ].map(({ key, icon: Icon }) => (
                   <button
                     key={key}
@@ -849,6 +891,9 @@ const InventoryManagementApp = () => {
               fileInputRef={fileInputRef}
             />
           </Suspense>
+        )}
+        {activeTab === 'settings' && (
+          <SettingsPage />
         )}
       </main>
 
