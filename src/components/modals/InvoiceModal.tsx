@@ -190,24 +190,33 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
     const { subtotal, discount: discountAmount, total } = calculateInvoiceTotal();
     
-    let itemsToSave = invoiceItems; // Start with the current state of items in the modal
+    // When creating a NEW invoice, capture baseline stock before making any changes
+    let itemsWithBase = invoiceItems;
+    if (!editingInvoice) {
+      itemsWithBase = await Promise.all(invoiceItems.map(async (item) => {
+        const productRef = doc(db, 'products', item.productId);
+        const productSnap = await getDoc(productRef);
+        const productData = productSnap.data();
 
-    // If it's a new invoice, or if any item in an existing invoice doesn't have baseQuantity
-    // (e.g., newly added item during edit, or legacy invoice item from before baseQuantity was implemented)
-    const needsBaseQuantityCapture = !editingInvoice || invoiceItems.some(item => item.baseQuantity === undefined || item.baseQuantity === null);
-
-    if (needsBaseQuantityCapture) {
-      itemsToSave = await Promise.all(invoiceItems.map(async (item) => {
+        return {
+          ...item,
+          baseQuantity: productData?.quantity || 0, // record true starting stock
+        };
+      }));
+    } else {
+      // When editing, ensure existing items retain their original baseQuantity
+      // and newly added items get their current stock as baseQuantity.
+      itemsWithBase = await Promise.all(invoiceItems.map(async (item) => {
         if (item.baseQuantity === undefined || item.baseQuantity === null) {
           const productRef = doc(db, 'products', item.productId);
           const productSnap = await getDoc(productRef);
           const productData = productSnap.data();
           return {
             ...item,
-            baseQuantity: productData?.quantity || 0, // record true starting stock for new/legacy items
+            baseQuantity: productData?.quantity || 0,
           };
         }
-        return item; // For existing items with baseQuantity, keep it as is
+        return item;
       }));
     }
 
@@ -215,7 +224,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       number: currentInvoice!.number,
       date: currentInvoice!.date,
       customer: customerInfo,
-      items: itemsToSave, // Use the processed items with baseQuantity
+      items: itemsWithBase, // Use the processed items with baseQuantity
       subtotal,
       discount: discountAmount,
       discountPercentage: discount,
@@ -233,20 +242,36 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         await addDoc(collection(db, 'invoices'), invoiceData);
       }
 
-      // Unified stock update logic for both new and edited invoices
-      const updatePromises = itemsToSave.map(async (item) => {
+      // --- SAFE BASELINE STOCK LOGIC ---
+      // Always uses the original baseQuantity stored in the invoice item.
+      // Never depends on the product's current Firestore quantity.
+      for (const item of itemsWithBase) {
         const productRef = doc(db, 'products', item.productId);
-        const baseQty = Number(item.baseQuantity || 0); // Always use the stored baseQuantity
+        const productSnap = await getDoc(productRef);
+        if (!productSnap.exists()) continue;
+
         const qty = Math.abs(Number(item.quantity));
+        const base = Number(item.baseQuantity ?? 0);           // original stock before invoice
+        const oldType = editingInvoice ? editingInvoice.invoiceType || 'sale' : null;
+        const newType = selectedInvoiceType;
 
-        let finalStock = baseQty;
-        if (selectedInvoiceType === 'sale') finalStock = baseQty - qty;
-        else if (selectedInvoiceType === 'refund') finalStock = baseQty + qty;
-        else if (selectedInvoiceType === 'writeoff') finalStock = baseQty - qty;
+        // Calculate what stock *should* be after removing old effect and adding new one,
+        // both relative to the baseline.
+        let targetStock = base;
 
-        await updateDoc(productRef, { quantity: Math.max(0, finalStock) });
-      });
-      await Promise.all(updatePromises);
+        // Remove previous type's effect (only if editing an existing invoice)
+        // This step is implicitly handled by starting targetStock at 'base'
+        // and then applying the new effect directly to 'base'.
+        // The explicit 'undo' is not needed if we always calculate from 'base'.
+
+        // Apply new type’s effect (fresh calculation from baseline)
+        if (newType === 'sale') targetStock = base - qty;
+        else if (newType === 'refund') targetStock = base + qty;
+        else if (newType === 'writeoff') targetStock = base - qty;
+
+        // Write the result once
+        await updateDoc(productRef, { quantity: Math.max(0, targetStock) });
+      }
 
       handleCloseInvoiceModal();
       toast.success(editingInvoice ? 'Invoice updated successfully!' : 'Invoice saved successfully!');
@@ -312,7 +337,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                             <p className="text-primary font-semibold">{product.price.toFixed(2)} ден.</p>
                           </div>
                           <div className="text-right">
-                            <p className className="text-sm text-muted-foreground">Stock: {product.quantity}</p>
+                            <p className="text-sm text-muted-foreground">Stock: {product.quantity}</p>
                             <div className="bg-primary text-primary-foreground rounded-full p-2 mt-2">
                               <Plus className="h-4 w-4" />
                             </div>
