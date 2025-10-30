@@ -91,10 +91,16 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
     try {
       if (editingProduct) {
+        // When editing, only update the fields provided in productData.
+        // initialStock should not be changed here.
         await updateDoc(doc(db, 'products', editingProduct.id), productData);
         toast.success("Product updated successfully");
       } else {
-        await addDoc(collection(db, 'products'), productData);
+        // For new products, set initialStock to the current quantity
+        await addDoc(collection(db, 'products'), {
+          ...productData,
+          initialStock: parseInt(productForm.quantity) // Set initialStock for new products
+        });
         toast.success("Product added successfully");
       }
       handleCloseProductModal();

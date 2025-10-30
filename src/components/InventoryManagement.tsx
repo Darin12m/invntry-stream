@@ -43,6 +43,7 @@ export interface Product {
   category: string;
   purchasePrice?: number; // Admin-only field for profit calculations
   shortDescription?: string; // Short text description
+  initialStock?: number; // NEW: Initial stock for deterministic calculations
 }
 
 export interface Invoice {
@@ -65,6 +66,7 @@ export interface Invoice {
     discount?: number; // Per-item discount percentage
     baseQuantity?: number; // NEW: Stock before this invoice was applied
   }[];
+  itemsIds?: string[]; // NEW: Array of product IDs for easier querying
   subtotal: number;
   discount: number;
   discountPercentage: number;
@@ -267,6 +269,32 @@ const InventoryManagementApp = () => {
 
   // DELETE FUNCTIONS - Multiple implementations
 
+  // Helper function to recalculate product stock (copied from InvoiceModal for consistency)
+  const recalcProductStock = async (productId: string) => {
+    const productRef = doc(db, "products", productId);
+    
+    const invoicesQuery = query(collection(db, "invoices"), where("itemsIds", "array-contains", productId));
+    const invoicesSnap = await getDocs(invoicesQuery);
+
+    let totalSold = 0;
+    for (const invDoc of invoicesSnap.docs) {
+      const data = invDoc.data();
+      const type = data.invoiceType || "sale";
+      const item = (data.items || []).find((i: any) => i.productId === productId);
+      if (!item) continue;
+      const qty = Number(item.quantity) || 0;
+
+      if (type === "sale") totalSold += qty;
+      else if (type === "writeoff") totalSold += qty;
+      else if (type === "refund") totalSold -= qty;
+    }
+
+    const productSnap = await getDoc(productRef);
+    const initialStock = productSnap.data()?.initialStock || 0;
+    const finalStock = Math.max(0, initialStock - totalSold);
+    await updateDoc(productRef, { quantity: finalStock });
+  };
+
   // 1. Delete single product
   const handleDeleteProduct = async (productId: string) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
@@ -313,39 +341,20 @@ const InventoryManagementApp = () => {
     if (window.confirm('Are you sure you want to delete this invoice?')) {
       try {
         const invoice = invoices.find(inv => inv.id === invoiceId);
-        
+        const productIdsToRecalculate = new Set<string>();
+
         if (invoice && invoice.items) {
-          const restorePromises = invoice.items.map(async (item) => {
-            const productRef = doc(db, 'products', item.productId);
-            const base = Number(item.baseQuantity || 0); // Use stored baseQuantity
-            const qty = Math.abs(Number(item.quantity)); // Quantity from the invoice item
-            const invoiceType = invoice.invoiceType || 'sale'; // Default for old invoices
-
-            let finalQuantity = base; // Default to baseline for new system
-
-            // For old invoices without baseQuantity, reverse based on current stock
-            if (item.baseQuantity === undefined || item.baseQuantity === null) {
-              const productSnap = await getDoc(productRef);
-              if (!productSnap.exists()) return; // Product might have been deleted
-              const currentProductQuantity = productSnap.data().quantity || 0;
-
-              if (invoiceType === 'sale') {
-                finalQuantity = currentProductQuantity + qty;
-              } else if (invoiceType === 'refund') {
-                finalQuantity = currentProductQuantity - qty;
-              } else if (invoiceType === 'writeoff') {
-                finalQuantity = currentProductQuantity + qty;
-              }
-            }
-            // For new invoices with baseQuantity, finalQuantity is already 'base'
-
-            await updateDoc(productRef, { quantity: Math.max(0, finalQuantity) });
-          });
-          await Promise.all(restorePromises);
+          invoice.items.forEach(item => productIdsToRecalculate.add(item.productId));
         }
         
         await deleteDoc(doc(db, 'invoices', invoiceId));
         toast.success("Invoice deleted successfully");
+
+        // Recalculate stock for affected products after deletion
+        for (const productId of productIdsToRecalculate) {
+          await recalcProductStock(productId);
+        }
+
       } catch (error) {
         console.error('Error deleting invoice:', error);
         toast.error('Failed to delete invoice');
@@ -362,43 +371,24 @@ const InventoryManagementApp = () => {
     
     if (window.confirm(`Are you sure you want to delete ${selectedInvoices.size} selected invoice(s)?`)) {
       try {
-        const restorePromises = Array.from(selectedInvoices).flatMap((invoiceId) => {
+        const productIdsToRecalculate = new Set<string>();
+
+        const deletePromises = Array.from(selectedInvoices).map(async (invoiceId) => {
           const invoice = invoices.find(inv => inv.id === invoiceId);
           if (invoice && invoice.items) {
-            return invoice.items.map(async (item) => {
-              const productRef = doc(db, 'products', item.productId);
-              const base = Number(item.baseQuantity || 0);
-              const qty = Math.abs(Number(item.quantity));
-              const invoiceType = invoice.invoiceType || 'sale';
-
-              let finalQuantity = base;
-
-              if (item.baseQuantity === undefined || item.baseQuantity === null) {
-                const productSnap = await getDoc(productRef);
-                if (!productSnap.exists()) return;
-                const currentProductQuantity = productSnap.data().quantity || 0;
-
-                if (invoiceType === 'sale') {
-                  finalQuantity = currentProductQuantity + qty;
-                } else if (invoiceType === 'refund') {
-                  finalQuantity = currentProductQuantity - qty;
-                } else if (invoiceType === 'writeoff') {
-                  finalQuantity = currentProductQuantity + qty;
-                }
-              }
-              await updateDoc(productRef, { quantity: Math.max(0, finalQuantity) });
-            });
+            invoice.items.forEach(item => productIdsToRecalculate.add(item.productId));
           }
-          return [];
+          return deleteDoc(doc(db, 'invoices', invoiceId));
         });
-        await Promise.all(restorePromises);
-        
-        const deletePromises = Array.from(selectedInvoices).map((invoiceId) =>
-          deleteDoc(doc(db, 'invoices', invoiceId))
-        );
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
         toast.success(`${selectedInvoices.size} invoices deleted successfully`);
+
+        // Recalculate stock for affected products after bulk deletion
+        for (const productId of productIdsToRecalculate) {
+          await recalcProductStock(productId);
+        }
+
       } catch (error) {
         console.error('Error bulk deleting invoices:', error);
         toast.error('Failed to delete invoices');
@@ -415,42 +405,25 @@ const InventoryManagementApp = () => {
     
     if (window.confirm(`Are you sure you want to delete ALL ${invoices.length} invoices? This action cannot be undone.`)) {
       try {
-        const restorePromises = invoices.flatMap((invoice) => {
-          if (invoice && invoice.items) {
-            return invoice.items.map(async (item) => {
-              const productRef = doc(db, 'products', item.productId);
-              const base = Number(item.baseQuantity || 0);
-              const qty = Math.abs(Number(item.quantity));
-              const invoiceType = invoice.invoiceType || 'sale';
-
-              let finalQuantity = base;
-
-              if (item.baseQuantity === undefined || item.baseQuantity === null) {
-                const productSnap = await getDoc(productRef);
-                if (!productSnap.exists()) return;
-                const currentProductQuantity = productSnap.data().quantity || 0;
-
-                if (invoiceType === 'sale') {
-                  finalQuantity = currentProductQuantity + qty;
-                } else if (invoiceType === 'refund') {
-                  finalQuantity = currentProductQuantity - qty;
-                } else if (invoiceType === 'writeoff') {
-                  finalQuantity = currentProductQuantity + qty;
-                }
-              }
-              await updateDoc(productRef, { quantity: Math.max(0, finalQuantity) });
-            });
+        const productIdsToRecalculate = new Set<string>();
+        invoices.forEach(invoice => {
+          if (invoice.items) {
+            invoice.items.forEach(item => productIdsToRecalculate.add(item.productId));
           }
-          return [];
         });
-        await Promise.all(restorePromises);
-        
+
         const deletePromises = invoices.map((invoice) =>
           deleteDoc(doc(db, 'invoices', invoice.id))
         );
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
         toast.success("All invoices deleted successfully");
+
+        // Recalculate stock for all products that were ever in an invoice
+        for (const productId of productIdsToRecalculate) {
+          await recalcProductStock(productId);
+        }
+
       } catch (error) {
         console.error('Error deleting all invoices:', error);
         toast.error('Failed to delete all data');
