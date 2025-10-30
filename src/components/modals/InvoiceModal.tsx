@@ -38,8 +38,14 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [invoiceProductSearch, setInvoiceProductSearch] = useState('');
   const [discount, setDiscount] = useState(0);
   const [selectedInvoiceType, setSelectedInvoiceType] = useState<'sale' | 'refund' | 'writeoff'>('sale'); // Added state for invoice type
+  const [liveStockMap, setLiveStockMap] = useState<Map<string, number>>(new Map()); // NEW: Live stock map
 
   useEffect(() => {
+    const initialLiveStockMap = new Map<string, number>();
+    products.forEach(p => {
+      initialLiveStockMap.set(p.id, p.quantity);
+    });
+
     if (editingInvoice) {
       setCurrentInvoice({
         id: editingInvoice.id,
@@ -57,6 +63,11 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
       const refreshedItems = editingInvoice.items.map((item) => {
         const latestProduct = products.find(p => p.id === item.productId);
+        // When editing, "free up" the quantity of items already in this invoice
+        // so they can be adjusted within the modal's context.
+        const currentStock = initialLiveStockMap.get(item.productId) || 0;
+        initialLiveStockMap.set(item.productId, currentStock + item.quantity);
+
         return latestProduct
           ? {
               ...item,
@@ -94,6 +105,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setDiscount(0);
       setSelectedInvoiceType('sale'); // Reset invoice type for new invoices
     }
+    setLiveStockMap(initialLiveStockMap); // Initialize live stock map
     setInvoiceProductSearch(''); // Always clear search on modal open/edit
   }, [editingInvoice, products, invoices]);
 
@@ -106,6 +118,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     setInvoiceProductSearch('');
     setDiscount(0);
     setSelectedInvoiceType('sale'); // Reset invoice type on close
+    setLiveStockMap(new Map()); // Clear live stock map on close
   };
 
   const filteredInvoiceProducts = products.filter(product =>
@@ -115,20 +128,29 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   );
 
   const addItemToInvoice = (product: Product) => {
-    if (product.quantity <= 0) {
-      toast.error(`"${product.name}" is out of stock and cannot be added to the invoice.`);
+    const currentLiveStock = liveStockMap.get(product.id) || 0;
+
+    if (currentLiveStock <= 0) {
+      toast.error(`❌ Stock is 0 — cannot add more of "${product.name}".`);
       return;
     }
 
-    const existingItem = invoiceItems.find(item => item.productId === product.id);
-    if (existingItem) {
-      setInvoiceItems(invoiceItems.map(item =>
-        item.productId === product.id
+    // Deduct 1 from liveStockMap
+    setLiveStockMap(prevMap => {
+      const newMap = new Map(prevMap);
+      newMap.set(product.id, currentLiveStock - 1);
+      return newMap;
+    });
+
+    const existingItemIndex = invoiceItems.findIndex(item => item.productId === product.id);
+    if (existingItemIndex > -1) {
+      setInvoiceItems(prevItems => prevItems.map((item, index) =>
+        index === existingItemIndex
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ));
     } else {
-      setInvoiceItems([...invoiceItems, {
+      setInvoiceItems(prevItems => [...prevItems, {
         productId: product.id,
         name: product.name,
         sku: product.sku,
@@ -141,12 +163,37 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     toast.success(`${product.name} added to invoice`);
   };
 
-  const updateInvoiceItemQuantity = (productId: string, quantity: number) => {
-    setInvoiceItems(invoiceItems.map(item =>
-      item.productId === productId
-        ? { ...item, quantity }
-        : item
-    ));
+  const updateInvoiceItemQuantity = (productId: string, newQuantity: number) => {
+    setInvoiceItems(prevItems => {
+      return prevItems.map(item => {
+        if (item.productId === productId) {
+          const oldQuantity = item.quantity;
+          const quantityDifference = newQuantity - oldQuantity; // positive if increasing, negative if decreasing
+
+          const currentLiveStock = liveStockMap.get(productId) || 0;
+
+          if (newQuantity < 0) { // Prevent negative quantities in invoice item
+            toast.error("Quantity cannot be negative.");
+            return item;
+          }
+
+          if (quantityDifference > 0 && currentLiveStock < quantityDifference) {
+            toast.error(`Not enough stock to increase quantity for "${item.name}". Available: ${currentLiveStock}`);
+            return item; // Don't update if not enough stock
+          }
+
+          // Update liveStockMap
+          setLiveStockMap(prevMap => {
+            const newMap = new Map(prevMap);
+            newMap.set(productId, currentLiveStock - quantityDifference);
+            return newMap;
+          });
+
+          return { ...item, quantity: newQuantity };
+        }
+        return item;
+      });
+    });
   };
 
   const updateInvoiceItemDiscount = (productId: string, discount: number) => {
@@ -169,6 +216,15 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   };
 
   const removeInvoiceItem = (productId: string) => {
+    const itemToRemove = invoiceItems.find(item => item.productId === productId);
+    if (itemToRemove) {
+      setLiveStockMap(prevMap => {
+        const newMap = new Map(prevMap);
+        const currentStock = newMap.get(productId) || 0;
+        newMap.set(productId, currentStock + itemToRemove.quantity);
+        return newMap;
+      });
+    }
     setInvoiceItems(invoiceItems.filter(item => item.productId !== productId));
     toast.success("Item removed from invoice");
   };
@@ -180,6 +236,14 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
     
     if (window.confirm(`Are you sure you want to remove all ${invoiceItems.length} items from this invoice?`)) {
+      setLiveStockMap(prevMap => {
+        const newMap = new Map(prevMap);
+        invoiceItems.forEach(item => {
+          const currentStock = newMap.get(item.productId) || 0;
+          newMap.set(item.productId, currentStock + item.quantity);
+        });
+        return newMap;
+      });
       setInvoiceItems([]);
       toast.success("All items cleared from invoice");
     }
@@ -289,27 +353,30 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 {/* Products List */}
                 <div className="flex-1 overflow-y-auto p-4">
                   <div className="space-y-3">
-                    {filteredInvoiceProducts.map(product => (
-                      <Card
-                        key={product.id}
-                        onClick={() => addItemToInvoice(product)}
-                        className={`p-4 cursor-pointer hover:shadow-elegant transition-all duration-300 ${product.quantity <= 0 ? 'opacity-50 cursor-not-allowed border-destructive/50' : 'hover:border-primary/50'}`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h4 className="font-bold">{product.name}</h4>
-                            <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
-                            <p className="text-primary font-semibold">{product.price.toFixed(2)} ден.</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm text-muted-foreground">Stock: {product.quantity}</p>
-                            <div className={`rounded-full p-2 mt-2 ${product.quantity <= 0 ? 'bg-gray-400' : 'bg-primary text-primary-foreground'}`}>
-                              <Plus className="h-4 w-4" />
+                    {filteredInvoiceProducts.map(product => {
+                      const currentLiveStock = liveStockMap.get(product.id) || 0; // Get live stock
+                      return (
+                        <Card
+                          key={product.id}
+                          onClick={() => addItemToInvoice(product)}
+                          className={`p-4 cursor-pointer hover:shadow-elegant transition-all duration-300 ${currentLiveStock <= 0 ? 'opacity-50 cursor-not-allowed border-destructive/50' : 'hover:border-primary/50'}`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <h4 className="font-bold">{product.name}</h4>
+                              <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
+                              <p className="text-primary font-semibold">{product.price.toFixed(2)} ден.</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm text-muted-foreground">Stock: {currentLiveStock}</p> {/* Display live stock */}
+                              <div className={`rounded-full p-2 mt-2 ${currentLiveStock <= 0 ? 'bg-gray-400' : 'bg-primary text-primary-foreground'}`}>
+                                <Plus className="h-4 w-4" />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </Card>
-                    ))}
+                        </Card>
+                      );
+                    })}
                   </div>
                 </div>
                 
@@ -435,6 +502,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                       variant="outline"
                                       size="sm"
                                       className="h-8 w-8 p-0"
+                                      disabled={item.quantity <= 1} // Disable if quantity is 1
                                     >
                                       -
                                     </Button>
