@@ -204,43 +204,76 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
     try {
       if (editingInvoice) {
-        const oldInvoiceRef = doc(db, 'invoices', editingInvoice.id);
-        const oldInvoiceSnap = await getDoc(oldInvoiceRef);
-        const oldInvoiceData = oldInvoiceSnap.exists() ? oldInvoiceSnap.data() as Invoice : null;
-
-        if (oldInvoiceData) {
-          const oldType = oldInvoiceData.invoiceType || 'sale';
+        const oldRef = doc(db, 'invoices', editingInvoice.id);
+        const oldSnap = await getDoc(oldRef);
+        if (oldSnap.exists()) {
+          const oldData = oldSnap.data() as Invoice; // Cast to Invoice type
+          const oldType = oldData.invoiceType || 'sale';
           const newType = selectedInvoiceType;
 
-          const productNetStockChange: { [productId: string]: number } = {};
+          // Only adjust stock if the invoice type has changed
+          if (oldType !== newType) {
+            for (const newItem of invoiceItems) {
+              const productRef = doc(db, 'products', newItem.productId);
+              const productSnap = await getDoc(productRef);
+              if (!productSnap.exists()) continue;
+              const product = productSnap.data();
+              const absQty = Math.abs(Number(newItem.quantity)); // Use absolute quantity for calculations
 
-          oldInvoiceData.items.forEach(item => {
-            const qty = Number(item.quantity) || 0;
-            if (oldType === 'sale') {
-              productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) + qty;
-            } else if (oldType === 'refund') {
-              productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) - qty;
-            }
-          });
+              let adjustment = 0;
 
-          invoiceItems.forEach(item => {
-            const qty = Number(item.quantity) || 0;
-            if (newType === 'sale') {
-              productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) - qty;
-            } else if (newType === 'refund') {
-              productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) + qty;
-            }
-          });
+              // Determine the stock adjustment based on type change
+              if (oldType === 'sale' && newType === 'refund') {
+                adjustment = absQty; // Sale (stock -qty) -> Refund (stock +qty). Net change from current stock: +qty
+              } else if (oldType === 'refund' && newType === 'sale') {
+                adjustment = -absQty; // Refund (stock +qty) -> Sale (stock -qty). Net change from current stock: -qty
+              } else if (oldType === 'writeoff' && newType === 'refund') {
+                adjustment = absQty; // Writeoff (no change) -> Refund (stock +qty). Net change from current stock: +qty
+              } else if (oldType === 'refund' && newType === 'writeoff') {
+                adjustment = -absQty; // Refund (stock +qty) -> Writeoff (no change). Net change from current stock: -qty
+              }
+              // Other combinations (e.g., sale -> writeoff, writeoff -> sale) imply no stock change.
 
-          const stockUpdatePromises = Object.entries(productNetStockChange).map(async ([productId, change]) => {
-            const productRef = doc(db, 'products', productId);
-            const productSnap = await getDoc(productRef);
-            if (productSnap.exists()) {
-              const currentProduct = productSnap.data();
-              await updateDoc(productRef, { quantity: Math.max(0, currentProduct.quantity + change) });
+              await updateDoc(productRef, { quantity: Math.max(0, product.quantity + adjustment) });
             }
-          });
-          await Promise.all(stockUpdatePromises);
+          } else {
+            // If invoice type hasn't changed, but quantities/items might have,
+            // we need to calculate the net change between old and new items.
+            const productNetStockChange: { [productId: string]: number } = {};
+
+            // Undo old invoice items' effect
+            oldData.items.forEach(item => {
+              const qty = Number(item.quantity) || 0;
+              if (oldType === 'sale') {
+                productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) + qty;
+              } else if (oldType === 'refund') {
+                productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) - qty;
+              }
+              // 'writeoff' has no stock effect
+            });
+
+            // Apply new invoice items' effect
+            invoiceItems.forEach(item => {
+              const qty = Number(item.quantity) || 0;
+              if (newType === 'sale') {
+                productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) - qty;
+              } else if (newType === 'refund') {
+                productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) + qty;
+              }
+              // 'writeoff' has no stock effect
+            });
+
+            // Apply net changes to products in Firestore
+            const stockUpdatePromises = Object.entries(productNetStockChange).map(async ([productId, change]) => {
+              const productRef = doc(db, 'products', productId);
+              const productSnap = await getDoc(productRef);
+              if (productSnap.exists()) {
+                const currentProduct = productSnap.data();
+                await updateDoc(productRef, { quantity: Math.max(0, currentProduct.quantity + change) });
+              }
+            });
+            await Promise.all(stockUpdatePromises);
+          }
         }
 
         await updateDoc(doc(db, 'invoices', editingInvoice.id), invoiceData);
