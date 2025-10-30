@@ -190,33 +190,24 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
     const { subtotal, discount: discountAmount, total } = calculateInvoiceTotal();
     
-    // When creating a NEW invoice, capture baseline stock before making any changes
-    let itemsWithBase = invoiceItems;
-    if (!editingInvoice) {
-      itemsWithBase = await Promise.all(invoiceItems.map(async (item) => {
-        const productRef = doc(db, 'products', item.productId);
-        const productSnap = await getDoc(productRef);
-        const productData = productSnap.data();
+    let itemsToSave = invoiceItems; // Start with the current state of items in the modal
 
-        return {
-          ...item,
-          baseQuantity: productData?.quantity || 0, // record true starting stock
-        };
-      }));
-    } else {
-      // When editing, ensure existing items retain their original baseQuantity
-      // and newly added items get their current stock as baseQuantity.
-      itemsWithBase = await Promise.all(invoiceItems.map(async (item) => {
+    // If it's a new invoice, or if any item in an existing invoice doesn't have baseQuantity
+    // (e.g., newly added item during edit, or legacy invoice item from before baseQuantity was implemented)
+    const needsBaseQuantityCapture = !editingInvoice || invoiceItems.some(item => item.baseQuantity === undefined || item.baseQuantity === null);
+
+    if (needsBaseQuantityCapture) {
+      itemsToSave = await Promise.all(invoiceItems.map(async (item) => {
         if (item.baseQuantity === undefined || item.baseQuantity === null) {
           const productRef = doc(db, 'products', item.productId);
           const productSnap = await getDoc(productRef);
           const productData = productSnap.data();
           return {
             ...item,
-            baseQuantity: productData?.quantity || 0,
+            baseQuantity: productData?.quantity || 0, // record true starting stock for new/legacy items
           };
         }
-        return item;
+        return item; // For existing items with baseQuantity, keep it as is
       }));
     }
 
@@ -224,7 +215,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       number: currentInvoice!.number,
       date: currentInvoice!.date,
       customer: customerInfo,
-      items: itemsWithBase, // Use the processed items with baseQuantity
+      items: itemsToSave, // Use the processed items with baseQuantity
       subtotal,
       discount: discountAmount,
       discountPercentage: discount,
@@ -245,32 +236,19 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       // --- SAFE BASELINE STOCK LOGIC ---
       // Always uses the original baseQuantity stored in the invoice item.
       // Never depends on the product's current Firestore quantity.
-      for (const item of itemsWithBase) {
+      for (const item of itemsToSave) {
         const productRef = doc(db, 'products', item.productId);
-        const productSnap = await getDoc(productRef);
-        if (!productSnap.exists()) continue;
 
+        const base = Number(item.baseQuantity ?? 0);  // true stock before first invoice
         const qty = Math.abs(Number(item.quantity));
-        const base = Number(item.baseQuantity ?? 0);           // original stock before invoice
-        const oldType = editingInvoice ? editingInvoice.invoiceType || 'sale' : null;
         const newType = selectedInvoiceType;
 
-        // Calculate what stock *should* be after removing old effect and adding new one,
-        // both relative to the baseline.
-        let targetStock = base;
+        let finalStock = base;
+        if (newType === 'sale') finalStock = base - qty;
+        else if (newType === 'refund') finalStock = base + qty;
+        else if (newType === 'writeoff') finalStock = base - qty;
 
-        // Remove previous type's effect (only if editing an existing invoice)
-        // This step is implicitly handled by starting targetStock at 'base'
-        // and then applying the new effect directly to 'base'.
-        // The explicit 'undo' is not needed if we always calculate from 'base'.
-
-        // Apply new type’s effect (fresh calculation from baseline)
-        if (newType === 'sale') targetStock = base - qty;
-        else if (newType === 'refund') targetStock = base + qty;
-        else if (newType === 'writeoff') targetStock = base - qty;
-
-        // Write the result once
-        await updateDoc(productRef, { quantity: Math.max(0, targetStock) });
+        await updateDoc(productRef, { quantity: Math.max(0, finalStock) });
       }
 
       handleCloseInvoiceModal();
