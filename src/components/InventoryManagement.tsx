@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { db, auth, storage } from '@/lib/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, getDocs, where, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, getDocs, where } from 'firebase/firestore';
 import { signOut, User } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -72,9 +72,6 @@ export interface Invoice {
   total: number;
   status: string;
   invoiceType?: 'sale' | 'refund' | 'writeoff'; // NEW: Invoice Type
-  deleted?: boolean; // NEW: Soft delete flag
-  deletedAt?: Timestamp; // NEW: Timestamp for when it was deleted
-  createdAt?: Timestamp; // Existing, but ensuring type
 }
 
 const InventoryManagementApp = () => {
@@ -156,9 +153,9 @@ const InventoryManagementApp = () => {
     return () => unsubscribe(); // Cleanup listener on component unmount
   }, []);
 
-  // Real-time invoice loading from Firebase (only active invoices)
+  // Real-time invoice loading from Firebase
   useEffect(() => {
-    const invoicesQuery = query(collection(db, 'invoices'), where("deleted", "!=", true), orderBy('date', 'desc'));
+    const invoicesQuery = query(collection(db, 'invoices'), orderBy('date', 'desc'));
     const unsubscribe = onSnapshot(invoicesQuery, (querySnapshot) => {
       const invoicesData = querySnapshot.docs.map(doc => ({
         id: doc.id,
@@ -295,8 +292,8 @@ const InventoryManagementApp = () => {
   async function recalcProductStock(productId: string) {
     const productRef = doc(db, "products", productId);
 
-    // Get all invoices containing this product that are NOT deleted
-    const invoicesQuery = query(collection(db, "invoices"), where("itemsIds", "array-contains", productId), where("deleted", "!=", true));
+    // Get all invoices containing this product
+    const invoicesQuery = query(collection(db, "invoices"), where("itemsIds", "array-contains", productId));
     const invoicesSnap = await getDocs(invoicesQuery);
 
     let totalSold = 0;
@@ -375,13 +372,13 @@ const InventoryManagementApp = () => {
     }
   };
 
-  // 4. Soft Delete single invoice (moves to trash)
+  // 4. Delete single invoice
   async function handleDeleteInvoice(invoice: Invoice) {
     if (!invoice || !invoice.items) return;
 
-    if (window.confirm('Are you sure you want to move this invoice to Trash?')) {
+    if (window.confirm('Are you sure you want to delete this invoice?')) {
       try {
-        // 1️⃣  Revert the stock impact of this invoice itself BEFORE soft-deleting
+        // 1️⃣  Revert the stock impact of this invoice itself BEFORE deleting
         for (const item of invoice.items) {
           const productRef = doc(db, "products", item.productId);
           const productSnap = await getDoc(productRef);
@@ -406,108 +403,85 @@ const InventoryManagementApp = () => {
           await updateDoc(productRef, { quantity: restoredQty });
         }
 
-        // 2️⃣  Mark the invoice as deleted
-        await updateDoc(doc(db, "invoices", invoice.id), {
-          deleted: true,
-          deletedAt: serverTimestamp(),
-        });
-        toast.success("Invoice moved to Trash and stock restored.");
-        console.log("✅ Invoice moved to Trash and stock restored to its pre-invoice value.");
+        // 2️⃣  Delete the invoice document
+        await deleteDoc(doc(db, "invoices", invoice.id));
+        toast.success("Invoice deleted successfully");
+        console.log("✅ Invoice deleted and stock restored to its pre-invoice value.");
 
       } catch (error) {
-        console.error('Error moving invoice to trash:', error);
-        toast.error('Failed to move invoice to trash');
+        console.error('Error deleting invoice:', error);
+        toast.error('Failed to delete invoice');
       }
     }
   }
 
-  // 5. Bulk soft delete invoices
+  // 5. Bulk delete invoices
   const handleBulkDeleteInvoices = async () => {
     if (selectedInvoices.size === 0) {
-      toast.error("Please select invoices to move to Trash");
+      toast.error("Please select invoices to delete");
       return;
     }
     
-    if (window.confirm(`Are you sure you want to move ${selectedInvoices.size} selected invoice(s) to Trash?`)) {
+    if (window.confirm(`Are you sure you want to delete ${selectedInvoices.size} selected invoice(s)?`)) {
       try {
         const productIdsToRecalculate = new Set<string>();
 
-        const updatePromises = Array.from(selectedInvoices).map(async (invoiceId) => {
+        const deletePromises = Array.from(selectedInvoices).map(async (invoiceId) => {
           const invoice = invoices.find(inv => inv.id === invoiceId);
           if (invoice && invoice.items) {
-            // Revert stock for each item in the invoice
-            for (const item of invoice.items) {
-              const productRef = doc(db, "products", item.productId);
-              const productSnap = await getDoc(productRef);
-              if (!productSnap.exists()) continue;
-
-              const product = productSnap.data();
-              const currentQty = Number(product.quantity || 0);
-              const qty = Math.abs(Number(item.quantity) || 0);
-              const type = invoice.invoiceType || "sale";
-
-              let restoredQty = currentQty;
-              if (type === "sale" || type === "writeoff") {
-                restoredQty = currentQty + qty;
-              } else if (type === "refund") {
-                restoredQty = Math.max(0, currentQty - qty);
-              }
-              await updateDoc(productRef, { quantity: restoredQty });
-            }
+            invoice.items.forEach(item => productIdsToRecalculate.add(item.productId));
           }
-          return updateDoc(doc(db, 'invoices', invoiceId), { deleted: true, deletedAt: serverTimestamp() });
+          return deleteDoc(doc(db, 'invoices', invoiceId));
         });
-        await Promise.all(updatePromises);
+        await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
-        toast.success(`${selectedInvoices.size} invoices moved to Trash and stock restored.`);
+        toast.success(`${selectedInvoices.size} invoices deleted successfully`);
+
+        // Recalculate stock for affected products after bulk deletion
+        for (const productId of productIdsToRecalculate) {
+          await recalcProductStock(productId);
+        }
+        console.log("✅ Bulk invoices deleted and stock restored to correct values.");
 
       } catch (error) {
-        console.error('Error bulk moving invoices to trash:', error);
-        toast.error('Failed to move selected invoices to trash');
+        console.error('Error bulk deleting invoices:', error);
+        toast.error('Failed to delete invoices');
       }
     }
   };
 
-  // 6. Soft delete all active invoices
+  // 6. Delete all invoices
   const handleDeleteAllInvoices = async () => {
     if (invoices.length === 0) {
-      toast.error("No active invoices to move to Trash");
+      toast.error("No invoices to delete");
       return;
     }
     
-    if (window.confirm(`Are you sure you want to move ALL ${invoices.length} active invoices to Trash? This action cannot be undone.`)) {
+    if (window.confirm(`Are you sure you want to delete ALL ${invoices.length} invoices? This action cannot be undone.`)) {
       try {
-        const updatePromises = invoices.map(async (invoice) => {
-          // Revert stock for each item in the invoice
+        const productIdsToRecalculate = new Set<string>();
+        invoices.forEach(invoice => {
           if (invoice.items) {
-            for (const item of invoice.items) {
-              const productRef = doc(db, "products", item.productId);
-              const productSnap = await getDoc(productRef);
-              if (!productSnap.exists()) continue;
-
-              const product = productSnap.data();
-              const currentQty = Number(product.quantity || 0);
-              const qty = Math.abs(Number(item.quantity) || 0);
-              const type = invoice.invoiceType || "sale";
-
-              let restoredQty = currentQty;
-              if (type === "sale" || type === "writeoff") {
-                restoredQty = currentQty + qty;
-              } else if (type === "refund") {
-                restoredQty = Math.max(0, currentQty - qty);
-              }
-              await updateDoc(productRef, { quantity: restoredQty });
-            }
+            invoice.items.forEach(item => productIdsToRecalculate.add(item.productId));
           }
-          return updateDoc(doc(db, 'invoices', invoice.id), { deleted: true, deletedAt: serverTimestamp() });
         });
-        await Promise.all(updatePromises);
+
+        const deletePromises = invoices.map((invoice) =>
+          deleteDoc(doc(db, 'invoices', invoice.id))
+        );
+        await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
-        toast.success("All active invoices moved to Trash and stock restored.");
+        toast.success("All invoices deleted successfully");
+
+        // Recalculate stock for all products that were ever in an invoice
+        for (const productId of productIdsToRecalculate) {
+          await recalcProductStock(productId);
+        }
+        console.log("✅ All invoices deleted and stock restored to correct values.");
 
       } catch (error) {
-        console.error('Error moving all active invoices to trash:', error);
-        toast.error('Failed to move all active invoices to trash');
+        console.error('Error deleting all invoices:', error);
+        toast.error('Failed to delete all data');
       }
     }
   };
@@ -525,13 +499,8 @@ const InventoryManagementApp = () => {
         const deleteProductsPromises = products.map((product) =>
           deleteDoc(doc(db, 'products', product.id))
         );
-        // Fetch all invoices, including deleted ones, for permanent deletion
-        const allInvoicesQuery = query(collection(db, 'invoices'));
-        const allInvoicesSnap = await getDocs(allInvoicesQuery);
-        const allInvoicesToDelete = allInvoicesSnap.docs.map(d => d.id);
-
-        const deleteInvoicesPromises = allInvoicesToDelete.map((invoiceId) =>
-          deleteDoc(doc(db, 'invoices', invoiceId))
+        const deleteInvoicesPromises = invoices.map((invoice) =>
+          deleteDoc(doc(db, 'invoices', invoice.id))
         );
         
         await Promise.all([...deleteProductsPromises, ...deleteInvoicesPromises]);
@@ -851,9 +820,6 @@ const InventoryManagementApp = () => {
             invoiceSortBy={invoiceSortBy}
             invoiceSortDirection={invoiceSortDirection}
             handleInvoiceSort={handleInvoiceSort}
-            db={db}
-            toast={toast}
-            recalcProductStock={recalcProductStock}
           />
         )}
         {activeTab === 'dashboard' && (
