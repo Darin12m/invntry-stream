@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { db, auth, storage } from '@/lib/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc } from 'firebase/firestore'; // Added getDoc
 import { signOut, User } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getGoogleDriveDirectLink } from '@/lib/utils'; // Import the new utility
@@ -889,414 +889,89 @@ const InventoryManagementApp = () => {
 
     try {
       if (editingInvoice) {
-        // Update existing invoice
-        await updateDoc(doc(db, 'invoices', editingInvoice.id), invoiceData);
-        
-        // Restore previous quantities then apply new ones
-        if (editingInvoice.items) {
-          const restorePromises = editingInvoice.items.map(async (item) => {
-            const product = products.find(p => p.id === item.productId);
-            if (product) {
-              const restoredQuantity = product.quantity + item.quantity;
-              await updateDoc(doc(db, 'products', item.productId), { quantity: restoredQuantity });
+        // --- Comprehensive Stock Recalculation for EDITED Invoices ---
+        // 1. Fetch the original invoice data to determine old stock impact
+        const oldInvoiceRef = doc(db, 'invoices', editingInvoice.id);
+        const oldInvoiceSnap = await getDoc(oldInvoiceRef);
+        const oldInvoiceData = oldInvoiceSnap.exists() ? oldInvoiceSnap.data() as Invoice : null;
+
+        if (oldInvoiceData) {
+          const oldType = oldInvoiceData.invoiceType || 'sale';
+          const newType = selectedInvoiceType;
+
+          // Map to store net change for each product
+          const productNetStockChange: { [productId: string]: number } = {};
+
+          // Calculate undo for old invoice items
+          oldInvoiceData.items.forEach(item => {
+            const qty = Math.abs(Number(item.quantity));
+            if (oldType === 'sale') {
+              productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) + qty; // Add back to stock
+            } else if (oldType === 'refund') {
+              productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) - qty; // Remove from stock
+            }
+            // 'writeoff' has no stock effect to undo
+          });
+
+          // Calculate apply for new invoice items
+          invoiceItems.forEach(item => {
+            const qty = Math.abs(Number(item.quantity));
+            if (newType === 'sale') {
+              productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) - qty; // Subtract from stock
+            } else if (newType === 'refund') {
+              productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) + qty; // Add to stock
+            }
+            // 'writeoff' has no stock effect to apply
+          });
+
+          // Apply net changes to products in Firestore
+          const stockUpdatePromises = Object.entries(productNetStockChange).map(async ([productId, change]) => {
+            const productRef = doc(db, 'products', productId);
+            const productSnap = await getDoc(productRef);
+            if (productSnap.exists()) {
+              const currentProduct = productSnap.data();
+              await updateDoc(productRef, { quantity: Math.max(0, currentProduct.quantity + change) });
             }
           });
-          await Promise.all(restorePromises);
+          await Promise.all(stockUpdatePromises);
         }
-      } else {
-        // Create new invoice
+
+        // Update the invoice document itself
+        await updateDoc(doc(db, 'invoices', editingInvoice.id), invoiceData);
+
+      } else { // --- For NEW invoices ---
+        // Create new invoice document
         await addDoc(collection(db, 'invoices'), invoiceData);
+
+        // Apply stock changes for new invoices based on selectedInvoiceType
+        const newInvoiceStockUpdatePromises = invoiceItems.map(async (item) => {
+          const productRef = doc(db, 'products', item.productId);
+          const productSnap = await getDoc(productRef);
+          if (productSnap.exists()) {
+            const currentProduct = productSnap.data();
+            const qty = Math.abs(Number(item.quantity));
+            let newQuantity = currentProduct.quantity;
+
+            if (selectedInvoiceType === 'sale') {
+              newQuantity -= qty;
+            } else if (selectedInvoiceType === 'refund') {
+              newQuantity += qty;
+            }
+            // 'writeoff' has no stock effect on creation
+
+            await updateDoc(productRef, { quantity: Math.max(0, newQuantity) });
+          }
+        });
+        await Promise.all(newInvoiceStockUpdatePromises);
       }
 
-      // Update product quantities in Firebase (handle positive and negative quantities)
-      const updatePromises = invoiceItems.map(async (item) => {
-        const product = products.find(p => p.id === item.productId);
-        if (product) {
-          // For existing invoices, we already restored quantities above
-          // For new invoices, subtract from current stock
-          const currentStock = editingInvoice 
-            ? products.find(p => p.id === item.productId)?.quantity || 0
-            : product.quantity;
-          // Handle negative quantities correctly (negative means adding back to stock)
-          const newQuantity = currentStock - Number(item.quantity);
-          await updateDoc(doc(db, 'products', item.productId), { quantity: Math.max(0, newQuantity) });
-        }
-      });
-      await Promise.all(updatePromises);
-
-      handleCloseInvoiceModal(); // Reset state after successful save
-      
+      handleCloseInvoiceModal();
       toast.success(editingInvoice ? 'Invoice updated successfully!' : 'Invoice saved successfully!');
       // Data will reload automatically via onSnapshot
     } catch (error) {
       console.error('Error saving invoice:', error);
       toast.error('Failed to save invoice');
     }
-  };
-
-  // Import/Export functions
-  const handleImportExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const workbook = XLSX.read(e.target?.result, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-        if (jsonData.length === 0) {
-          toast.error("Excel file is empty");
-          return;
-        }
-
-        // Get column names from the first row
-        const columns = Object.keys(jsonData[0]);
-        
-        // Store data and show mapping modal
-        setExcelData(jsonData);
-        setExcelColumns(columns);
-        setColumnMapping({
-          name: '',
-          sku: '',
-          quantity: '',
-          price: '',
-          category: '',
-          purchasePrice: ''
-        });
-        setShowColumnMappingModal(true);
-        
-      } catch (error) {
-        toast.error("Error reading Excel file. Please check the format.");
-      }
-    };
-    reader.readAsBinaryString(file);
-  };
-
-  const handleConfirmImport = async () => {
-    if (!columnMapping.name || !columnMapping.sku || !columnMapping.quantity || !columnMapping.price) {
-      toast.error("Please map all required fields (Name, SKU, Quantity, Price)");
-      return;
-    }
-
-    try {
-      const importedProducts = excelData.map((row) => ({
-        name: row[columnMapping.name] || '',
-        sku: row[columnMapping.sku] || '',
-        quantity: parseInt(row[columnMapping.quantity] || 0),
-        price: parseFloat(row[columnMapping.price] || 0),
-        category: columnMapping.category ? (row[columnMapping.category] || 'Uncategorized') : 'Uncategorized',
-        ...(columnMapping.purchasePrice && row[columnMapping.purchasePrice] && { 
-          purchasePrice: parseFloat(row[columnMapping.purchasePrice] || 0) 
-        })
-      })).filter(product => product.name && product.sku); // Filter out invalid rows
-
-      // Save all products to Firebase
-      const importPromises = importedProducts.map((product) =>
-        addDoc(collection(db, 'products'), product)
-      );
-      await Promise.all(importPromises);
-
-      setShowColumnMappingModal(false);
-      setExcelData([]);
-      setExcelColumns([]);
-      
-      toast.success(`Successfully imported ${importedProducts.length} products!`);
-      // Data will reload automatically via onSnapshot
-    } catch (error) {
-      console.error('Error importing products:', error);
-      toast.error('Failed to import products');
-    }
-  };
-
-  const exportToCSV = (data: any[], filename: string) => {
-    const csv = [
-      Object.keys(data[0]).join(','),
-      ...data.map(row => Object.values(row).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    toast.success(`${filename} exported successfully`);
-  };
-
-  const exportToJSON = (data: any[], filename: string) => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    toast.success(`${filename} exported successfully`);
-  };
-
-  const printInvoice = async () => {
-    try {
-      // Check if running on native iOS
-      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
-        // Use native iOS AirPrint
-        const element = document.querySelector('[data-invoice-content]') as HTMLElement;
-        if (!element) {
-          toast.error('Invoice content not found');
-          return;
-        }
-
-        // Generate canvas for native print
-        const canvas = await html2canvas(element, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true
-        });
-
-        const imgData = canvas.toDataURL('image/png');
-        
-        // Use the native print plugin (requires @capacitor/print plugin)
-        // For now, we'll use the PDF generation as fallback
-        await saveInvoiceAsPDF();
-        toast.success('Ready to print via AirPrint');
-      } else {
-        // On web or Android, use standard print
-        window.print();
-      }
-    } catch (error) {
-      console.error('Error printing:', error);
-      toast.error('Failed to print invoice');
-    }
-  };
-
-  const saveInvoiceAsPDF = async () => {
-    try {
-      const element = document.querySelector('[data-invoice-content]') as HTMLElement;
-      if (!element) {
-        toast.error('Invoice content not found');
-        return;
-      }
-
-      // Create a temporary container with white background for edge-to-edge rendering
-      const tempContainer = document.createElement('div');
-      tempContainer.style.position = 'fixed';
-      tempContainer.style.left = '-9999px';
-      tempContainer.style.top = '0';
-      tempContainer.style.width = '210mm';
-      tempContainer.style.padding = '10mm';
-      tempContainer.style.backgroundColor = '#ffffff';
-      tempContainer.innerHTML = element.innerHTML;
-      document.body.appendChild(tempContainer);
-
-      const canvas = await html2canvas(tempContainer, {
-        scale: 3, // Higher quality
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        windowWidth: 794, // A4 width in pixels at 96 DPI
-        windowHeight: 1123 // A4 height in pixels at 96 DPI
-      });
-
-      document.body.removeChild(tempContainer);
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      const pdfWidth = 210; // A4 width in mm
-      const pdfHeight = 297; // A4 height in mm
-      const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      // Add first page
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
-
-      // Add additional pages if needed
-      while (heightLeft > 0) {
-        position = -(pdfHeight - heightLeft);
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
-      }
-
-      pdf.save(`${viewingInvoice?.number || 'invoice'}.pdf`);
-      toast.success('PDF downloaded successfully');
-    } catch (error) {
-      console.error('Error saving PDF:', error);
-      toast.error('Failed to save PDF');
-    }
-  };
-
-  // MINI-CATALOG FEATURE: New function to create a mini catalog PDF
-  const createMiniCatalog = async () => {
-    if (selectedProducts.size === 0) {
-      toast.error("Please select at least one product to create a mini catalog.");
-      return;
-    }
-
-    toast.loading("Generating mini catalog...", { id: "catalog-toast" });
-
-    try {
-      const doc = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 15;
-      const contentWidth = pageWidth - 2 * margin;
-      let cursorY = margin;
-      let productsPerRow = 2; // Can be 2 or 3
-      let productWidth = (contentWidth - (productsPerRow - 1) * 10) / productsPerRow; // 10mm spacing between products
-      let productHeight = 100; // Fixed height for each product card
-      let rowHeight = productHeight + 10; // Product height + spacing
-
-      const selectedProductsData = products.filter(p => selectedProducts.has(p.id));
-
-      // Helper to add header and footer
-      const addPageHeaderFooter = (pageNumber: number) => {
-        doc.setFontSize(24);
-        doc.setFont("helvetica", "bold");
-        doc.text("КАТАЛОГ НА ПРОИЗВОДИ", pageWidth / 2, margin + 10, { align: "center" });
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "normal");
-        doc.text("Колекција Вселена", pageWidth / 2, margin + 18, { align: "center" });
-
-        doc.setFontSize(10);
-        doc.text(`Страна ${pageNumber}`, pageWidth / 2, pageHeight - margin + 5, { align: "center" });
-      };
-
-      addPageHeaderFooter(1);
-      cursorY += 30; // Space for header
-
-      let productCount = 0;
-      let currentPage = 1;
-
-      for (const product of selectedProductsData) {
-        const colIndex = productCount % productsPerRow;
-        const rowIndex = Math.floor(productCount / productsPerRow);
-
-        let x = margin + colIndex * (productWidth + 10);
-        let y = cursorY + rowIndex * rowHeight;
-
-        // Check if new page is needed
-        if (y + productHeight > pageHeight - margin - 10) { // 10mm buffer for footer
-          doc.addPage();
-          currentPage++;
-          addPageHeaderFooter(currentPage);
-          cursorY = margin + 30; // Reset cursorY for new page, accounting for header
-          y = cursorY; // Reset y for the first product on new page
-          productCount = 0; // Reset product count for new page layout
-          x = margin + colIndex * (productWidth + 10); // Recalculate x based on new productCount
-        }
-
-        // Product Card Background
-        doc.setFillColor(245, 245, 245); // Light grey background
-        doc.rect(x, y, productWidth, productHeight, 'F');
-        doc.setDrawColor(200, 200, 200); // Light grey border
-        doc.rect(x, y, productWidth, productHeight, 'S');
-
-        // Add Thumbnail
-        if (product.thumbnail) {
-          const directLink = getGoogleDriveDirectLink(product.thumbnail); // Use the utility here
-          const imgData = await loadImageAsDataURL(directLink);
-          if (imgData) {
-            const img = new Image(); // Create a temporary image to get dimensions
-            img.src = imgData;
-            await new Promise<void>((resolve) => {
-              img.onload = () => {
-                const imgX = x + productWidth / 2;
-                const imgY = y + 5; // 5mm padding from top
-                const imgMaxHeight = productHeight * 0.4; // Max 40% of card height
-                const imgMaxWidth = productWidth * 0.8; // Max 80% of card width
-
-                const aspectRatio = img.width / img.height;
-                let finalImgWidth = imgMaxWidth;
-                let finalImgHeight = imgMaxWidth / aspectRatio;
-
-                if (finalImgHeight > imgMaxHeight) {
-                  finalImgHeight = imgMaxHeight;
-                  finalImgWidth = imgMaxHeight * aspectRatio;
-                }
-                
-                doc.addImage(imgData, 'PNG', imgX - finalImgWidth / 2, imgY, finalImgWidth, finalImgHeight);
-                resolve();
-              };
-              img.onerror = () => {
-                console.warn(`Failed to render image data for product ${product.name}.`);
-                resolve();
-              };
-            });
-          } else {
-            console.warn(`Skipping image for product ${product.name} due to loading failure or timeout.`);
-          }
-        }
-
-        // Add Product Name
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text(product.name, x + productWidth / 2, y + productHeight * 0.55, { align: "center" });
-
-        // Removed short description from mini-catalog display
-        
-        productCount++;
-      }
-
-      doc.save("mini-catalog.pdf");
-      toast.success("Mini catalog generated successfully!", { id: "catalog-toast" });
-    } catch (error) {
-      console.error("Error generating mini catalog:", error);
-      toast.error("Failed to generate mini catalog.", { id: "catalog-toast" });
-    }
-  };
-
-  // Dashboard calculations
-  const getFilteredInvoices = () => {
-    return invoices.filter(invoice => {
-      const invoiceDate = new Date(invoice.date);
-      const fromDate = new Date(dateFilter.from);
-      const toDate = new Date(dateFilter.to);
-      return invoiceDate >= fromDate && invoiceDate <= toDate;
-    });
-  };
-
-  const calculateDashboardMetrics = () => {
-    const filteredInvoices = getFilteredInvoices();
-    
-    let totalSales = 0;
-    let totalCosts = 0;
-    let totalNegativeQuantity = 0;
-    let totalNegativeValue = 0;
-    
-    filteredInvoices.forEach(invoice => {
-      totalSales += invoice.total;
-      
-      // Calculate costs and track negative quantities
-      invoice.items.forEach(item => {
-        const product = products.find(p => p.id === item.productId);
-        const purchasePrice = product?.purchasePrice || item.purchasePrice || 0;
-        totalCosts += purchasePrice * item.quantity;
-        
-        // Track negative quantities (returns/damaged/free items)
-        if (item.quantity < 0) {
-          totalNegativeQuantity += Math.abs(item.quantity);
-          totalNegativeValue += Math.abs(item.price * item.quantity);
-        }
-      });
-    });
-    
-    const totalProfit = totalSales - totalCosts;
-    const numberOfInvoices = filteredInvoices.length;
-    
-    return {
-      totalSales,
-      totalCosts,
-      totalProfit,
-      numberOfInvoices,
-      totalNegativeQuantity,
-      totalNegativeValue,
-      filteredInvoices
-    };
   };
 
   return (
