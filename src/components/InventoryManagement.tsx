@@ -65,6 +65,7 @@ interface Invoice {
   discountPercentage: number;
   total: number;
   status: string;
+  invoiceType?: 'sale' | 'refund' | 'writeoff'; // NEW: Invoice Type
 }
 
 // --- NEW IMAGE LOADING UTILITY FUNCTION (kept for PDF generation) ---
@@ -181,6 +182,9 @@ const InventoryManagementApp = () => {
   // State for thumbnail file upload
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const thumbnailFileInputRef = useRef<HTMLInputElement>(null);
+
+  // NEW: Invoice Type state
+  const [selectedInvoiceType, setSelectedInvoiceType] = useState<'sale' | 'refund' | 'writeoff'>('sale');
 
   // Listen for auth state changes
   useEffect(() => {
@@ -524,14 +528,31 @@ const InventoryManagementApp = () => {
         // Find the invoice to restore quantities
         const invoice = invoices.find(inv => inv.id === invoiceId);
         
-        // Restore product quantities before deleting invoice
+        // Restore product quantities before deleting invoice based on invoiceType
         if (invoice && invoice.items) {
           const restorePromises = invoice.items.map(async (item) => {
             const product = products.find(p => p.id === item.productId);
-            if (product) {
-              const restoredQuantity = product.quantity + item.quantity;
-              await updateDoc(doc(db, 'products', item.productId), { quantity: restoredQuantity });
+            if (!product) return;
+            const qty = Number(item.quantity) || 0;
+            const absQty = Math.abs(qty);
+            const invoiceType = (invoice as any).invoiceType || 'sale'; // Default to 'sale' for old invoices
+
+            if (invoiceType === 'sale') {
+              // normal sale → deleting restores stock
+              await updateDoc(doc(db,'products',item.productId),
+                { quantity: Math.max(0, product.quantity + absQty) });
+              return;
             }
+            if (invoiceType === 'refund') {
+              // refund (negative qty) → deleting reverses refund (removes stock)
+              await updateDoc(doc(db,'products',item.productId),
+                { quantity: Math.max(0, product.quantity - absQty) });
+              return;
+            }
+            if (invoiceType === 'writeoff') return; // damaged/free → do nothing
+            // Fallback for any other unexpected type or old invoices without type
+            await updateDoc(doc(db,'products',item.productId),
+              { quantity: Math.max(0, product.quantity + qty) });
           });
           await Promise.all(restorePromises);
         }
@@ -556,16 +577,30 @@ const InventoryManagementApp = () => {
     
     if (window.confirm(`Are you sure you want to delete ${selectedInvoices.size} selected invoice(s)?`)) {
       try {
-        // Restore product quantities for all selected invoices
+        // Restore product quantities for all selected invoices based on invoiceType
         const restorePromises = Array.from(selectedInvoices).flatMap((invoiceId) => {
           const invoice = invoices.find(inv => inv.id === invoiceId);
           if (invoice && invoice.items) {
             return invoice.items.map(async (item) => {
               const product = products.find(p => p.id === item.productId);
-              if (product) {
-                const restoredQuantity = product.quantity + item.quantity;
-                await updateDoc(doc(db, 'products', item.productId), { quantity: restoredQuantity });
+              if (!product) return;
+              const qty = Number(item.quantity) || 0;
+              const absQty = Math.abs(qty);
+              const invoiceType = (invoice as any).invoiceType || 'sale'; // Default to 'sale' for old invoices
+
+              if (invoiceType === 'sale') {
+                await updateDoc(doc(db,'products',item.productId),
+                  { quantity: Math.max(0, product.quantity + absQty) });
+                return;
               }
+              if (invoiceType === 'refund') {
+                await updateDoc(doc(db,'products',item.productId),
+                  { quantity: Math.max(0, product.quantity - absQty) });
+                return;
+              }
+              if (invoiceType === 'writeoff') return;
+              await updateDoc(doc(db,'products',item.productId),
+                { quantity: Math.max(0, product.quantity + qty) });
             });
           }
           return [];
@@ -596,15 +631,29 @@ const InventoryManagementApp = () => {
     
     if (window.confirm(`Are you sure you want to delete ALL ${invoices.length} invoices? This action cannot be undone.`)) {
       try {
-        // Restore product quantities for all invoices
+        // Restore product quantities for all invoices based on invoiceType
         const restorePromises = invoices.flatMap((invoice) => {
           if (invoice && invoice.items) {
             return invoice.items.map(async (item) => {
               const product = products.find(p => p.id === item.productId);
-              if (product) {
-                const restoredQuantity = product.quantity + item.quantity;
-                await updateDoc(doc(db, 'products', item.productId), { quantity: restoredQuantity });
+              if (!product) return;
+              const qty = Number(item.quantity) || 0;
+              const absQty = Math.abs(qty);
+              const invoiceType = (invoice as any).invoiceType || 'sale'; // Default to 'sale' for old invoices
+
+              if (invoiceType === 'sale') {
+                await updateDoc(doc(db,'products',item.productId),
+                  { quantity: Math.max(0, product.quantity + absQty) });
+                return;
               }
+              if (invoiceType === 'refund') {
+                await updateDoc(doc(db,'products',item.productId),
+                  { quantity: Math.max(0, product.quantity - absQty) });
+                return;
+              }
+              if (invoiceType === 'writeoff') return;
+              await updateDoc(doc(db,'products',item.productId),
+                { quantity: Math.max(0, product.quantity + qty) });
             });
           }
           return [];
@@ -621,7 +670,7 @@ const InventoryManagementApp = () => {
         // Data will reload automatically via onSnapshot
       } catch (error) {
         console.error('Error deleting all invoices:', error);
-        toast.error('Failed to delete all invoices');
+        toast.error('Failed to delete all data');
       }
     }
   };
@@ -684,6 +733,7 @@ const InventoryManagementApp = () => {
     setInvoiceProductSearch('');
     setDiscount(0);
     setEditingInvoice(null);
+    setSelectedInvoiceType('sale'); // Reset invoice type on close
   };
 
   const handleCreateInvoice = () => {
@@ -701,7 +751,8 @@ const InventoryManagementApp = () => {
       discount: 0,
       discountPercentage: 0,
       total: 0,
-      status: 'draft'
+      status: 'draft',
+      invoiceType: 'sale' // Default to sale
     };
     setCurrentInvoice(newInvoice);
     setInvoiceItems([]);
@@ -709,6 +760,7 @@ const InventoryManagementApp = () => {
     setDiscount(0);
     setInvoiceProductSearch('');
     setEditingInvoice(null);
+    setSelectedInvoiceType('sale'); // Set default type for new invoice
     setShowInvoiceModal(true);
   };
 
@@ -724,7 +776,8 @@ const InventoryManagementApp = () => {
     discount: invoice.discount,
     discountPercentage: invoice.discountPercentage,
     total: invoice.total,
-    status: invoice.status
+    status: invoice.status,
+    invoiceType: invoice.invoiceType // Set existing type
   });
 
   // ✅ Refresh invoice items with the latest product data
@@ -748,6 +801,7 @@ const InventoryManagementApp = () => {
   setCustomerInfo({ ...invoice.customer, phone: invoice.customer.phone || '' }); // Ensure phone is always a string
   setDiscount(invoice.discountPercentage || 0);
   setInvoiceProductSearch('');
+  setSelectedInvoiceType(invoice.invoiceType || 'sale'); // Set invoice type from existing invoice
   setShowInvoiceModal(true);
 };
 
@@ -829,7 +883,8 @@ const InventoryManagementApp = () => {
       discount: discountAmount,
       discountPercentage: discount,
       total,
-      status: 'saved'
+      status: 'saved',
+      invoiceType: selectedInvoiceType, // NEW: Save invoice type
     };
 
     try {
@@ -1732,6 +1787,20 @@ const InventoryManagementApp = () => {
                     </div>
                   </div>
 
+                  {/* NEW: Invoice Type Dropdown */}
+                  <div className="mb-6">
+                    <Label className="block text-sm font-medium mb-1">Invoice type</Label>
+                    <select
+                      value={selectedInvoiceType}
+                      onChange={(e) => setSelectedInvoiceType(e.target.value as 'sale' | 'refund' | 'writeoff')}
+                      className="w-full border rounded-md p-2 bg-background text-foreground"
+                    >
+                      <option value="sale">Sale / Outgoing</option>
+                      <option value="refund">Refund / Return</option>
+                      <option value="writeoff">Free / Damaged / Promo</option>
+                    </select>
+                  </div>
+
                    {/* Customer Information */}
                   <div className="mb-6">
                     <h3 className="font-bold text-lg mb-3">Customer Information</h3>
@@ -2086,6 +2155,14 @@ const InventoryManagementApp = () => {
                       }}>
                         Датум: {new Date(viewingInvoice.date).toLocaleDateString('mk-MK', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')}г.
                       </p>
+                      {/* NEW: Display Invoice Type on PDF */}
+                      <p style={{ margin: "0", fontSize: "14px", color: "#666" }}>
+                        Тип: {viewingInvoice.invoiceType === 'refund'
+                          ? 'ВРАЌАЊЕ / РЕФУНД'
+                          : viewingInvoice.invoiceType === 'writeoff'
+                          ? 'ОТПИС / ОШТЕТЕНО / ПРОМО'
+                          : 'ПРОДАЖБА / ИЗЛЕЗ'}
+                      </p>
                     </div>
                     
                     {/* Right - Customer Info */}
@@ -2423,7 +2500,7 @@ const InventoryManagementApp = () => {
                   <select
                     id="purchasePrice-mapping"
                     value={columnMapping.purchasePrice}
-                    onChange={(e) => setColumnMapping({ ...columnColumnMapping, purchasePrice: e.target.value })}
+                    onChange={(e) => setColumnMapping({ ...columnMapping, purchasePrice: e.target.value })}
                     className="w-full p-2 border border-border rounded-md bg-background"
                   >
                     <option value="">Select column or leave empty...</option>

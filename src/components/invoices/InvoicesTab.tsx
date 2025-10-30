@@ -28,6 +28,7 @@ interface Invoice {
   discountPercentage: number;
   total: number;
   status: string;
+  invoiceType?: 'sale' | 'refund' | 'writeoff'; // NEW: Invoice Type
 }
 
 interface InvoicesTabProps {
@@ -214,7 +215,25 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
                       className="mt-1"
                     />
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-lg mb-1 truncate">{invoice.number || 'No Number'}</h4>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-bold text-lg truncate">{invoice.number || 'No Number'}</h4>
+                        {/* NEW: Invoice Type Badge */}
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            invoice.invoiceType === 'refund'
+                              ? 'bg-red-100 text-red-700'
+                              : invoice.invoiceType === 'writeoff'
+                              ? 'bg-orange-100 text-orange-700'
+                              : 'bg-green-100 text-green-700'
+                          }`}
+                        >
+                          {invoice.invoiceType === 'refund'
+                            ? 'Refund'
+                            : invoice.invoiceType === 'writeoff'
+                            ? 'Write-off'
+                            : 'Sale'}
+                        </span>
+                      </div>
                       <div className="space-y-1 text-sm">
                         <div className="flex items-center gap-2">
                           <UserIcon className="h-3 w-3 text-muted-foreground" />
