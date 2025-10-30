@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Search, Plus, Trash, X, Save } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { Product, Invoice } from '../InventoryManagement'; // Import interfaces
+import { toast } from "sonner"; // Correct import for sonner toast
 
 interface InvoiceModalProps {
   showInvoiceModal: boolean;
@@ -233,13 +234,13 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         await addDoc(collection(db, 'invoices'), invoiceData);
       }
 
-      // --- SAFE BASELINE STOCK LOGIC ---
-      // Always uses the original baseQuantity stored in the invoice item.
-      // Never depends on the product's current Firestore quantity.
-      for (const item of itemsToSave) {
+      // --- DEBUGGING STOCK LOGIC ---
+      let debugCounter = 0;
+      for (const item of itemsToSave) { // Changed from invoiceItems to itemsToSave
+        debugCounter++;
         const productRef = doc(db, 'products', item.productId);
 
-        const base = Number(item.baseQuantity ?? 0);  // true stock before first invoice
+        const base = Number(item.baseQuantity ?? 0);
         const qty = Math.abs(Number(item.quantity));
         const newType = selectedInvoiceType;
 
@@ -248,8 +249,13 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         else if (newType === 'refund') finalStock = base + qty;
         else if (newType === 'writeoff') finalStock = base - qty;
 
+        // 🔍 Display debug info on screen
+        toast(`[#${debugCounter}] base=${base}, qty=${qty}, type=${newType}, result=${finalStock}`, { duration: 6000 });
+
         await updateDoc(productRef, { quantity: Math.max(0, finalStock) });
       }
+
+      toast.success("Stock recalculated with debug info visible!");
 
       handleCloseInvoiceModal();
       toast.success(editingInvoice ? 'Invoice updated successfully!' : 'Invoice saved successfully!');
