@@ -1,9 +1,8 @@
 import React from 'react';
-import { Search, Plus, Edit, Trash2, Package, X, CheckSquare, Square, Trash, ChevronUp, ChevronDown, BookOpenText, Image as ImageIcon } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, X, ChevronUp, ChevronDown, Image as ImageIcon } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { getGoogleDriveDirectLink } from '@/lib/utils'; // Import the new utility
 
@@ -25,9 +24,9 @@ interface InventoryTabProps {
   filteredProducts: Product[];
   products: Product[];
   sortedProducts: Product[];
-  selectedProducts: Set<string>;
-  toggleProductSelection: (productId: string) => void;
-  selectAllProducts: () => void;
+  // Removed selectedProducts: Set<string>;
+  // Removed toggleProductSelection: (productId: string) => void;
+  // Removed selectAllProducts: () => void;
   handleBulkDeleteProducts: () => Promise<void>;
   handleDeleteAllProducts: () => Promise<void>;
   handleAddProduct: () => void;
@@ -37,7 +36,7 @@ interface InventoryTabProps {
   sortDirection: 'asc' | 'desc';
   handleSort: (column: 'name' | 'sku' | 'category' | 'quantity' | 'price') => void;
   getStockStatus: (quantity: number) => { label: string; variant: 'destructive' | 'warning' | 'secondary' | 'default' };
-  handleCreateMiniCatalog: () => void;
+  // Removed handleCreateMiniCatalog: () => void;
 }
 
 const InventoryTab: React.FC<InventoryTabProps> = ({
@@ -46,9 +45,9 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   filteredProducts,
   products,
   sortedProducts,
-  selectedProducts,
-  toggleProductSelection,
-  selectAllProducts,
+  // Removed selectedProducts,
+  // Removed toggleProductSelection,
+  // Removed selectAllProducts,
   handleBulkDeleteProducts,
   handleDeleteAllProducts,
   handleAddProduct,
@@ -58,7 +57,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   sortDirection,
   handleSort,
   getStockStatus,
-  handleCreateMiniCatalog,
+  // Removed handleCreateMiniCatalog,
 }) => (
   <div className="space-y-6 animate-fade-in">
     {/* Header */}
@@ -68,26 +67,17 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
         <p className="text-muted-foreground mt-1">Manage your products and stock levels</p>
       </div>
       <div className="flex gap-3">
-        {selectedProducts.size > 0 && (
-          <>
-            <Button
-              onClick={handleBulkDeleteProducts}
-              variant="destructive"
-              className="shadow-elegant"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Selected ({selectedProducts.size})
-            </Button>
-            <Button
-              onClick={handleCreateMiniCatalog}
-              className="bg-purple-600 hover:bg-purple-700 text-white shadow-elegant transition-all duration-300"
-              disabled={selectedProducts.size === 0}
-            >
-              <BookOpenText className="h-4 w-4 mr-2" />
-              Create Mini Catalog
-            </Button>
-          </>
-        )}
+        {/* Removed selectedProducts.size > 0 check and Create Mini Catalog button */}
+        {/* The bulk delete button will now always be disabled as there's no selection mechanism */}
+        <Button
+          onClick={handleBulkDeleteProducts}
+          variant="destructive"
+          className="shadow-elegant"
+          disabled={true} // Always disabled as selection is removed
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Delete Selected (0)
+        </Button>
         <Button
           onClick={handleAddProduct}
           className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
@@ -124,24 +114,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
       )}
 
       <div className="flex gap-2 justify-end">
-        <Button
-          onClick={selectAllProducts}
-          variant="outline"
-          size="sm"
-          className="transition-all duration-200"
-        >
-          {selectedProducts.size === sortedProducts.length && sortedProducts.length > 0 ? (
-            <>
-              <Square className="h-4 w-4 mr-2" />
-              Deselect All
-            </>
-          ) : (
-            <>
-              <CheckSquare className="h-4 w-4 mr-2" />
-              Select All
-            </>
-          )}
-        </Button>
+        {/* Removed Select All/Deselect All button */}
         {products.length > 0 && (
           <Button
             onClick={handleDeleteAllProducts}
@@ -162,12 +135,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
         <table className="w-full">
           <thead>
             <tr className="border-b bg-muted/30">
-              <th className="p-4 w-12">
-                <Checkbox
-                  checked={selectedProducts.size === sortedProducts.length && sortedProducts.length > 0}
-                  onCheckedChange={selectAllProducts}
-                />
-              </th>
+              {/* Removed checkbox column */}
               <th className="text-left p-4 font-medium">
                 <button
                   onClick={() => handleSort('name')}
@@ -235,12 +203,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                   key={product.id} 
                   className={`border-b hover:bg-muted/50 transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}
                 >
-                  <td className="p-4">
-                    <Checkbox
-                      checked={selectedProducts.has(product.id)}
-                      onCheckedChange={() => toggleProductSelection(product.id)}
-                    />
-                  </td>
+                  {/* Removed checkbox */}
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       {imageUrl ? (
@@ -316,11 +279,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
         return (
           <Card key={product.id} className="p-4 hover:shadow-lg transition-all duration-300 animate-scale-in">
             <div className="flex items-start gap-3 mb-3">
-              <Checkbox
-                checked={selectedProducts.has(product.id)}
-                onCheckedChange={() => toggleProductSelection(product.id)}
-                className="mt-1 flex-shrink-0"
-              />
+              {/* Removed checkbox */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-2">
                   {imageUrl ? (
@@ -405,7 +364,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
             {products.length === 0 
               ? "Add your first product using the + button above to get started with your inventory." 
               : localSearchInput 
-                ? `No products match "${localSearchSearchInput}". Try adjusting your search.`
+                ? `No products match "${localSearchInput}". Try adjusting your search.`
                 : "No products match the selected filters. Try different filter options."}
           </p>
           {products.length === 0 && (

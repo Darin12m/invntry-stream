@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useDeferredValue, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, CheckSquare, Square, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Sun, Moon, BookOpenText, Image as ImageIcon } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Sun, Moon, Image as ImageIcon } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -148,7 +148,6 @@ const InventoryManagementApp = () => {
   const [discount, setDiscount] = useState(0);
   const [invoiceSortBy, setInvoiceSortBy] = useState<'number' | 'date' | 'customer' | 'total'>('number');
   const [invoiceSortDirection, setInvoiceSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set()); // Initialize as Set
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set()); // Initialize as Set with useState
   const [showColumnMappingModal, setShowColumnMappingModal] = useState(false);
   const [excelData, setExcelData] = useState<any[]>([]);
@@ -296,31 +295,7 @@ const InventoryManagementApp = () => {
     return { label: 'In Stock', variant: 'default' as const };
   };
 
-  // Selection handlers
-  const toggleProductSelection = (productId: string) => {
-    const newSelected = new Set(selectedProducts);
-    if (newSelected.has(productId)) {
-      newSelected.delete(productId);
-    } else {
-      newSelected.add(productId);
-    }
-    setSelectedProducts(newSelected);
-  };
-
-  const selectAllProducts = () => {
-    const displayedProducts = products.filter(product =>
-      (product.name || '').toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
-      (product.sku || '').toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
-      (product.category || '').toLowerCase().includes(deferredSearchTerm.toLowerCase())
-    );
-    
-    if (selectedProducts.size === displayedProducts.length) {
-      setSelectedProducts(new Set());
-    } else {
-      setSelectedProducts(new Set(displayedProducts.map(p => p.id)));
-    }
-  };
-
+  // Selection handlers (for invoices only now)
   const toggleInvoiceSelection = (invoiceId: string) => {
     const newSelected = new Set(selectedInvoices);
     if (newSelected.has(invoiceId)) {
@@ -474,28 +449,9 @@ const InventoryManagementApp = () => {
     }
   };
 
-  // 2. Bulk delete products
+  // 2. Bulk delete products (no longer applicable without selection)
   const handleBulkDeleteProducts = async () => {
-    if (selectedProducts.size === 0) {
-      toast.error("Please select products to delete");
-      return;
-    }
-    
-    if (window.confirm(`Are you sure you want to delete ${selectedProducts.size} selected product(s)?`)) {
-      try {
-        const deletePromises = Array.from(selectedProducts).map((productId) =>
-          deleteDoc(doc(db, 'products', productId))
-        );
-        await Promise.all(deletePromises);
-        setSelectedProducts(new Set());
-        toast.success(`${selectedProducts.size} products deleted successfully`);
-        // Data will reload automatically via onSnapshot
-      } catch (error)
-      {
-        console.error('Error bulk deleting products:', error);
-        toast.error('Failed to delete products');
-      }
-    }
+    toast.error("Bulk delete is not available without product selection.");
   };
 
   // 3. Delete all products
@@ -511,7 +467,6 @@ const InventoryManagementApp = () => {
           deleteDoc(doc(db, 'products', product.id))
         );
         await Promise.all(deletePromises);
-        setSelectedProducts(new Set());
         toast.success("All products deleted successfully");
         // Data will reload automatically via onSnapshot
       } catch (error) {
@@ -713,7 +668,6 @@ const InventoryManagementApp = () => {
         
         await Promise.all([...deleteProductsPromises, ...deleteInvoicesPromises]);
         
-        setSelectedProducts(new Set());
         setSelectedInvoices(new Set());
         toast.success("All data cleared successfully");
         // Data will reload automatically via onSnapshot
@@ -904,7 +858,7 @@ const InventoryManagementApp = () => {
 
           // Calculate undo for old invoice items
           oldInvoiceData.items.forEach(item => {
-            const qty = Math.abs(Number(item.quantity));
+            const qty = Number(item.quantity) || 0; // Use actual quantity, not abs, for undoing
             if (oldType === 'sale') {
               productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) + qty; // Add back to stock
             } else if (oldType === 'refund') {
@@ -915,7 +869,7 @@ const InventoryManagementApp = () => {
 
           // Calculate apply for new invoice items
           invoiceItems.forEach(item => {
-            const qty = Math.abs(Number(item.quantity));
+            const qty = Number(item.quantity) || 0; // Use actual quantity, not abs, for applying
             if (newType === 'sale') {
               productNetStockChange[item.productId] = (productNetStockChange[item.productId] || 0) - qty; // Subtract from stock
             } else if (newType === 'refund') {
@@ -949,7 +903,7 @@ const InventoryManagementApp = () => {
           const productSnap = await getDoc(productRef);
           if (productSnap.exists()) {
             const currentProduct = productSnap.data();
-            const qty = Math.abs(Number(item.quantity));
+            const qty = Number(item.quantity) || 0;
             let newQuantity = currentProduct.quantity;
 
             if (selectedInvoiceType === 'sale') {
@@ -972,6 +926,256 @@ const InventoryManagementApp = () => {
       console.error('Error saving invoice:', error);
       toast.error('Failed to save invoice');
     }
+  };
+
+  // Import/Export functions
+  const handleImportExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const workbook = XLSX.read(e.target?.result, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        if (jsonData.length === 0) {
+          toast.error("Excel file is empty");
+          return;
+        }
+
+        // Get column names from the first row
+        const columns = Object.keys(jsonData[0]);
+        
+        // Store data and show mapping modal
+        setExcelData(jsonData);
+        setExcelColumns(columns);
+        setColumnMapping({
+          name: '',
+          sku: '',
+          quantity: '',
+          price: '',
+          category: '',
+          purchasePrice: ''
+        });
+        setShowColumnMappingModal(true);
+        
+      } catch (error) {
+        toast.error("Error reading Excel file. Please check the format.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleConfirmImport = async () => {
+    if (!columnMapping.name || !columnMapping.sku || !columnMapping.quantity || !columnMapping.price) {
+      toast.error("Please map all required fields (Name, SKU, Quantity, Price)");
+      return;
+    }
+
+    try {
+      const importedProducts = excelData.map((row) => ({
+        name: row[columnMapping.name] || '',
+        sku: row[columnMapping.sku] || '',
+        quantity: parseInt(row[columnMapping.quantity] || 0),
+        price: parseFloat(row[columnMapping.price] || 0),
+        category: columnMapping.category ? (row[columnMapping.category] || 'Uncategorized') : 'Uncategorized',
+        ...(columnMapping.purchasePrice && row[columnMapping.purchasePrice] && { 
+          purchasePrice: parseFloat(row[columnMapping.purchasePrice] || 0) 
+        })
+      })).filter(product => product.name && product.sku); // Filter out invalid rows
+
+      // Save all products to Firebase
+      const importPromises = importedProducts.map((product) =>
+        addDoc(collection(db, 'products'), product)
+      );
+      await Promise.all(importPromises);
+
+      setShowColumnMappingModal(false);
+      setExcelData([]);
+      setExcelColumns([]);
+      
+      toast.success(`Successfully imported ${importedProducts.length} products!`);
+      // Data will reload automatically via onSnapshot
+    } catch (error) {
+      console.error('Error importing products:', error);
+      toast.error('Failed to import products');
+    }
+  };
+
+  const exportToCSV = (data: any[], filename: string) => {
+    const csv = [
+      Object.keys(data[0]).join(','),
+      ...data.map(row => Object.values(row).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    toast.success(`${filename} exported successfully`);
+  };
+
+  const exportToJSON = (data: any[], filename: string) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    toast.success(`${filename} exported successfully`);
+  };
+
+  const printInvoice = async () => {
+    try {
+      // Check if running on native iOS
+      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+        // Use native iOS AirPrint
+        const element = document.querySelector('[data-invoice-content]') as HTMLElement;
+        if (!element) {
+          toast.error('Invoice content not found');
+          return;
+        }
+
+        // Generate canvas for native print
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        
+        // Use the native print plugin (requires @capacitor/print plugin)
+        // For now, we'll use the PDF generation as fallback
+        await saveInvoiceAsPDF();
+        toast.success('Ready to print via AirPrint');
+      } else {
+        // On web or Android, use standard print
+        window.print();
+      }
+    } catch (error) {
+      console.error('Error printing:', error);
+      toast.error('Failed to print invoice');
+    }
+  };
+
+  const saveInvoiceAsPDF = async () => {
+    try {
+      const element = document.querySelector('[data-invoice-content]') as HTMLElement;
+      if (!element) {
+        toast.error('Invoice content not found');
+        return;
+      }
+
+      // Create a temporary container with white background for edge-to-edge rendering
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'fixed';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.top = '0';
+      tempContainer.style.width = '210mm';
+      tempContainer.style.padding = '10mm';
+      tempContainer.style.backgroundColor = '#ffffff';
+      tempContainer.innerHTML = element.innerHTML;
+      document.body.appendChild(tempContainer);
+
+      const canvas = await html2canvas(tempContainer, {
+        scale: 3, // Higher quality
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        windowWidth: 794, // A4 width in pixels at 96 DPI
+        windowHeight: 1123 // A4 height in pixels at 96 DPI
+      });
+
+      document.body.removeChild(tempContainer);
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const pdfWidth = 210; // A4 width in mm
+      const pdfHeight = 297; // A4 height in mm
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      // Add first page
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+
+      // Add additional pages if needed
+      while (heightLeft > 0) {
+        position = -(pdfHeight - heightLeft);
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      pdf.save(`${viewingInvoice?.number || 'invoice'}.pdf`);
+      toast.success('PDF downloaded successfully');
+    } catch (error) {
+      console.error('Error saving PDF:', error);
+      toast.error('Failed to save PDF');
+    }
+  };
+
+  // MINI-CATALOG FEATURE: This function is being removed.
+  // const createMiniCatalog = useCallback(async () => {
+  //   // ... (removed content)
+  // }, [selectedProducts, products, toast, loadImageAsDataURL, getGoogleDriveDirectLink]); // Dependencies for useCallback
+
+  // Dashboard calculations
+  const getFilteredInvoices = () => {
+    return invoices.filter(invoice => {
+      const invoiceDate = new Date(invoice.date);
+      const fromDate = new Date(dateFilter.from);
+      const toDate = new Date(dateFilter.to);
+      return invoiceDate >= fromDate && invoiceDate <= toDate;
+    });
+  };
+
+  const calculateDashboardMetrics = () => {
+    const filteredInvoices = getFilteredInvoices();
+    
+    let totalSales = 0;
+    let totalCosts = 0;
+    let totalNegativeQuantity = 0;
+    let totalNegativeValue = 0;
+    
+    filteredInvoices.forEach(invoice => {
+      totalSales += invoice.total;
+      
+      // Calculate costs and track negative quantities
+      invoice.items.forEach(item => {
+        const product = products.find(p => p.id === item.productId);
+        const purchasePrice = product?.purchasePrice || item.purchasePrice || 0;
+        totalCosts += purchasePrice * item.quantity;
+        
+        // Track negative quantities (returns/damaged/free items)
+        if (item.quantity < 0) {
+          totalNegativeQuantity += Math.abs(item.quantity);
+          totalNegativeValue += Math.abs(item.price * item.quantity);
+        }
+      });
+    });
+    
+    const totalProfit = totalSales - totalCosts;
+    const numberOfInvoices = filteredInvoices.length;
+    
+    return {
+      totalSales,
+      totalCosts,
+      totalProfit,
+      numberOfInvoices,
+      totalNegativeQuantity,
+      totalNegativeValue,
+      filteredInvoices
+    };
   };
 
   return (
@@ -1120,9 +1324,7 @@ const InventoryManagementApp = () => {
             filteredProducts={filteredProducts}
             products={products}
             sortedProducts={sortedProducts}
-            selectedProducts={selectedProducts}
-            toggleProductSelection={toggleProductSelection}
-            selectAllProducts={selectAllProducts}
+            // Removed selectedProducts, toggleProductSelection, selectAllProducts
             handleBulkDeleteProducts={handleBulkDeleteProducts}
             handleDeleteAllProducts={handleDeleteAllProducts}
             handleAddProduct={handleAddProduct}
@@ -1132,8 +1334,7 @@ const InventoryManagementApp = () => {
             sortDirection={sortDirection}
             handleSort={handleSort}
             getStockStatus={getStockStatus}
-            // MINI-CATALOG FEATURE: Pass the new function
-            handleCreateMiniCatalog={createMiniCatalog}
+            // Removed handleCreateMiniCatalog
           />
         )}
         {activeTab === 'invoices' && (
