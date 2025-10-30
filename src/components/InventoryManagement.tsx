@@ -342,15 +342,18 @@ const InventoryManagementApp = () => {
 
     if (window.confirm('Are you sure you want to delete this invoice?')) {
       try {
-        // 1️⃣ Delete the invoice document
+        // 🧩 STEP 1: Collect all product IDs from this invoice BEFORE deleting it
+        const productIds = invoice.items.map((item) => item.productId);
+
+        // 🗑️ STEP 2: Delete the invoice document
         await deleteDoc(doc(db, "invoices", invoice.id));
 
-        // 2️⃣ For every product in that invoice, recalc stock
-        for (const item of invoice.items) {
-          await recalcProductStock(item.productId);
+        // 🔁 STEP 3: Recalculate stock for each affected product
+        for (const productId of productIds) {
+          await recalcProductStock(productId);
         }
         toast.success("Invoice deleted successfully");
-        console.log("✅ Invoice deleted and stock restored correctly.");
+        console.log("✅ Invoice deleted and stock restored to correct value.");
 
       } catch (error) {
         console.error('Error deleting invoice:', error);
@@ -385,6 +388,7 @@ const InventoryManagementApp = () => {
         for (const productId of productIdsToRecalculate) {
           await recalcProductStock(productId);
         }
+        console.log("✅ Bulk invoices deleted and stock restored to correct values.");
 
       } catch (error) {
         console.error('Error bulk deleting invoices:', error);
@@ -420,6 +424,7 @@ const InventoryManagementApp = () => {
         for (const productId of productIdsToRecalculate) {
           await recalcProductStock(productId);
         }
+        console.log("✅ All invoices deleted and stock restored to correct values.");
 
       } catch (error) {
         console.error('Error deleting all invoices:', error);
