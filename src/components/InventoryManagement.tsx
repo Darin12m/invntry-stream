@@ -374,21 +374,30 @@ const InventoryManagementApp = () => {
 
   // 4. Delete single invoice
   async function handleDeleteInvoice(invoice: Invoice) {
-    if (!invoice || !invoice.id) return;
+    if (!invoice || !invoice.id) {
+      toast.error("❌ No invoice selected for deletion.");
+      return;
+    }
 
     if (!window.confirm('Are you sure you want to delete this invoice? It will be moved to Trash.')) {
       return;
     }
 
     try {
-      // ✅ STEP 1: Move invoice to deletedInvoices
+      // STEP 1: confirm invoice shape
+      if (!invoice.items || invoice.items.length === 0) {
+        toast.error("❌ Invoice has no items — cannot move.");
+        return;
+      }
+
+      // STEP 2: Try to copy into deletedInvoices
       await setDoc(doc(db, "deletedInvoices", invoice.id), {
         ...invoice,
         deletedAt: serverTimestamp(),
       });
 
-      // ✅ STEP 2: Revert stock impact
-      for (const item of invoice.items || []) {
+      // STEP 3: Revert stock effect
+      for (const item of invoice.items) {
         const productRef = doc(db, "products", item.productId);
         const productSnap = await getDoc(productRef);
         if (!productSnap.exists()) continue;
@@ -405,13 +414,21 @@ const InventoryManagementApp = () => {
         await updateDoc(productRef, { quantity: restoredQty });
       }
 
-      // ✅ STEP 3: Delete from main collection
+      // STEP 4: Delete from main invoices
       await deleteDoc(doc(db, "invoices", invoice.id));
 
-      toast.success("🗑️ Invoice moved to Trash successfully.");
-    } catch (error) {
-      console.error("Delete error:", error);
-      toast.error("❌ Failed to move invoice to Trash.");
+      toast.success("🗑️ Invoice successfully moved to Trash.");
+    } catch (error: any) { // Explicitly type error as any for message access
+      // Better diagnostic feedback inside Dyad
+      const msg =
+        error?.message?.includes("Missing or insufficient permissions")
+          ? "⚠️ Firestore permission error — allow write access to 'deletedInvoices'."
+          : error?.message?.includes("No document to update")
+          ? "⚠️ Product not found while restoring stock."
+          : `❌ Unexpected error: ${error.message}`;
+
+      toast.error(msg);
+      console.error("🔍 Detailed error:", error); // Use console.error for errors
     }
   }
 
