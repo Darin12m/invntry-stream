@@ -90,6 +90,59 @@ function DeletedInvoicesSection({ db, toast }: { db: any, toast: any }) { // Acc
   };
 
   return (
+    <div className="space-y-3">
+      {trashInvoices.length === 0 && (
+        <p className="text-muted-foreground text-sm">No deleted invoices.</p>
+      )}
+      {trashInvoices.map((inv) => (
+        <Card
+          key={inv.id}
+          className="flex justify-between items-center p-3 rounded-lg shadow-card"
+        >
+          <div>
+            <p className="font-semibold">{inv.customer?.name || "Unnamed"}</p>
+            <p className="text-xs text-muted-foreground">
+              {inv.deletedAt?.seconds // Access seconds property of Timestamp
+                ? new Date(inv.deletedAt.seconds * 1000).toLocaleDateString()
+                : "Unknown Date"}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => handleRestore(inv)}
+              variant="outline"
+              size="sm"
+            >
+              ♻️ Restore
+            </Button>
+            <Button
+              onClick={() => handleDeleteForever(inv)}
+              variant="destructive"
+              size="sm"
+            >
+              🔥 Delete Forever
+            </Button>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+const DataTab: React.FC<DataTabProps> = ({
+  products,
+  invoices,
+  handleClearAllData,
+  handleImportExcel,
+  exportToCSV,
+  exportToJSON,
+  fileInputRef,
+  db, // Accept db prop
+  toast, // Accept toast prop
+}) => {
+  const [showActivityLog, setShowActivityLog] = useState(false); // NEW: State for ActivityLogModal
+
+  return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -197,30 +250,30 @@ function DeletedInvoicesSection({ db, toast }: { db: any, toast: any }) { // Acc
             </div>
             <div className="space-y-4">
               <h4 className="font-medium">Invoice Exports</h4>
-              <div className="space-y-3">
-                <Button
-                  onClick={() => exportToCSV(invoices, 'invoice-log.csv')}
-                  variant="outline"
-                  className="w-full justify-start"
-                  disabled={invoices.length === 0}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export Invoice Log (CSV)
-                </Button>
-                <Button
-                  onClick={() => exportToJSON(invoices, 'invoice-log.json')}
-                  variant="outline"
-                  className="w-full justify-start"
-                  disabled={invoices.length === 0}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export Invoice Log (JSON)
-                </Button>
-              </div>
+            <div className="space-y-3">
+              <Button
+                onClick={() => exportToCSV(invoices, 'invoice-log.csv')}
+                variant="outline"
+                className="w-full justify-start"
+                disabled={invoices.length === 0}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export Invoice Log (CSV)
+              </Button>
+              <Button
+                onClick={() => exportToJSON(invoices, 'invoice-log.json')}
+                variant="outline"
+                className="w-full justify-start"
+                disabled={invoices.length === 0}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export Invoice Log (JSON)
+              </Button>
             </div>
           </div>
         </div>
-      </Card>
+      </div>
+    </Card>
 
       {/* 🗑️ Trash (Deleted Invoices) Section */}
       <div className="mt-10">
@@ -237,6 +290,6 @@ function DeletedInvoicesSection({ db, toast }: { db: any, toast: any }) { // Acc
       )}
     </div>
   );
-}
+};
 
 export default DataTab;
