@@ -34,7 +34,7 @@ import InvoiceViewerModal from './modals/InvoiceViewerModal';
 import ColumnMappingModal from './modals/ColumnMappingModal';
 
 // Import the new stock controller
-import { recalcProductStock } from '@/lib/stockController';
+import { recalcProductStock } from '@/utils/recalcStock';
 
 // Product interface with purchase price for profit calculations
 export interface Product {

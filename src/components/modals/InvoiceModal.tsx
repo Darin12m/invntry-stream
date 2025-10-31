@@ -8,7 +8,7 @@ import { Search, Plus, Trash, X, Save } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, getDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { Product, Invoice } from '../InventoryManagement'; // Import interfaces
 import { toast } from "sonner"; // Correct import for sonner toast
-import { recalcProductStock } from '@/lib/stockController'; // Import the new stock controller
+import { recalcProductStock } from '@/utils/recalcStock'; // Import the new stock controller
 
 interface InvoiceModalProps {
   showInvoiceModal: boolean;

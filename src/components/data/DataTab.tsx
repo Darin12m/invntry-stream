@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Product, Invoice } from '../InventoryManagement'; // Import Product and Invoice interfaces
 import { toast } from "sonner"; // Correct import for sonner toast
-import { recalcProductStock } from '@/lib/stockController'; // Import the new stock controller
+import { recalcProductStock } from '@/utils/recalcStock'; // Import the new stock controller
 
 interface DataTabProps {
   products: Product[];
