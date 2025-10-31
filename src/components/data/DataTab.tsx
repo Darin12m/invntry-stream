@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Product, Invoice } from '../InventoryManagement'; // Import Product and Invoice interfaces
 import { toast } from "sonner"; // Correct import for sonner toast
+import { recalcProductStock } from '@/lib/stockController'; // Import the new stock controller
 
 interface DataTabProps {
   products: Product[];
@@ -40,21 +41,9 @@ function DeletedInvoicesSection({ db, toast }: { db: any, toast: typeof toast })
       });
       await deleteDoc(doc(db, "deletedInvoices", invoice.id));
 
+      // Recalculate stock for all items in the restored invoice
       for (const item of invoice.items || []) {
-        const productRef = doc(db, "products", item.productId);
-        const productSnap = await getDoc(productRef);
-        if (!productSnap.exists()) continue;
-
-        const product = productSnap.data();
-        const currentQty = Number(product.quantity || 0);
-        const qty = Math.abs(Number(item.quantity) || 0);
-        const type = invoice.invoiceType || "sale";
-
-        let newQty = currentQty;
-        if (type === "sale" || type === "writeoff") newQty = Math.max(0, currentQty - qty);
-        else if (type === "refund") newQty = currentQty + qty;
-
-        await updateDoc(productRef, { quantity: newQty });
+        await recalcProductStock(item.productId);
       }
 
       toast.success("♻️ Invoice restored successfully.");

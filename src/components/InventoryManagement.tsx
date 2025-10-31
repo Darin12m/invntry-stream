@@ -33,6 +33,9 @@ import InvoiceModal from './modals/InvoiceModal';
 import InvoiceViewerModal from './modals/InvoiceViewerModal';
 import ColumnMappingModal from './modals/ColumnMappingModal';
 
+// Import the new stock controller
+import { recalcProductStock } from '@/lib/stockController';
+
 // Product interface with purchase price for profit calculations
 export interface Product {
   id: string;
@@ -285,35 +288,6 @@ const InventoryManagementApp = () => {
     setShowProductModal(true);
   };
 
-  /*
-  Recalculate product stock based on all invoices that reference it.
-  Stock = initialStock - (sales + write-offs) + refunds
-  */
-  async function recalcProductStock(productId: string) {
-    const productRef = doc(db, "products", productId);
-
-    // Get all invoices containing this product
-    const invoicesQuery = query(collection(db, "invoices"), where("itemsIds", "array-contains", productId));
-    const invoicesSnap = await getDocs(invoicesQuery);
-
-    let totalSold = 0;
-    for (const inv of invoicesSnap.docs) {
-      const data = inv.data();
-      const type = data.invoiceType || "sale";
-      const item = (data.items || []).find((i:any)=>i.productId === productId);
-      if (!item) continue;
-      const qty = Number(item.quantity) || 0;
-
-      if (type === "sale" || type === "writeoff") totalSold += qty;
-      else if (type === "refund") totalSold -= qty;
-    }
-
-    const initialStock = (await getDoc(productRef)).data()?.initialStock || 0;
-    const finalStock = Math.max(0, initialStock - totalSold);
-
-    await updateDoc(productRef, { quantity: finalStock });
-  }
-
   // 1. Delete single product
   const handleDeleteProduct = async (productId: string) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
@@ -396,22 +370,10 @@ const InventoryManagementApp = () => {
         deletedAt: serverTimestamp(),
       });
 
-      // STEP 3: Revert stock effect
+      // STEP 3: Recalculate stock for affected products *before* deleting the main invoice
+      // This ensures the stock reflects the state as if this invoice never existed.
       for (const item of invoice.items) {
-        const productRef = doc(db, "products", item.productId);
-        const productSnap = await getDoc(productRef);
-        if (!productSnap.exists()) continue;
-
-        const product = productSnap.data();
-        const currentQty = Number(product.quantity || 0);
-        const qty = Math.abs(Number(item.quantity) || 0);
-        const type = invoice.invoiceType || "sale";
-
-        let restoredQty = currentQty;
-        if (type === "sale" || type === "writeoff") restoredQty = currentQty + qty;
-        else if (type === "refund") restoredQty = Math.max(0, currentQty - qty);
-
-        await updateDoc(productRef, { quantity: restoredQty });
+        await recalcProductStock(item.productId);
       }
 
       // STEP 4: Delete from main invoices

@@ -8,6 +8,7 @@ import { Search, Plus, Trash, X, Save } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, getDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { Product, Invoice } from '../InventoryManagement'; // Import interfaces
 import { toast } from "sonner"; // Correct import for sonner toast
+import { recalcProductStock } from '@/lib/stockController'; // Import the new stock controller
 
 interface InvoiceModalProps {
   showInvoiceModal: boolean;
@@ -18,7 +19,6 @@ interface InvoiceModalProps {
   invoices: Invoice[]; // All invoices for generating new number
   db: any; // Firebase Firestore instance
   toast: any; // Sonner toast instance
-  recalcProductStock: (productId: string) => Promise<void>; // New prop for recalc function
 }
 
 const InvoiceModal: React.FC<InvoiceModalProps> = ({
@@ -30,7 +30,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   invoices,
   db,
   toast,
-  recalcProductStock, // Destructure new prop
 }) => {
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
@@ -135,7 +134,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       return;
     }
 
-    // Deduct 1 from liveStockMap
+    // Deduct 1 from liveStockMap for in-modal validation
     setLiveStockMap(prevMap => {
       const newMap = new Map(prevMap);
       newMap.set(product.id, currentLiveStock - 1);
@@ -182,7 +181,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
             return item; // Don't update if not enough stock
           }
 
-          // Update liveStockMap
+          // Update liveStockMap for in-modal validation
           setLiveStockMap(prevMap => {
             const newMap = new Map(prevMap);
             newMap.set(productId, currentLiveStock - quantityDifference);
@@ -218,6 +217,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const removeInvoiceItem = (productId: string) => {
     const itemToRemove = invoiceItems.find(item => item.productId === productId);
     if (itemToRemove) {
+      // Restore quantity to liveStockMap for in-modal validation
       setLiveStockMap(prevMap => {
         const newMap = new Map(prevMap);
         const currentStock = newMap.get(productId) || 0;
@@ -236,6 +236,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
     
     if (window.confirm(`Are you sure you want to remove all ${invoiceItems.length} items from this invoice?`)) {
+      // Restore all quantities to liveStockMap for in-modal validation
       setLiveStockMap(prevMap => {
         const newMap = new Map(prevMap);
         invoiceItems.forEach(item => {
