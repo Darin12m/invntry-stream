@@ -32,6 +32,7 @@ import ProductModal from './modals/ProductModal';
 import InvoiceModal from './modals/InvoiceModal';
 import InvoiceViewerModal from './modals/InvoiceViewerModal';
 import ColumnMappingModal from './modals/ColumnMappingModal';
+import SellHistoryModal from './modals/SellHistoryModal'; // NEW: Import SellHistoryModal
 
 // Import the new stock controller
 import { recalcProductStock } from '@/utils/recalcStock';
@@ -101,6 +102,7 @@ const InventoryManagementApp = () => {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showInvoiceViewer, setShowInvoiceViewer] = useState(false);
   const [showColumnMappingModal, setShowColumnMappingModal] = useState(false);
+  const [selectedProductForHistory, setSelectedProductForHistory] = useState<Product | null>(null); // NEW: State for SellHistoryModal
 
   // Data for modals
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -784,6 +786,8 @@ const InventoryManagementApp = () => {
             selectedProducts={selectedProducts}
             toggleProductSelection={toggleProductSelection}
             selectAllProducts={selectAllProducts}
+            selectedProductForHistory={selectedProductForHistory} // NEW: Pass state
+            setSelectedProductForHistory={setSelectedProductForHistory} // NEW: Pass setter
           />
         )}
         {activeTab === 'invoices' && (
@@ -880,6 +884,16 @@ const InventoryManagementApp = () => {
         db={db}
         toast={toast}
       />
+
+      {/* Sell History Modal */}
+      {selectedProductForHistory && (
+        <SellHistoryModal
+          product={selectedProductForHistory}
+          onClose={() => setSelectedProductForHistory(null)}
+          db={db}
+          toast={toast}
+        />
+      )}
     </div>
   );
 };

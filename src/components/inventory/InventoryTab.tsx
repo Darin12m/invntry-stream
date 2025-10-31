@@ -1,21 +1,11 @@
 import React from 'react';
-import { Search, Plus, Edit, Trash2, Trash, X, ChevronUp, ChevronDown, Package, CheckSquare, Square } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Trash, X, ChevronUp, ChevronDown, Package, CheckSquare, Square, Clock } from 'lucide-react'; // NEW: Import Clock icon
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-
-interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  quantity: number;
-  price: number;
-  category: string;
-  purchasePrice?: number;
-  shortDescription?: string;
-}
+import { Product } from '../InventoryManagement'; // Import Product interface
 
 interface InventoryTabProps {
   localSearchInput: string;
@@ -35,6 +25,8 @@ interface InventoryTabProps {
   selectedProducts: Set<string>;
   toggleProductSelection: (productId: string) => void;
   selectAllProducts: () => void;
+  selectedProductForHistory: Product | null; // NEW: Prop for SellHistoryModal
+  setSelectedProductForHistory: (product: Product | null) => void; // NEW: Setter for SellHistoryModal
 }
 
 const InventoryTab: React.FC<InventoryTabProps> = ({
@@ -55,6 +47,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   selectedProducts,
   toggleProductSelection,
   selectAllProducts,
+  setSelectedProductForHistory, // NEW: Destructure setter
 }) => (
   <div className="space-y-6 animate-fade-in">
     {/* Header */}
@@ -260,6 +253,14 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
+                      {/* NEW: Sell History Button */}
+                      <Button
+                        onClick={() => setSelectedProductForHistory(product)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Clock className="h-4 w-4 text-indigo-500" />
+                      </Button>
                       <Button
                         onClick={() => handleDeleteProduct(product.id)}
                         variant="destructive"
@@ -327,6 +328,16 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
+              </Button>
+              {/* NEW: Sell History Button */}
+              <Button
+                onClick={() => setSelectedProductForHistory(product)}
+                variant="outline"
+                size="sm"
+                className="flex-1"
+              >
+                <Clock className="h-4 w-4 mr-2 text-indigo-500" />
+                History
               </Button>
               <Button
                 onClick={() => handleDeleteProduct(product.id)}
