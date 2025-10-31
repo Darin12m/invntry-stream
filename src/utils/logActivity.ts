@@ -1,35 +1,38 @@
-import { db } from "@/lib/firebase"; // Corrected import path
+import { db } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 
-// map emails to names
+// local cache so we don’t query repeatedly
+let cachedUser: any = null;
+
+// map email → display name
 function mapEmailToName(email?: string | null): string {
   if (!email) return "Unknown user";
   if (email === "darinmiladinovski@gmail.com") return "Darin";
   if (email === "bubespasovska@gmail.com") return "Bube";
-  return email; // fallback: show email
+  return email;
 }
 
-export async function logActivity(
-  action: string,
-  target: string,
-  details: string = ""
-) {
+// keep track of current user in real time
+const auth = getAuth();
+onAuthStateChanged(auth, (user) => {
+  cachedUser = user || null;
+});
+
+export async function logActivity(action: string, target: string, details = "") {
   try {
-    const auth = getAuth();
-    const currentUser = auth.currentUser;
-    const userEmail = currentUser?.email || null;
-    const userDisplay = mapEmailToName(userEmail);
+    const userEmail = cachedUser?.email || null;
+    const userName = mapEmailToName(userEmail);
 
     await addDoc(collection(db, "activityLogs"), {
       action,
       target,
       details,
-      userEmail: userEmail,
-      user: userDisplay,
+      user: userName,
+      userEmail,
       timestamp: serverTimestamp(),
     });
-  } catch (error) {
-    console.error("Failed to log activity:", error);
+  } catch (err) {
+    console.error("Failed to log activity:", err);
   }
 }
