@@ -727,7 +727,7 @@ const InventoryManagementApp = () => {
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium">Logged in as</p>
-                          <p className className="text-sm text-muted-foreground truncate">{currentUser.email}</p>
+                          <p className="text-sm text-muted-foreground truncate">{currentUser.email}</p>
                         </div>
                       </div>
                       <Button 
