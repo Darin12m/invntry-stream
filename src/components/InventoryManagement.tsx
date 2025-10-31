@@ -349,34 +349,50 @@ const InventoryManagementApp = () => {
 
   // 4. Delete single invoice
   async function handleDeleteInvoice(invoice: Invoice) {
-    if (!invoice || !invoice.id) {
-      toast.error("❌ No invoice selected for deletion.");
-      return;
-    }
+    if (!invoice || !invoice.id) return;
 
     if (!window.confirm('Are you sure you want to delete this invoice? It will be moved to Trash.')) {
       return;
     }
 
     try {
-      // Move to deletedInvoices
+      // 1️⃣ Move invoice to deletedInvoices
       await setDoc(doc(db, "deletedInvoices", invoice.id), {
         ...invoice,
         deletedAt: serverTimestamp(),
       });
 
-      // Remove from main
-      await deleteDoc(doc(db, "invoices", invoice.id));
-
-      // 🔄 Recalculate stock based only on remaining active invoices
+      // 2️⃣ Restore (return) stock
       for (const item of invoice.items || []) {
-        await recalcProductStock(item.productId);
+        const productRef = doc(db, "products", item.productId);
+        const productSnap = await getDoc(productRef);
+        if (!productSnap.exists()) continue;
+
+        const product = productSnap.data();
+        const currentQty = Number(product.quantity || 0);
+        const qty = Number(item.quantity) || 0;
+        const type = invoice.invoiceType || "sale";
+
+        let newQty = currentQty;
+
+        if (type === "sale" || type === "writeoff") {
+          // Return stock
+          newQty = currentQty + qty;
+        } else if (type === "refund") {
+          // Refunds had increased stock originally, now remove it
+          newQty = Math.max(0, currentQty - qty);
+        }
+
+        await updateDoc(productRef, { quantity: newQty });
       }
 
-      toast.success("🗑️ Invoice moved to Trash and stock recalculated.");
+      // 3️⃣ Delete from main collection
+      await deleteDoc(doc(db, "invoices", invoice.id));
+
+      toast.success("🗑️ Invoice moved to Trash, stock returned.");
     } catch (error) {
       console.error("Delete error:", error);
-      toast.error("❌ Failed to delete invoice.");
+      toast.error("❌ Failed to move invoice to Trash.");
     }
   }
 

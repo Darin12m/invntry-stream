@@ -31,43 +31,58 @@ function DeletedInvoicesSection({ db, toast }: { db: any, toast: any }) { // Acc
     return () => unsub();
   }, [db]); // Add db to dependency array
 
-  const handleRestore = async (invoice: Invoice) => { // Use Invoice interface
+  const handleRestore = async (invoice: Invoice) => {
     if (!invoice) return;
+
     try {
+      // 1️⃣ Restore invoice to main collection
       await setDoc(doc(db, "invoices", invoice.id), {
         ...invoice,
-        deleted: false,
         restoredAt: serverTimestamp(),
       });
-      await deleteDoc(doc(db, "deletedInvoices", invoice.id));
 
-      // Recalculate stock for all items in the restored invoice
+      // 2️⃣ Adjust stock again (reapply original effect)
       for (const item of invoice.items || []) {
-        await recalcProductStock(item.productId);
+        const productRef = doc(db, "products", item.productId);
+        const productSnap = await getDoc(productRef);
+        if (!productSnap.exists()) continue;
+
+        const product = productSnap.data();
+        const currentQty = Number(product.quantity || 0);
+        const qty = Number(item.quantity) || 0;
+        const type = invoice.invoiceType || "sale";
+
+        let newQty = currentQty;
+        if (type === "sale" || type === "writeoff") {
+          // Reduce stock again
+          newQty = Math.max(0, currentQty - qty);
+        } else if (type === "refund") {
+          // Refund increases stock again
+          newQty = currentQty + qty;
+        }
+
+        await updateDoc(productRef, { quantity: newQty });
       }
 
-      toast.success("♻️ Invoice restored successfully.");
+      // 3️⃣ Remove from deletedInvoices
+      await deleteDoc(doc(db, "deletedInvoices", invoice.id));
+
+      toast.success("♻️ Invoice restored and stock adjusted.");
     } catch (error) {
-      console.error("Error restoring invoice:", error);
-      toast.error("Failed to restore invoice.");
+      console.error("Restore error:", error);
+      toast.error("❌ Failed to restore invoice.");
     }
   };
 
-  const handleDeleteForever = async (invoice: Invoice) => { // Use Invoice interface
+  const handleDeleteForever = async (invoice: Invoice) => {
     if (!invoice) return;
     const confirmDel = window.confirm(
-      `Permanently delete invoice for ${invoice.customer?.name || "Unnamed"}?` // Use invoice.customer.name
+      `Permanently delete invoice for ${invoice.customer?.name || "Unnamed"}?`
     );
     if (!confirmDel) return;
 
     await deleteDoc(doc(db, "deletedInvoices", invoice.id));
-
-    // ✅ Optional but safe: recalc after permanent delete
-    for (const item of invoice.items || []) {
-      await recalcProductStock(item.productId);
-    }
-
-    toast.success("🔥 Invoice permanently deleted and stock refreshed.");
+    toast.success("🔥 Invoice permanently deleted (stock unchanged).");
   };
 
   return (
