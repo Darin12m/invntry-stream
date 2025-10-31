@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { db, auth, storage } from '@/lib/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, getDocs, where } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, getDocs, where, setDoc, serverTimestamp } from 'firebase/firestore';
 import { signOut, User } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -374,44 +374,44 @@ const InventoryManagementApp = () => {
 
   // 4. Delete single invoice
   async function handleDeleteInvoice(invoice: Invoice) {
-    if (!invoice || !invoice.items) return;
+    if (!invoice || !invoice.id) return;
 
-    if (window.confirm('Are you sure you want to delete this invoice?')) {
-      try {
-        // 1️⃣  Revert the stock impact of this invoice itself BEFORE deleting
-        for (const item of invoice.items) {
-          const productRef = doc(db, "products", item.productId);
-          const productSnap = await getDoc(productRef);
-          if (!productSnap.exists()) continue;
+    if (!window.confirm('Are you sure you want to delete this invoice? It will be moved to Trash.')) {
+      return;
+    }
 
-          const product = productSnap.data();
-          const currentQty = Number(product.quantity || 0);
-          const qty = Math.abs(Number(item.quantity) || 0);
-          const type = invoice.invoiceType || "sale";
+    try {
+      // ✅ STEP 1: Move invoice to deletedInvoices
+      await setDoc(doc(db, "deletedInvoices", invoice.id), {
+        ...invoice,
+        deletedAt: serverTimestamp(),
+      });
 
-          let restoredQty = currentQty;
+      // ✅ STEP 2: Revert stock impact
+      for (const item of invoice.items || []) {
+        const productRef = doc(db, "products", item.productId);
+        const productSnap = await getDoc(productRef);
+        if (!productSnap.exists()) continue;
 
-          // Reverse the invoice’s effect on stock
-          if (type === "sale" || type === "writeoff") {
-            // These reduced stock → add back
-            restoredQty = currentQty + qty;
-          } else if (type === "refund") {
-            // Refund increased stock → subtract it back
-            restoredQty = Math.max(0, currentQty - qty);
-          }
+        const product = productSnap.data();
+        const currentQty = Number(product.quantity || 0);
+        const qty = Math.abs(Number(item.quantity) || 0);
+        const type = invoice.invoiceType || "sale";
 
-          await updateDoc(productRef, { quantity: restoredQty });
-        }
+        let restoredQty = currentQty;
+        if (type === "sale" || type === "writeoff") restoredQty = currentQty + qty;
+        else if (type === "refund") restoredQty = Math.max(0, currentQty - qty);
 
-        // 2️⃣  Delete the invoice document
-        await deleteDoc(doc(db, "invoices", invoice.id));
-        toast.success("Invoice deleted successfully");
-        console.log("✅ Invoice deleted and stock restored to its pre-invoice value.");
-
-      } catch (error) {
-        console.error('Error deleting invoice:', error);
-        toast.error('Failed to delete invoice');
+        await updateDoc(productRef, { quantity: restoredQty });
       }
+
+      // ✅ STEP 3: Delete from main collection
+      await deleteDoc(doc(db, "invoices", invoice.id));
+
+      toast.success("🗑️ Invoice moved to Trash successfully.");
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("❌ Failed to move invoice to Trash.");
     }
   }
 
