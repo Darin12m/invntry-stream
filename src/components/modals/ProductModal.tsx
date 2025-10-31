@@ -5,8 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Edit, Save, X } from 'lucide-react';
-import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, getDoc } from 'firebase/firestore'; // Import getDoc
 import { Product } from '../InventoryManagement'; // Import Product interface
+import { toast } from "sonner"; // Correct import for sonner toast
+import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
 
 interface ProductModalProps {
   showProductModal: boolean;
@@ -93,15 +95,20 @@ const ProductModal: React.FC<ProductModalProps> = ({
       if (editingProduct) {
         // When editing, only update the fields provided in productData.
         // initialStock should not be changed here.
+        const oldProductSnap = await getDoc(doc(db, 'products', editingProduct.id));
+        const oldQty = oldProductSnap.exists() ? oldProductSnap.data().quantity : 0;
+
         await updateDoc(doc(db, 'products', editingProduct.id), productData);
         toast.success("Product updated successfully");
+        await logActivity("Edited product", productForm.name, `qty: ${oldQty} → ${productData.quantity}`); // Log activity
       } else {
         // For new products, set initialStock to the current quantity
-        await addDoc(collection(db, 'products'), {
+        const docRef = await addDoc(collection(db, 'products'), {
           ...productData,
           initialStock: parseInt(productForm.quantity) // Set initialStock for new products
         });
         toast.success("Product added successfully");
+        await logActivity("Added product", productForm.name, `qty: ${productData.quantity}`); // Log activity
       }
       handleCloseProductModal();
     } catch (error) {

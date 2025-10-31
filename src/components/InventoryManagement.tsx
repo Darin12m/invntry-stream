@@ -36,6 +36,7 @@ import SellHistoryModal from './modals/SellHistoryModal'; // NEW: Import SellHis
 
 // Import the new stock controller
 import { recalcProductStock } from '@/utils/recalcStock';
+import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
 
 // Product interface with purchase price for profit calculations
 export interface Product {
@@ -297,6 +298,7 @@ const InventoryManagementApp = () => {
       try {
         await deleteDoc(doc(db, 'products', productId));
         toast.success("Product deleted successfully");
+        await logActivity("Deleted product", productId); // Log activity
         // Data will reload automatically via onSnapshot
       } catch (error) {
         console.error('Error deleting product:', error);
@@ -320,6 +322,7 @@ const InventoryManagementApp = () => {
         await Promise.all(deletePromises);
         setSelectedProducts(new Set()); // Clear selection after deletion
         toast.success(`${selectedProducts.size} products deleted successfully`);
+        await logActivity("Bulk deleted products", "Multiple", `${selectedProducts.size} products`); // Log activity
       } catch (error) {
         console.error('Error bulk deleting products:', error);
         toast.error('Failed to delete selected products');
@@ -341,6 +344,7 @@ const InventoryManagementApp = () => {
         );
         await Promise.all(deletePromises);
         toast.success("All products deleted successfully");
+        await logActivity("Deleted all products", "All", `${products.length} products`); // Log activity
         // Data will reload automatically via onSnapshot
       } catch (error) {
         console.error('Error deleting all products:', error);
@@ -392,6 +396,7 @@ const InventoryManagementApp = () => {
       await deleteDoc(doc(db, "invoices", invoice.id));
 
       toast.success("🗑️ Invoice moved to Trash, stock returned.");
+      await logActivity("Deleted invoice", invoice.number || invoice.id, "Moved to Trash"); // Log activity
     } catch (error) {
       console.error("Delete error:", error);
       toast.error("❌ Failed to move invoice to Trash.");
@@ -419,6 +424,7 @@ const InventoryManagementApp = () => {
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
         toast.success(`${selectedInvoices.size} invoices deleted successfully`);
+        await logActivity("Bulk deleted invoices", "Multiple", `${selectedInvoices.size} invoices`); // Log activity
 
         // Recalculate stock for affected products after bulk deletion
         for (const productId of productIdsToRecalculate) {
@@ -455,6 +461,7 @@ const InventoryManagementApp = () => {
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
         toast.success("All invoices deleted successfully");
+        await logActivity("Deleted all invoices", "All", `${invoices.length} invoices`); // Log activity
 
         // Recalculate stock for all products that were ever in an invoice
         for (const productId of productIdsToRecalculate) {
@@ -490,6 +497,7 @@ const InventoryManagementApp = () => {
         
         setSelectedInvoices(new Set());
         toast.success("All data cleared successfully");
+        await logActivity("Cleared all data", "All Products and Invoices"); // Log activity
       } catch (error) {
         console.error('Error clearing all data:', error);
         toast.error('Failed to clear all data');

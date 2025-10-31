@@ -7,6 +7,8 @@ import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapsh
 import { Product, Invoice } from '../InventoryManagement'; // Import Product and Invoice interfaces
 import { toast } from "sonner"; // Correct import for sonner toast
 import { recalcProductStock } from '@/utils/recalcStock'; // Import the new stock controller
+import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
+import ActivityLog from './ActivityLog'; // NEW: Import ActivityLog
 
 interface DataTabProps {
   products: Product[];
@@ -68,6 +70,7 @@ function DeletedInvoicesSection({ db, toast }: { db: any, toast: any }) { // Acc
       await deleteDoc(doc(db, "deletedInvoices", invoice.id));
 
       toast.success("♻️ Invoice restored and stock adjusted.");
+      await logActivity("Restored invoice", invoice.number || invoice.id); // Log activity
     } catch (error) {
       console.error("Restore error:", error);
       toast.error("❌ Failed to restore invoice.");
@@ -83,6 +86,7 @@ function DeletedInvoicesSection({ db, toast }: { db: any, toast: any }) { // Acc
 
     await deleteDoc(doc(db, "deletedInvoices", invoice.id));
     toast.success("🔥 Invoice permanently deleted (stock unchanged).");
+    await logActivity("Deleted invoice permanently", invoice.number || invoice.id); // Log activity
   };
 
   return (
@@ -142,6 +146,9 @@ const DataTab: React.FC<DataTabProps> = ({
       <h2 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Data Management</h2>
       <p className="text-muted-foreground mt-1">Import, export, and manage your data</p>
     </div>
+
+    {/* Activity Log */}
+    <ActivityLog db={db} /> {/* NEW: ActivityLog component */}
 
     {/* Danger Zone */}
     <Card className="border-destructive/20 shadow-card">
@@ -257,7 +264,7 @@ const DataTab: React.FC<DataTabProps> = ({
       </div>
     </Card>
 
-    {/* 🗑️ Deleted Invoices Section */}
+    {/* 🗑️ Trash (Deleted Invoices) Section */}
     <div className="mt-10">
       <h2 className="text-xl font-bold mb-3 flex items-center gap-2">
         <Trash className="h-5 w-5" /> <span>Trash (Deleted Invoices)</span>

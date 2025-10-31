@@ -9,6 +9,7 @@ import { collection, addDoc, updateDoc, doc, getDoc, query, where, serverTimesta
 import { Product, Invoice } from '../InventoryManagement'; // Import interfaces
 import { toast } from "sonner"; // Correct import for sonner toast
 import { recalcProductStock } from '@/utils/recalcStock'; // Import the new stock controller
+import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
 
 interface InvoiceModalProps {
   showInvoiceModal: boolean;
@@ -103,6 +104,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       });
       setInvoiceItems([]);
       setCustomerInfo({ name: '', email: '', address: '', phone: '' });
+      setInvoiceProductSearch('');
       setDiscount(0);
       setSelectedInvoiceType('sale'); // Reset invoice type for new invoices
     }
@@ -289,6 +291,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           ...baseInvoiceData,
         });
         toast.success('Invoice updated successfully!');
+        await logActivity("Updated invoice", baseInvoiceData.number || editingInvoice.id, `${invoiceItems.length} items`); // Log activity
 
       } else {
         // --- CREATING NEW INVOICE LOGIC ---
@@ -297,8 +300,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           createdAt: serverTimestamp(), // Add createdAt timestamp
         };
 
-        await addDoc(collection(db, "invoices"), invoiceData);
+        const docRef = await addDoc(collection(db, "invoices"), invoiceData);
         toast.success('Invoice saved successfully!');
+        await logActivity("Created invoice", invoiceData.number || docRef.id, `${invoiceItems.length} items`); // Log activity
       }
 
       // After saving (create or edit), recalculate stock for all affected products
