@@ -90,7 +90,7 @@ const InventoryManagementApp = () => {
   });
   const [products, setProducts] = useState<Product[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = true);
+  const [loading, setLoading] = useState(true); // Fixed: Correct useState initialization
   
   // Search term state for InventoryTab
   const [localSearchInput, setLocalSearchInput] = useState(''); // Local state for the input field
