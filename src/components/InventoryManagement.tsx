@@ -78,6 +78,7 @@ export interface Invoice {
   status: string;
   invoiceType?: 'sale' | 'refund' | 'writeoff'; // NEW: Invoice Type
   deletedAt?: Timestamp; // NEW: Add deletedAt property for invoices moved to trash
+  createdAt?: Timestamp; // NEW: Add createdAt property for sorting
 }
 
 const InventoryManagementApp = () => {

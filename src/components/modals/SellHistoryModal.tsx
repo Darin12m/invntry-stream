@@ -1,51 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { Clock, X } from "lucide-react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  Timestamp,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase"; // Correct Firebase import path
+import { Clock, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner"; // Correct toast import
-
-interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  quantity: number;
-  price: number;
-  category: string;
-  purchasePrice?: number;
-  shortDescription?: string;
-  initialStock?: number;
-}
-
-interface InvoiceItem {
-  productId: string;
-  name: string;
-  sku: string;
-  price: number;
-  quantity: number;
-  purchasePrice?: number;
-  discount?: number;
-}
-
-interface Invoice {
-  id: string;
-  number: string;
-  date: string;
-  customer: {
-    name: string;
-    email: string;
-    address: string;
-    phone?: string;
-  };
-  items: InvoiceItem[];
-  subtotal: number;
-  discount: number;
-  discountPercentage: number;
-  total: number;
-  status: string;
-  invoiceType?: 'sale' | 'refund' | 'writeoff';
-}
+import { Product, Invoice } from '../InventoryManagement'; // Import Product and Invoice interfaces
 
 interface SellHistoryModalProps {
   product: Product | null;
@@ -55,7 +21,7 @@ interface SellHistoryModalProps {
 }
 
 const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, db, toast }) => {
-  const [history, setHistory] = useState<Invoice[]>([]);
+  const [history, setHistory] = useState<Array<Invoice & { status: "Active" | "Deleted" }>>([]);
 
   useEffect(() => {
     if (!product) {
@@ -63,20 +29,53 @@ const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, d
       return;
     }
 
-    const q = query(
-      collection(db, "invoices"),
-      where("itemsIds", "array-contains", product.id)
-    );
+    async function loadHistory() {
+      try {
+        // Active invoices
+        const activeQ = query(
+          collection(db, "invoices"),
+          where("itemsIds", "array-contains", product.id)
+        );
 
-    const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Invoice[];
-      setHistory(list);
-    }, (error) => {
-      console.error("Error fetching sell history:", error);
-      toast.error("Failed to load sell history.");
-    });
+        // Deleted invoices
+        const deletedQ = query(
+          collection(db, "deletedInvoices"),
+          where("itemsIds", "array-contains", product.id)
+        );
 
-    return () => unsub();
+        const [activeSnap, deletedSnap] = await Promise.all([
+          getDocs(activeQ),
+          getDocs(deletedQ),
+        ]);
+
+        const active = activeSnap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+          status: "Active",
+        })) as Array<Invoice & { status: "Active" | "Deleted" }>;
+
+        const deleted = deletedSnap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+          status: "Deleted",
+        })) as Array<Invoice & { status: "Active" | "Deleted" }>;
+
+        const combined = [...active, ...deleted].sort(
+          (a, b) => {
+            const dateA = a.status === "Active" ? (a.createdAt?.toDate().getTime() || new Date(a.date).getTime()) : (a.deletedAt?.toDate().getTime() || new Date(a.date).getTime());
+            const dateB = b.status === "Active" ? (b.createdAt?.toDate().getTime() || new Date(b.date).getTime()) : (b.deletedAt?.toDate().getTime() || new Date(b.date).getTime());
+            return dateB - dateA; // Descending order
+          }
+        );
+
+        setHistory(combined);
+      } catch (err) {
+        console.error("Failed to load product history:", err);
+        toast.error("Failed to load sell history.");
+      }
+    }
+
+    loadHistory();
   }, [product, db, toast]);
 
   if (!product) return null;
@@ -113,6 +112,7 @@ const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, d
                   <tr className="text-left text-muted-foreground border-b border-border">
                     <th className="py-2 px-4 font-medium">Date</th>
                     <th className="py-2 px-4 font-medium">Invoice #</th>
+                    <th className="py-2 px-4 font-medium">Status</th> {/* NEW Status Column */}
                     <th className="py-2 px-4 font-medium">Type</th>
                     <th className="py-2 px-4 font-medium text-right">Qty</th>
                   </tr>
@@ -122,12 +122,29 @@ const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, d
                     const item = (inv.items || []).find(
                       (i) => i.productId === product.id
                     );
+
+                    const isDeleted = inv.status === "Deleted";
+                    const rowStyle = isDeleted
+                      ? "text-muted-foreground italic"
+                      : "text-foreground";
+
                     return (
                       <tr key={inv.id} className="border-b border-border hover:bg-muted/20 transition-colors">
-                        <td className="py-2 px-4">{new Date(inv.date).toLocaleDateString()}</td>
-                        <td className="py-2 px-4">{inv.number || inv.id}</td>
-                        <td className="py-2 px-4 capitalize">{inv.invoiceType || "sale"}</td>
-                        <td className="py-2 px-4 text-right">{item?.quantity || 0}</td>
+                        <td className={`py-2 px-4 ${rowStyle}`}>
+                          {new Date(inv.date).toLocaleDateString()}
+                        </td>
+                        <td className={`py-2 px-4 ${rowStyle}`}>{inv.number || inv.id}</td>
+                        <td
+                          className={`py-2 px-4 font-medium ${
+                            isDeleted ? "text-destructive" : "text-success"
+                          }`}
+                        >
+                          {isDeleted ? "🔴 Deleted" : "🟢 Active"}
+                        </td>
+                        <td className={`py-2 px-4 ${rowStyle} capitalize`}>
+                          {inv.invoiceType || "sale"}
+                        </td>
+                        <td className={`py-2 px-4 text-right ${rowStyle}`}>{item?.quantity || 0}</td>
                       </tr>
                     );
                   })}
