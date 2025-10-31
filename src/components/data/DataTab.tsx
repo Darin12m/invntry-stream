@@ -3,7 +3,7 @@ import { Upload, Download, Trash } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; // Import Timestamp
 import { Product, Invoice } from '../InventoryManagement'; // Import Product and Invoice interfaces
 import { toast } from "sonner"; // Correct import for sonner toast
 import { recalcProductStock } from '@/utils/recalcStock'; // Import the new stock controller
@@ -17,11 +17,11 @@ interface DataTabProps {
   exportToJSON: (data: any[], filename: string) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
   db: any; // NEW PROP
-  toast: typeof toast; // NEW PROP
+  toast: any; // Changed from typeof toast to any to resolve circular reference
 }
 
 // Helper component for deleted invoices
-function DeletedInvoicesSection({ db, toast }: { db: any, toast: typeof toast }) { // Accept db and toast as props
+function DeletedInvoicesSection({ db, toast }: { db: any, toast: any }) { // Accept db and toast as props
   const [trashInvoices, setTrashInvoices] = useState<Invoice[]>([]); // Use Invoice interface
 
   useEffect(() => {
@@ -82,7 +82,7 @@ function DeletedInvoicesSection({ db, toast }: { db: any, toast: typeof toast })
           <div>
             <p className="font-semibold">{inv.customer?.name || "Unnamed"}</p>
             <p className="text-xs text-muted-foreground">
-              {inv.deletedAt?.seconds
+              {inv.deletedAt?.seconds // Access seconds property of Timestamp
                 ? new Date(inv.deletedAt.seconds * 1000).toLocaleDateString()
                 : "Unknown Date"}
             </p>

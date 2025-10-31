@@ -19,6 +19,7 @@ interface InvoiceModalProps {
   invoices: Invoice[]; // All invoices for generating new number
   db: any; // Firebase Firestore instance
   toast: any; // Sonner toast instance
+  recalcProductStock: (productId: string) => Promise<void>; // NEW: Add recalcProductStock prop
 }
 
 const InvoiceModal: React.FC<InvoiceModalProps> = ({
@@ -30,6 +31,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   invoices,
   db,
   toast,
+  recalcProductStock, // Destructure recalcProductStock
 }) => {
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<any[]>([]);

@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { db, auth, storage } from '@/lib/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, getDocs, where, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, getDocs, where, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; // Import Timestamp
 import { signOut, User } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -75,6 +75,7 @@ export interface Invoice {
   total: number;
   status: string;
   invoiceType?: 'sale' | 'refund' | 'writeoff'; // NEW: Invoice Type
+  deletedAt?: Timestamp; // NEW: Add deletedAt property for invoices moved to trash
 }
 
 const InventoryManagementApp = () => {
@@ -89,7 +90,7 @@ const InventoryManagementApp = () => {
   });
   const [products, setProducts] = useState<Product[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = true);
   
   // Search term state for InventoryTab
   const [localSearchInput, setLocalSearchInput] = useState(''); // Local state for the input field
