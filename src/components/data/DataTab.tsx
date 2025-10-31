@@ -56,17 +56,18 @@ function DeletedInvoicesSection({ db, toast }: { db: any, toast: any }) { // Acc
   const handleDeleteForever = async (invoice: Invoice) => { // Use Invoice interface
     if (!invoice) return;
     const confirmDel = window.confirm(
-      `⚠️ Permanently delete invoice for ${invoice.customer?.name || "Unnamed"}?` // Use invoice.customer.name
+      `Permanently delete invoice for ${invoice.customer?.name || "Unnamed"}?` // Use invoice.customer.name
     );
     if (!confirmDel) return;
 
-    try {
-      await deleteDoc(doc(db, "deletedInvoices", invoice.id));
-      toast.success("🔥 Invoice permanently deleted.");
-    } catch (error) {
-      console.error("Error deleting invoice forever:", error);
-      toast.error("Failed to permanently delete invoice.");
+    await deleteDoc(doc(db, "deletedInvoices", invoice.id));
+
+    // ✅ Optional but safe: recalc after permanent delete
+    for (const item of invoice.items || []) {
+      await recalcProductStock(item.productId);
     }
+
+    toast.success("🔥 Invoice permanently deleted and stock refreshed.");
   };
 
   return (

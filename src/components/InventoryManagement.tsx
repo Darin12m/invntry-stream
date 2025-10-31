@@ -90,7 +90,7 @@ const InventoryManagementApp = () => {
   });
   const [products, setProducts] = useState<Product[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true); // Fixed: Correct useState initialization
+  const [loading, setLoading] = useState(true);
   
   // Search term state for InventoryTab
   const [localSearchInput, setLocalSearchInput] = useState(''); // Local state for the input field
@@ -359,39 +359,24 @@ const InventoryManagementApp = () => {
     }
 
     try {
-      // STEP 1: confirm invoice shape
-      if (!invoice.items || invoice.items.length === 0) {
-        toast.error("❌ Invoice has no items — cannot move.");
-        return;
-      }
-
-      // STEP 2: Try to copy into deletedInvoices
+      // Move to deletedInvoices
       await setDoc(doc(db, "deletedInvoices", invoice.id), {
         ...invoice,
         deletedAt: serverTimestamp(),
       });
 
-      // STEP 3: Recalculate stock for affected products *before* deleting the main invoice
-      // This ensures the stock reflects the state as if this invoice never existed.
-      for (const item of invoice.items) {
+      // Remove from main
+      await deleteDoc(doc(db, "invoices", invoice.id));
+
+      // 🔄 Recalculate stock based only on remaining active invoices
+      for (const item of invoice.items || []) {
         await recalcProductStock(item.productId);
       }
 
-      // STEP 4: Delete from main invoices
-      await deleteDoc(doc(db, "invoices", invoice.id));
-
-      toast.success("🗑️ Invoice successfully moved to Trash.");
-    } catch (error: any) { // Explicitly type error as any for message access
-      // Better diagnostic feedback inside Dyad
-      const msg =
-        error?.message?.includes("Missing or insufficient permissions")
-          ? "⚠️ Firestore permission error — allow write access to 'deletedInvoices'."
-          : error?.message?.includes("No document to update")
-          ? "⚠️ Product not found while restoring stock."
-          : `❌ Unexpected error: ${error.message}`;
-
-      toast.error(msg);
-      console.error("🔍 Detailed error:", error); // Use console.error for errors
+      toast.success("🗑️ Invoice moved to Trash and stock recalculated.");
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("❌ Failed to delete invoice.");
     }
   }
 
@@ -742,7 +727,7 @@ const InventoryManagementApp = () => {
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium">Logged in as</p>
-                          <p className="text-sm text-muted-foreground truncate">{currentUser.email}</p>
+                          <p className className="text-sm text-muted-foreground truncate">{currentUser.email}</p>
                         </div>
                       </div>
                       <Button 

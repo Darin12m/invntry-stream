@@ -10,8 +10,9 @@ import {
 } from "firebase/firestore";
 
 /**
- * Calculates stock based on all invoices referencing a product.
- * Formula: stock = initialStock - totalSales - totalWriteOff + totalRefund
+ * Calculates stock based on *active* invoices only.
+ * Deleted invoices (moved to deletedInvoices) are ignored.
+ * Formula: stock = initialStock - sales - writeOffs + refunds
  */
 export async function recalcProductStock(productId: string) {
   const productRef = doc(db, "products", productId);
@@ -25,12 +26,15 @@ export async function recalcProductStock(productId: string) {
   let totalWriteOff = 0;
   let totalRefund = 0;
 
-  const invoicesSnap = await getDocs(
-    query(collection(db, "invoices"), where("itemsIds", "array-contains", productId))
+  const q = query(
+    collection(db, "invoices"),
+    where("itemsIds", "array-contains", productId)
   );
 
+  const invoicesSnap = await getDocs(q);
   invoicesSnap.forEach((docSnap) => {
     const inv = docSnap.data();
+    if (inv.deleted === true) return; // 🔥 Ignore soft-deleted invoices
     const type = inv.invoiceType || "sale";
     const item = (inv.items || []).find((i: any) => i.productId === productId);
     if (!item) return;
