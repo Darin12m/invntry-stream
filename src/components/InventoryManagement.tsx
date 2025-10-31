@@ -847,8 +847,8 @@ const InventoryManagementApp = () => {
               exportToCSV={exportToCSV}
               exportToJSON={exportToJSON}
               fileInputRef={fileInputRef}
-              db={db} {/* Pass db */}
-              toast={toast} {/* Pass toast */}
+              db={db}
+              toast={toast}
             />
           </Suspense>
         )}
