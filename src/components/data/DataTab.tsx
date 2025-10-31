@@ -1,44 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, Download, Trash } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-
-interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  quantity: number;
-  price: number;
-  category: string;
-  purchasePrice?: number;
-}
-
-interface Invoice {
-  id: string;
-  number: string;
-  date: string;
-  customer: {
-    name: string;
-    email: string;
-    address: string;
-    phone?: string;
-  };
-  items: {
-    productId: string;
-    name: string;
-    sku: string;
-    price: number;
-    quantity: number;
-    purchasePrice?: number;
-    discount?: number;
-  }[];
-  subtotal: number;
-  discount: number;
-  discountPercentage: number;
-  total: number;
-  status: string;
-}
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { Product, Invoice } from '../InventoryManagement'; // Import Product and Invoice interfaces
+import { toast } from "sonner"; // Correct import for sonner toast
 
 interface DataTabProps {
   products: Product[];
@@ -48,6 +15,109 @@ interface DataTabProps {
   exportToCSV: (data: any[], filename: string) => void;
   exportToJSON: (data: any[], filename: string) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
+  db: any; // NEW PROP
+  toast: typeof toast; // NEW PROP
+}
+
+// Helper component for deleted invoices
+function DeletedInvoicesSection({ db, toast }: { db: any, toast: typeof toast }) { // Accept db and toast as props
+  const [trashInvoices, setTrashInvoices] = useState<Invoice[]>([]); // Use Invoice interface
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "deletedInvoices"), (snap) => {
+      setTrashInvoices(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Invoice))); // Cast to Invoice
+    });
+    return () => unsub();
+  }, [db]); // Add db to dependency array
+
+  const handleRestore = async (invoice: Invoice) => { // Use Invoice interface
+    if (!invoice) return;
+    try {
+      await setDoc(doc(db, "invoices", invoice.id), {
+        ...invoice,
+        deleted: false,
+        restoredAt: serverTimestamp(),
+      });
+      await deleteDoc(doc(db, "deletedInvoices", invoice.id));
+
+      for (const item of invoice.items || []) {
+        const productRef = doc(db, "products", item.productId);
+        const productSnap = await getDoc(productRef);
+        if (!productSnap.exists()) continue;
+
+        const product = productSnap.data();
+        const currentQty = Number(product.quantity || 0);
+        const qty = Math.abs(Number(item.quantity) || 0);
+        const type = invoice.invoiceType || "sale";
+
+        let newQty = currentQty;
+        if (type === "sale" || type === "writeoff") newQty = Math.max(0, currentQty - qty);
+        else if (type === "refund") newQty = currentQty + qty;
+
+        await updateDoc(productRef, { quantity: newQty });
+      }
+
+      toast.success("♻️ Invoice restored successfully.");
+    } catch (error) {
+      console.error("Error restoring invoice:", error);
+      toast.error("Failed to restore invoice.");
+    }
+  };
+
+  const handleDeleteForever = async (invoice: Invoice) => { // Use Invoice interface
+    if (!invoice) return;
+    const confirmDel = window.confirm(
+      `⚠️ Permanently delete invoice for ${invoice.customer?.name || "Unnamed"}?` // Use invoice.customer.name
+    );
+    if (!confirmDel) return;
+
+    try {
+      await deleteDoc(doc(db, "deletedInvoices", invoice.id));
+      toast.success("🔥 Invoice permanently deleted.");
+    } catch (error) {
+      console.error("Error deleting invoice forever:", error);
+      toast.error("Failed to permanently delete invoice.");
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {trashInvoices.length === 0 && (
+        <p className="text-muted-foreground text-sm">No deleted invoices.</p>
+      )}
+      {trashInvoices.map((inv) => (
+        <Card
+          key={inv.id}
+          className="flex justify-between items-center p-3 rounded-lg shadow-card"
+        >
+          <div>
+            <p className="font-semibold">{inv.customer?.name || "Unnamed"}</p>
+            <p className="text-xs text-muted-foreground">
+              {inv.deletedAt?.seconds
+                ? new Date(inv.deletedAt.seconds * 1000).toLocaleDateString()
+                : "Unknown Date"}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => handleRestore(inv)}
+              variant="outline"
+              size="sm"
+            >
+              ♻️ Restore
+            </Button>
+            <Button
+              onClick={() => handleDeleteForever(inv)}
+              variant="destructive"
+              size="sm"
+            >
+              🔥 Delete Forever
+            </Button>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
 }
 
 const DataTab: React.FC<DataTabProps> = ({
@@ -58,6 +128,8 @@ const DataTab: React.FC<DataTabProps> = ({
   exportToCSV,
   exportToJSON,
   fileInputRef,
+  db, // Accept db prop
+  toast, // Accept toast prop
 }) => (
   <div className="space-y-6 animate-fade-in">
     {/* Header */}
@@ -179,6 +251,15 @@ const DataTab: React.FC<DataTabProps> = ({
         </div>
       </div>
     </Card>
+
+    {/* 🗑️ Deleted Invoices Section */}
+    <div className="mt-10">
+      <h2 className="text-xl font-bold mb-3 flex items-center gap-2">
+        <Trash className="h-5 w-5" /> <span>Trash (Deleted Invoices)</span>
+      </h2>
+
+      <DeletedInvoicesSection db={db} toast={toast} />
+    </div>
   </div>
 );
 
