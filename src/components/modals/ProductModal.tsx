@@ -42,7 +42,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
       setProductForm({
         name: editingProduct.name,
         sku: editingProduct.sku,
-        quantity: editingProduct.quantity.toString(),
+        quantity: (editingProduct.onHand ?? editingProduct.quantity ?? 0).toString(), // Use onHand for display if available
         price: editingProduct.price.toString(),
         category: editingProduct.category,
         purchasePrice: editingProduct.purchasePrice?.toString() || '',
@@ -67,7 +67,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
     setProductForm({
       name: '',
       sku: '',
-      quantity: '',
+        quantity: '',
       price: '',
       category: '',
       purchasePrice: '',
@@ -84,7 +84,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
     const productData = {
       name: productForm.name,
       sku: productForm.sku,
-      quantity: parseInt(productForm.quantity),
+      quantity: parseInt(productForm.quantity), // Keep 'quantity' for existing logic/fallback
       price: parseFloat(productForm.price),
       category: productForm.category,
       ...(productForm.purchasePrice && { purchasePrice: parseFloat(productForm.purchasePrice) }),
@@ -96,7 +96,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
         // When editing, only update the fields provided in productData.
         // initialStock and onHand should not be changed here directly.
         const oldProductSnap = await getDoc(doc(db, 'products', editingProduct.id));
-        const oldQty = oldProductSnap.exists() ? oldProductSnap.data().quantity : 0;
+        const oldQty = oldProductSnap.exists() ? (oldProductSnap.data().onHand ?? oldProductSnap.data().quantity) : 0; // Use onHand for logging
 
         await updateDoc(doc(db, 'products', editingProduct.id), productData);
         toast.success("Product updated successfully");

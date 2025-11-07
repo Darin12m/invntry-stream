@@ -6,10 +6,8 @@ import { Label } from "@/components/ui/label";
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; // Import Timestamp
 import { Product, Invoice } from '../InventoryManagement'; // Import Product and Invoice interfaces
 import { toast } from "sonner"; // Correct import for sonner toast
-import { recalcProductStock } from '@/utils/recalcStock'; // Import the new stock controller
 import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
 import ActivityLogModal from '../modals/ActivityLogModal'; // NEW: Import ActivityLogModal
-import { applyInvoiceStock } from '@/lib/stock'; // NEW: Import applyInvoiceStock
 import { User } from 'firebase/auth'; // NEW: Import User type
 
 interface DataTabProps {
@@ -40,13 +38,24 @@ function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: an
     if (!invoice || !currentUser) return;
 
     try {
-      // 1️⃣ Call Cloud Function to re-apply stock changes
-      await applyInvoiceStock(
-        "restore",
-        invoice.id,
-        invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
-        currentUser.uid
-      );
+      // 1️⃣ Call Netlify Function to re-apply stock changes
+      const response = await fetch('/.netlify/functions/apply-invoice-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoiceId: invoice.id,
+          action: "restore",
+          newItems: invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+          idempotencyKey: `${invoice.id}:restore:${Date.now()}`,
+          userId: currentUser.uid,
+          reason: `Invoice ${invoice.number || invoice.id} restored.`
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
+      }
 
       // 2️⃣ Restore invoice to main collection
       await setDoc(doc(db, "invoices", invoice.id), {

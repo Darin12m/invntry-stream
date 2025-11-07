@@ -8,9 +8,7 @@ import { Search, Plus, Trash, X, Save } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, getDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { Product, Invoice } from '../InventoryManagement'; // Import interfaces
 import { toast } from "sonner"; // Correct import for sonner toast
-import { recalcProductStock } from '@/utils/recalcStock'; // Import the new stock controller
 import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
-import { applyInvoiceStock } from '@/lib/stock'; // NEW: Import applyInvoiceStock
 import { User } from 'firebase/auth'; // NEW: Import User type
 
 interface InvoiceModalProps {
@@ -22,7 +20,6 @@ interface InvoiceModalProps {
   invoices: Invoice[]; // All invoices for generating new number
   db: any; // Firebase Firestore instance
   toast: any; // Sonner toast instance
-  recalcProductStock: (productId: string) => Promise<void>; // NEW: Add recalcProductStock prop
   currentUser: User | null; // NEW: Add currentUser prop
 }
 
@@ -35,7 +32,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   invoices,
   db,
   toast,
-  recalcProductStock, // Destructure recalcProductStock
   currentUser, // Destructure currentUser
 }) => {
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
@@ -295,13 +291,24 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     try {
       if (editingInvoice) {
         // --- EDITING INVOICE LOGIC ---
-        // Call Cloud Function to update stock
-        await applyInvoiceStock(
-          "edit",
-          editingInvoice.id,
-          invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
-          currentUser.uid
-        );
+        // Call Netlify Function to update stock
+        const response = await fetch('/.netlify/functions/apply-invoice-stock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            invoiceId: editingInvoice.id,
+            action: "edit",
+            newItems: invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+            idempotencyKey: `${editingInvoice.id}:edit:${Date.now()}`,
+            userId: currentUser.uid,
+            reason: `Invoice ${editingInvoice.number || editingInvoice.id} edited.`
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
+        }
 
         await updateDoc(doc(db, 'invoices', editingInvoice.id), {
           ...baseInvoiceData,
@@ -316,22 +323,34 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           createdAt: serverTimestamp(), // Add createdAt timestamp
         };
 
+        // First, add the invoice to get an ID for the stock movement
         const docRef = await addDoc(collection(db, "invoices"), invoiceData);
         
-        // Call Cloud Function to update stock
-        await applyInvoiceStock(
-          "create",
-          docRef.id, // Use the newly created invoice ID
-          invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
-          currentUser.uid
-        );
+        // Call Netlify Function to update stock
+        const response = await fetch('/.netlify/functions/apply-invoice-stock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            invoiceId: docRef.id, // Use the newly created invoice ID
+            action: "create",
+            newItems: invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+            idempotencyKey: `${docRef.id}:create:${Date.now()}`,
+            userId: currentUser.uid,
+            reason: `Invoice ${invoiceData.number || docRef.id} created.`
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          // If stock update fails, consider rolling back the invoice creation or logging a critical error
+          console.error("Netlify function error during invoice creation:", errorData);
+          // For now, we'll just throw, but a more robust solution might handle this differently
+          throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
+        }
 
         toast.success('Invoice saved successfully!');
         await logActivity("Created invoice", invoiceData.number || docRef.id, `${invoiceItems.length} items`); // Log activity
       }
-
-      // After saving (create or edit), remove client-side recalcProductStock calls
-      // Stock is now managed by the Cloud Function.
       
       handleCloseInvoiceModal();
     } catch (error) {

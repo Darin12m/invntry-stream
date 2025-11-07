@@ -27,17 +27,15 @@ import DashboardTab from './dashboard/DashboardTab';
 // Lazy load DataTab for code splitting
 const LazyDataTab = React.lazy(() => import('./data/DataTab'));
 
-// Import new modal components (will be created in subsequent steps)
+// Import new modal components
 import ProductModal from './modals/ProductModal';
 import InvoiceModal from './modals/InvoiceModal';
 import InvoiceViewerModal from './modals/InvoiceViewerModal';
 import ColumnMappingModal from './modals/ColumnMappingModal';
-import SellHistoryModal from './modals/SellHistoryModal'; // NEW: Import SellHistoryModal
+import SellHistoryModal from './modals/SellHistoryModal';
 
-// Import the new stock controller
-import { recalcProductStock } from '@/utils/recalcStock';
-import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
-import { applyInvoiceStock } from '@/lib/stock'; // NEW: Import applyInvoiceStock
+// Import logActivity (recalcProductStock and applyInvoiceStock are removed)
+import { logActivity } from '@/utils/logActivity';
 
 // Product interface with purchase price for profit calculations
 export interface Product {
@@ -365,13 +363,24 @@ const InventoryManagementApp = () => {
     }
 
     try {
-      // 1️⃣ Call Cloud Function to revert stock
-      await applyInvoiceStock(
-        "delete",
-        invoice.id,
-        invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
-        currentUser.uid
-      );
+      // 1️⃣ Call Netlify Function to revert stock
+      const response = await fetch('/.netlify/functions/apply-invoice-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoiceId: invoice.id,
+          action: "delete",
+          newItems: invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+          idempotencyKey: `${invoice.id}:delete:${Date.now()}`,
+          userId: currentUser.uid,
+          reason: `Invoice ${invoice.number || invoice.id} deleted.`
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
+      }
 
       // 2️⃣ Move invoice to deletedInvoices
       await setDoc(doc(db, "deletedInvoices", invoice.id), {
@@ -403,13 +412,25 @@ const InventoryManagementApp = () => {
         const deletePromises = Array.from(selectedInvoices).map(async (invoiceId) => {
           const invoice = invoices.find(inv => inv.id === invoiceId);
           if (invoice) {
-            // Call Cloud Function for each invoice deletion
-            await applyInvoiceStock(
-              "delete",
-              invoice.id,
-              invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
-              currentUser.uid
-            );
+            // Call Netlify Function for each invoice deletion
+            const response = await fetch('/.netlify/functions/apply-invoice-stock', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                invoiceId: invoice.id,
+                action: "delete",
+                newItems: invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+                idempotencyKey: `${invoice.id}:bulk-delete:${Date.now()}`,
+                userId: currentUser.uid,
+                reason: `Invoice ${invoice.number || invoice.id} bulk deleted.`
+              }),
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
+            }
+
             return deleteDoc(doc(db, 'invoices', invoiceId));
           }
           return Promise.resolve();
@@ -437,13 +458,25 @@ const InventoryManagementApp = () => {
     if (window.confirm(`Are you sure you want to delete ALL ${invoices.length} invoices? This action cannot be undone.`)) {
       try {
         const deletePromises = invoices.map(async (invoice) => {
-          // Call Cloud Function for each invoice deletion
-          await applyInvoiceStock(
-            "delete",
-            invoice.id,
-            invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
-            currentUser.uid
-          );
+          // Call Netlify Function for each invoice deletion
+          const response = await fetch('/.netlify/functions/apply-invoice-stock', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              invoiceId: invoice.id,
+              action: "delete",
+              newItems: invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+              idempotencyKey: `${invoice.id}:delete-all:${Date.now()}`,
+              userId: currentUser.uid,
+              reason: `Invoice ${invoice.number || invoice.id} deleted (all).`
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
+          }
+
           return deleteDoc(doc(db, 'invoices', invoice.id));
         });
         await Promise.all(deletePromises);
@@ -473,13 +506,25 @@ const InventoryManagementApp = () => {
           deleteDoc(doc(db, 'products', product.id))
         );
         const deleteInvoicesPromises = invoices.map(async (invoice) => {
-          // Call Cloud Function for each invoice deletion
-          await applyInvoiceStock(
-            "delete",
-            invoice.id,
-            invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
-            currentUser.uid
-          );
+          // Call Netlify Function for each invoice deletion
+          const response = await fetch('/.netlify/functions/apply-invoice-stock', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              invoiceId: invoice.id,
+              action: "delete",
+              newItems: invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+              idempotencyKey: `${invoice.id}:clear-all:${Date.now()}`,
+              userId: currentUser.uid,
+              reason: `Invoice ${invoice.number || invoice.id} deleted (clear all).`
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
+          }
+
           return deleteDoc(doc(db, 'invoices', invoice.id));
         });
         
@@ -858,7 +903,6 @@ const InventoryManagementApp = () => {
         invoices={invoices}
         db={db}
         toast={toast}
-        recalcProductStock={recalcProductStock} // Pass recalc function
         currentUser={currentUser} // Pass currentUser to InvoiceModal
       />
 

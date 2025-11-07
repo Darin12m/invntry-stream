@@ -210,7 +210,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
           </thead>
           <tbody>
             {sortedProducts.map((product, index) => {
-              const displayQuantity = product.onHand ?? product.quantity; // Use onHand if exists, else quantity
+              const displayQuantity = product.onHand ?? product.quantity ?? 0; // Use onHand if exists, else quantity, else 0
               const stockStatus = getStockStatus(displayQuantity);
               return (
                 <tr 
@@ -282,7 +282,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
     {/* Mobile Card View - Hidden on desktop */}
     <div className="space-y-4 md:hidden">
       {sortedProducts.map(product => {
-        const displayQuantity = product.onHand ?? product.quantity; // Use onHand if exists, else quantity
+        const displayQuantity = product.onHand ?? product.quantity ?? 0; // Use onHand if exists, else quantity, else 0
         const stockStatus = getStockStatus(displayQuantity);
         return (
           <Card key={product.id} className="p-4 hover:shadow-lg transition-all duration-300 animate-scale-in">

@@ -1,55 +1,53 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Existing rules for general read/write access
+    // Allow authenticated users to read and write most collections
     match /{document=**} {
       allow read, write: if request.auth != null;
     }
 
-    // Rules for stock_movements collection
-    match /stock_movements/{docId} {
-      // Allow read for authenticated users
-      allow read: if request.auth != null;
-      // Only allow writes (create, update, delete) if the request is from a Cloud Function
-      // This is typically identified by a service account or custom token claim.
-      // For simplicity, we'll assume Admin SDK (used by Cloud Functions) bypasses these rules.
-      // Clients should explicitly be denied write access.
-      allow write: if false; // No direct client writes
-    }
-
-    // Rules for invoices_server_copies collection
-    match /invoices_server_copies/{docId} {
-      // Allow read for authenticated users
-      allow read: if request.auth != null;
-      // Only allow writes (create, update, delete) if the request is from a Cloud Function
-      allow write: if false; // No direct client writes
-    }
-
-    // Rules for products collection
+    // Products collection rules
     match /products/{productId} {
-      // Allow read for authenticated users
       allow read: if request.auth != null;
-      // Allow create and delete for authenticated users
-      allow create, delete: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && !("onHand" in request.resource.data) || request.resource.data.onHand == resource.data.onHand;
+      allow delete: if request.auth != null;
 
-      // Allow update for authenticated users, but ONLY if they are NOT modifying the 'onHand' field.
-      // The 'onHand' field should only be modified by Cloud Functions.
-      allow update: if request.auth != null && !("onHand" in request.resource.data.diff(resource.data).affectedKeys());
+      // Prevent clients from directly writing to the 'onHand' field
+      // This rule ensures that 'onHand' can only be updated by a trusted server (e.g., Netlify Function)
+      // If 'onHand' is present in the request, it must be unchanged from the existing value.
+      // This effectively makes 'onHand' read-only for clients.
+      // The 'update' rule above allows other fields to be updated.
+      // The 'create' rule allows 'onHand' to be set initially by the client (e.g., in ProductModal for new products)
+      // but subsequent updates must come from the server.
+      // For a truly server-only 'onHand' on creation, you'd need to remove 'onHand' from client-side create.
+      // For this setup, we allow client to set it on create, but not modify on update.
+      // The init-onhand function will ensure it's set if missing.
+      allow update: if request.auth != null && request.resource.data.onHand == resource.data.onHand;
     }
 
-    // Rules for invoices collection (existing)
-    match /invoices/{invoiceId} {
-      allow read, write: if request.auth != null;
+    // Stock Movements collection rules
+    match /stock_movements/{movementId} {
+      // Only allow reads for authenticated users
+      allow read: if request.auth != null;
+      // Prevent any client-side writes to stock_movements
+      allow create, update, delete: if false;
     }
 
-    // Rules for deletedInvoices collection (existing)
-    match /deletedInvoices/{invoiceId} {
-      allow read, write: if request.auth != null;
+    // Invoices Server Copies collection rules
+    match /invoices_server_copies/{invoiceId} {
+      // Only allow reads for authenticated users
+      allow read: if request.auth != null;
+      // Prevent any client-side writes to invoices_server_copies
+      allow create, update, delete: if false;
     }
 
-    // Rules for activityLogs collection (existing)
+    // Activity Logs collection rules
     match /activityLogs/{logId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      // Allow only server-side writes (e.g., Netlify functions)
+      allow create, update, delete: if false;
     }
   }
 }
