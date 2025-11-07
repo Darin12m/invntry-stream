@@ -1,14 +1,16 @@
 import * as admin from "firebase-admin";
-
-// Initialize Firebase Admin SDK (ensure your GOOGLE_APPLICATION_CREDENTIALS env var is set)
-// For local testing, you might need to set this:
-// export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/serviceAccountKey.json"
-admin.initializeApp();
+import { Request, Response } from "firebase-functions";
 
 const db = admin.firestore();
 
-async function initOnHandField() {
-  console.log("Starting onHand initialization script...");
+export async function initOnHand(req: Request, res: Response) {
+  // Ensure this function is only callable by authenticated users or specific origins if needed
+  // For a simple one-time migration, we'll allow it to be called directly, but in production,
+  // you might want to add authentication checks (e.g., check context.auth for callable functions,
+  // or specific headers/tokens for HTTP functions).
+  // For this prompt, we'll assume it's a utility function run by an admin.
+
+  console.log("Starting HTTP-triggered onHand initialization...");
 
   try {
     const productsRef = db.collection("products");
@@ -16,6 +18,7 @@ async function initOnHandField() {
 
     if (snapshot.empty) {
       console.log("No products found to initialize.");
+      res.status(200).send("No products found to initialize.");
       return;
     }
 
@@ -36,15 +39,15 @@ async function initOnHandField() {
     if (updatedCount > 0) {
       await batch.commit();
       console.log(`Successfully initialized 'onHand' for ${updatedCount} products.`);
+      res.status(200).send(`Successfully initialized 'onHand' for ${updatedCount} products.`);
     } else {
       console.log("All products already have 'onHand' field or no products found without it.");
+      res.status(200).send("All products already have 'onHand' field or no products found without it.");
     }
   } catch (error) {
     console.error("Error initializing onHand field:", error);
+    res.status(500).send(`Error initializing onHand field: ${error}`);
   } finally {
-    console.log("onHand initialization script finished.");
+    console.log("onHand initialization function finished.");
   }
 }
-
-// Execute the script
-initOnHandField();

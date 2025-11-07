@@ -1,6 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { applyInvoiceStock } from "./stockEngine";
+import { initOnHand } from "./initOnHandFunction"; // Import the new HTTP function
 
 admin.initializeApp();
 
@@ -33,3 +34,6 @@ export const applyInvoiceStockCallable = functions.https.onCall(async (data, con
     );
   }
 });
+
+// NEW: HTTP-triggered function for one-time onHand initialization
+export const initOnHandTrigger = functions.https.onRequest(initOnHand);
