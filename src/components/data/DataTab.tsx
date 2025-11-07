@@ -9,6 +9,8 @@ import { toast } from "sonner"; // Correct import for sonner toast
 import { recalcProductStock } from '@/utils/recalcStock'; // Import the new stock controller
 import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
 import ActivityLogModal from '../modals/ActivityLogModal'; // NEW: Import ActivityLogModal
+import { applyInvoiceStock } from '@/lib/stock'; // NEW: Import applyInvoiceStock
+import { User } from 'firebase/auth'; // NEW: Import User type
 
 interface DataTabProps {
   products: Product[];
@@ -20,10 +22,11 @@ interface DataTabProps {
   fileInputRef: React.RefObject<HTMLInputElement>;
   db: any; // NEW PROP
   toast: any; // Changed from typeof toast to any to resolve circular reference
+  currentUser: User | null; // NEW: Add currentUser prop
 }
 
 // Helper component for deleted invoices
-function DeletedInvoicesSection({ db, toast }: { db: any, toast: any }) { // Accept db and toast as props
+function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: any, currentUser: User | null }) { // Accept db, toast, and currentUser as props
   const [trashInvoices, setTrashInvoices] = useState<Invoice[]>([]); // Use Invoice interface
 
   useEffect(() => {
@@ -34,37 +37,22 @@ function DeletedInvoicesSection({ db, toast }: { db: any, toast: any }) { // Acc
   }, [db]); // Add db to dependency array
 
   const handleRestore = async (invoice: Invoice) => {
-    if (!invoice) return;
+    if (!invoice || !currentUser) return;
 
     try {
-      // 1️⃣ Restore invoice to main collection
+      // 1️⃣ Call Cloud Function to re-apply stock changes
+      await applyInvoiceStock(
+        "restore",
+        invoice.id,
+        invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+        currentUser.uid
+      );
+
+      // 2️⃣ Restore invoice to main collection
       await setDoc(doc(db, "invoices", invoice.id), {
         ...invoice,
         restoredAt: serverTimestamp(),
       });
-
-      // 2️⃣ Adjust stock again (reapply original effect)
-      for (const item of invoice.items || []) {
-        const productRef = doc(db, "products", item.productId);
-        const productSnap = await getDoc(productRef);
-        if (!productSnap.exists()) continue;
-
-        const product = productSnap.data();
-        const currentQty = Number(product.quantity || 0);
-        const qty = Number(item.quantity) || 0;
-        const type = invoice.invoiceType || "sale";
-
-        let newQty = currentQty;
-        if (type === "sale" || type === "writeoff") {
-          // Reduce stock again
-          newQty = Math.max(0, currentQty - qty);
-        } else if (type === "refund") {
-          // Refund increases stock again
-          newQty = currentQty + qty;
-        }
-
-        await updateDoc(productRef, { quantity: newQty });
-      }
 
       // 3️⃣ Remove from deletedInvoices
       await deleteDoc(doc(db, "deletedInvoices", invoice.id));
@@ -78,11 +66,14 @@ function DeletedInvoicesSection({ db, toast }: { db: any, toast: any }) { // Acc
   };
 
   const handleDeleteForever = async (invoice: Invoice) => {
-    if (!invoice) return;
+    if (!invoice || !currentUser) return;
     const confirmDel = window.confirm(
-      `Permanently delete invoice for ${invoice.customer?.name || "Unnamed"}?`
+      `Permanently delete invoice for ${invoice.customer?.name || "Unnamed"}? This will NOT affect stock.`
     );
     if (!confirmDel) return;
+
+    // No stock adjustment needed here as stock was already returned when it was "deleted"
+    // and this is a permanent deletion from trash.
 
     await deleteDoc(doc(db, "deletedInvoices", invoice.id));
     toast.success("🔥 Invoice permanently deleted (stock unchanged).");
@@ -139,6 +130,7 @@ const DataTab: React.FC<DataTabProps> = ({
   fileInputRef,
   db, // Accept db prop
   toast, // Accept toast prop
+  currentUser, // Accept currentUser prop
 }) => {
   const [showActivityLog, setShowActivityLog] = useState(false); // NEW: State for ActivityLogModal
 
@@ -281,7 +273,7 @@ const DataTab: React.FC<DataTabProps> = ({
           <Trash className="h-5 w-5" /> <span>Trash (Deleted Invoices)</span>
         </h2>
 
-        <DeletedInvoicesSection db={db} toast={toast} />
+        <DeletedInvoicesSection db={db} toast={toast} currentUser={currentUser} />
       </div>
 
       {/* Activity Log Modal */}

@@ -10,6 +10,8 @@ import { Product, Invoice } from '../InventoryManagement'; // Import interfaces
 import { toast } from "sonner"; // Correct import for sonner toast
 import { recalcProductStock } from '@/utils/recalcStock'; // Import the new stock controller
 import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
+import { applyInvoiceStock } from '@/lib/stock'; // NEW: Import applyInvoiceStock
+import { User } from 'firebase/auth'; // NEW: Import User type
 
 interface InvoiceModalProps {
   showInvoiceModal: boolean;
@@ -21,6 +23,7 @@ interface InvoiceModalProps {
   db: any; // Firebase Firestore instance
   toast: any; // Sonner toast instance
   recalcProductStock: (productId: string) => Promise<void>; // NEW: Add recalcProductStock prop
+  currentUser: User | null; // NEW: Add currentUser prop
 }
 
 const InvoiceModal: React.FC<InvoiceModalProps> = ({
@@ -33,6 +36,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   db,
   toast,
   recalcProductStock, // Destructure recalcProductStock
+  currentUser, // Destructure currentUser
 }) => {
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
@@ -45,7 +49,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   useEffect(() => {
     const initialLiveStockMap = new Map<string, number>();
     products.forEach(p => {
-      initialLiveStockMap.set(p.id, p.quantity);
+      initialLiveStockMap.set(p.id, p.onHand ?? p.quantity); // Use onHand if available, else quantity
     });
 
     if (editingInvoice) {
@@ -264,6 +268,10 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       toast.error('Please add at least one item to the invoice');
       return;
     }
+    if (!currentUser) {
+      toast.error('User not authenticated.');
+      return;
+    }
 
     const { subtotal, discount: discountAmount, total } = calculateInvoiceTotal();
     
@@ -287,6 +295,14 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     try {
       if (editingInvoice) {
         // --- EDITING INVOICE LOGIC ---
+        // Call Cloud Function to update stock
+        await applyInvoiceStock(
+          "edit",
+          editingInvoice.id,
+          invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+          currentUser.uid
+        );
+
         await updateDoc(doc(db, 'invoices', editingInvoice.id), {
           ...baseInvoiceData,
         });
@@ -301,15 +317,22 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         };
 
         const docRef = await addDoc(collection(db, "invoices"), invoiceData);
+        
+        // Call Cloud Function to update stock
+        await applyInvoiceStock(
+          "create",
+          docRef.id, // Use the newly created invoice ID
+          invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+          currentUser.uid
+        );
+
         toast.success('Invoice saved successfully!');
         await logActivity("Created invoice", invoiceData.number || docRef.id, `${invoiceItems.length} items`); // Log activity
       }
 
-      // After saving (create or edit), recalculate stock for all affected products
-      for (const item of invoiceItems) {
-        await recalcProductStock(item.productId);
-      }
-
+      // After saving (create or edit), remove client-side recalcProductStock calls
+      // Stock is now managed by the Cloud Function.
+      
       handleCloseInvoiceModal();
     } catch (error) {
       console.error('Error saving invoice:', error);

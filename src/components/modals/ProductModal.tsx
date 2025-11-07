@@ -94,7 +94,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
     try {
       if (editingProduct) {
         // When editing, only update the fields provided in productData.
-        // initialStock should not be changed here.
+        // initialStock and onHand should not be changed here directly.
         const oldProductSnap = await getDoc(doc(db, 'products', editingProduct.id));
         const oldQty = oldProductSnap.exists() ? oldProductSnap.data().quantity : 0;
 
@@ -102,10 +102,11 @@ const ProductModal: React.FC<ProductModalProps> = ({
         toast.success("Product updated successfully");
         await logActivity("Edited product", productForm.name, `qty: ${oldQty} → ${productData.quantity}`); // Log activity
       } else {
-        // For new products, set initialStock to the current quantity
+        // For new products, set initialStock and onHand to the current quantity
         const docRef = await addDoc(collection(db, 'products'), {
           ...productData,
-          initialStock: parseInt(productForm.quantity) // Set initialStock for new products
+          initialStock: parseInt(productForm.quantity), // Set initialStock for new products
+          onHand: parseInt(productForm.quantity) // NEW: Initialize onHand for new products
         });
         toast.success("Product added successfully");
         await logActivity("Added product", productForm.name, `qty: ${productData.quantity}`); // Log activity

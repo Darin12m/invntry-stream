@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Existing rules for general read/write access
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Rules for stock_movements collection
+    match /stock_movements/{docId} {
+      // Allow read for authenticated users
+      allow read: if request.auth != null;
+      // Only allow writes (create, update, delete) if the request is from a Cloud Function
+      // This is typically identified by a service account or custom token claim.
+      // For simplicity, we'll assume Admin SDK (used by Cloud Functions) bypasses these rules.
+      // Clients should explicitly be denied write access.
+      allow write: if false; // No direct client writes
+    }
+
+    // Rules for invoices_server_copies collection
+    match /invoices_server_copies/{docId} {
+      // Allow read for authenticated users
+      allow read: if request.auth != null;
+      // Only allow writes (create, update, delete) if the request is from a Cloud Function
+      allow write: if false; // No direct client writes
+    }
+
+    // Rules for products collection
+    match /products/{productId} {
+      // Allow read for authenticated users
+      allow read: if request.auth != null;
+      // Allow create and delete for authenticated users
+      allow create, delete: if request.auth != null;
+
+      // Allow update for authenticated users, but ONLY if they are NOT modifying the 'onHand' field.
+      // The 'onHand' field should only be modified by Cloud Functions.
+      allow update: if request.auth != null && !("onHand" in request.resource.data.diff(resource.data).affectedKeys());
+    }
+
+    // Rules for invoices collection (existing)
+    match /invoices/{invoiceId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Rules for deletedInvoices collection (existing)
+    match /deletedInvoices/{invoiceId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Rules for activityLogs collection (existing)
+    match /activityLogs/{logId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

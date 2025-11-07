@@ -210,7 +210,8 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
           </thead>
           <tbody>
             {sortedProducts.map((product, index) => {
-              const stockStatus = getStockStatus(product.quantity);
+              const displayQuantity = product.onHand ?? product.quantity; // Use onHand if exists, else quantity
+              const stockStatus = getStockStatus(displayQuantity);
               return (
                 <tr 
                   key={product.id} 
@@ -235,7 +236,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <span className="font-medium">{product.quantity}</span>
+                      <span className="font-medium">{displayQuantity}</span>
                       <Badge variant={stockStatus.variant} className="text-xs">
                         {stockStatus.label}
                       </Badge>
@@ -281,7 +282,8 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
     {/* Mobile Card View - Hidden on desktop */}
     <div className="space-y-4 md:hidden">
       {sortedProducts.map(product => {
-        const stockStatus = getStockStatus(product.quantity);
+        const displayQuantity = product.onHand ?? product.quantity; // Use onHand if exists, else quantity
+        const stockStatus = getStockStatus(displayQuantity);
         return (
           <Card key={product.id} className="p-4 hover:shadow-lg transition-all duration-300 animate-scale-in">
             <div className="flex items-start gap-3 mb-3">
@@ -306,7 +308,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Quantity:</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">{product.quantity}</span>
+                      <span className="font-medium">{displayQuantity}</span>
                       <Badge variant={stockStatus.variant} className="text-xs">
                         {stockStatus.label}
                       </Badge>

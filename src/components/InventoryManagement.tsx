@@ -37,13 +37,15 @@ import SellHistoryModal from './modals/SellHistoryModal'; // NEW: Import SellHis
 // Import the new stock controller
 import { recalcProductStock } from '@/utils/recalcStock';
 import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
+import { applyInvoiceStock } from '@/lib/stock'; // NEW: Import applyInvoiceStock
 
 // Product interface with purchase price for profit calculations
 export interface Product {
   id: string;
   name: string;
   sku: string;
-  quantity: number;
+  quantity: number; // Existing stock field
+  onHand?: number; // NEW: Bulletproof stock field
   price: number;
   category: string;
   purchasePrice?: number; // Admin-only field for profit calculations
@@ -356,42 +358,26 @@ const InventoryManagementApp = () => {
 
   // 4. Delete single invoice
   async function handleDeleteInvoice(invoice: Invoice) {
-    if (!invoice || !invoice.id) return;
+    if (!invoice || !invoice.id || !currentUser) return;
 
     if (!window.confirm('Are you sure you want to delete this invoice? It will be moved to Trash.')) {
       return;
     }
 
     try {
-      // 1️⃣ Move invoice to deletedInvoices
+      // 1️⃣ Call Cloud Function to revert stock
+      await applyInvoiceStock(
+        "delete",
+        invoice.id,
+        invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+        currentUser.uid
+      );
+
+      // 2️⃣ Move invoice to deletedInvoices
       await setDoc(doc(db, "deletedInvoices", invoice.id), {
         ...invoice,
         deletedAt: serverTimestamp(),
       });
-
-      // 2️⃣ Restore (return) stock
-      for (const item of invoice.items || []) {
-        const productRef = doc(db, "products", item.productId);
-        const productSnap = await getDoc(productRef);
-        if (!productSnap.exists()) continue;
-
-        const product = productSnap.data();
-        const currentQty = Number(product.quantity || 0);
-        const qty = Number(item.quantity) || 0;
-        const type = invoice.invoiceType || "sale";
-
-        let newQty = currentQty;
-
-        if (type === "sale" || type === "writeoff") {
-          // Return stock
-          newQty = currentQty + qty;
-        } else if (type === "refund") {
-          // Refunds had increased stock originally, now remove it
-          newQty = Math.max(0, currentQty - qty);
-        }
-
-        await updateDoc(productRef, { quantity: newQty });
-      }
 
       // 3️⃣ Delete from main collection
       await deleteDoc(doc(db, "invoices", invoice.id));
@@ -410,28 +396,28 @@ const InventoryManagementApp = () => {
       toast.error("Please select invoices to delete");
       return;
     }
+    if (!currentUser) return;
     
     if (window.confirm(`Are you sure you want to delete ${selectedInvoices.size} selected invoice(s)?`)) {
       try {
-        const productIdsToRecalculate = new Set<string>();
-
         const deletePromises = Array.from(selectedInvoices).map(async (invoiceId) => {
           const invoice = invoices.find(inv => inv.id === invoiceId);
-          if (invoice && invoice.items) {
-            invoice.items.forEach(item => productIdsToRecalculate.add(item.productId));
+          if (invoice) {
+            // Call Cloud Function for each invoice deletion
+            await applyInvoiceStock(
+              "delete",
+              invoice.id,
+              invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+              currentUser.uid
+            );
+            return deleteDoc(doc(db, 'invoices', invoiceId));
           }
-          return deleteDoc(doc(db, 'invoices', invoiceId));
+          return Promise.resolve();
         });
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
         toast.success(`${selectedInvoices.size} invoices deleted successfully`);
         await logActivity("Bulk deleted invoices", "Multiple", `${selectedInvoices.size} invoices`); // Log activity
-
-        // Recalculate stock for affected products after bulk deletion
-        for (const productId of productIdsToRecalculate) {
-          await recalcProductStock(productId);
-        }
-        console.log("✅ Bulk invoices deleted and stock restored to correct values.");
 
       } catch (error) {
         console.error('Error bulk deleting invoices:', error);
@@ -446,29 +432,24 @@ const InventoryManagementApp = () => {
       toast.error("No invoices to delete");
       return;
     }
+    if (!currentUser) return;
     
     if (window.confirm(`Are you sure you want to delete ALL ${invoices.length} invoices? This action cannot be undone.`)) {
       try {
-        const productIdsToRecalculate = new Set<string>();
-        invoices.forEach(invoice => {
-          if (invoice.items) {
-            invoice.items.forEach(item => productIdsToRecalculate.add(item.productId));
-          }
+        const deletePromises = invoices.map(async (invoice) => {
+          // Call Cloud Function for each invoice deletion
+          await applyInvoiceStock(
+            "delete",
+            invoice.id,
+            invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+            currentUser.uid
+          );
+          return deleteDoc(doc(db, 'invoices', invoice.id));
         });
-
-        const deletePromises = invoices.map((invoice) =>
-          deleteDoc(doc(db, 'invoices', invoice.id))
-        );
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
         toast.success("All invoices deleted successfully");
         await logActivity("Deleted all invoices", "All", `${invoices.length} invoices`); // Log activity
-
-        // Recalculate stock for all products that were ever in an invoice
-        for (const productId of productIdsToRecalculate) {
-          await recalcProductStock(productId);
-        }
-        console.log("✅ All invoices deleted and stock restored to correct values.");
 
       } catch (error) {
         console.error('Error deleting all invoices:', error);
@@ -483,6 +464,7 @@ const InventoryManagementApp = () => {
       toast.error("No data to clear");
       return;
     }
+    if (!currentUser) return;
     
     if (window.confirm("⚠️ WARNING: This will delete ALL products and invoices permanently. This action cannot be undone. Are you absolutely sure?")) {
       try {
@@ -490,9 +472,16 @@ const InventoryManagementApp = () => {
         const deleteProductsPromises = products.map((product) =>
           deleteDoc(doc(db, 'products', product.id))
         );
-        const deleteInvoicesPromises = invoices.map((invoice) =>
-          deleteDoc(doc(db, 'invoices', invoice.id))
-        );
+        const deleteInvoicesPromises = invoices.map(async (invoice) => {
+          // Call Cloud Function for each invoice deletion
+          await applyInvoiceStock(
+            "delete",
+            invoice.id,
+            invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+            currentUser.uid
+          );
+          return deleteDoc(doc(db, 'invoices', invoice.id));
+        });
         
         await Promise.all([...deleteProductsPromises, ...deleteInvoicesPromises]);
         
@@ -843,6 +832,7 @@ const InventoryManagementApp = () => {
               fileInputRef={fileInputRef}
               db={db}
               toast={toast}
+              currentUser={currentUser} // Pass currentUser to DataTab
             />
           </Suspense>
         )}
@@ -869,6 +859,7 @@ const InventoryManagementApp = () => {
         db={db}
         toast={toast}
         recalcProductStock={recalcProductStock} // Pass recalc function
+        currentUser={currentUser} // Pass currentUser to InvoiceModal
       />
 
       {/* Invoice Viewer Modal */}
