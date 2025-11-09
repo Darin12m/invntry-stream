@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useDeferredValue, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown } } from 'lucide-react'; // Removed Sun, Moon icons
+import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react'; // Removed Sun, Moon icons
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -125,7 +125,7 @@ const InventoryManagementApp = () => {
   const [invoiceSortDirection, setInvoiceSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
-  const [selectedInvoices, setSelectedInvoices] = new Set();
+  const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -415,7 +415,7 @@ const InventoryManagementApp = () => {
         });
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
-        toast.success(`🗑️ ${selectedInvoices.size} invoices moved to Trash, stock returned.`);
+        toast.success(`🗑️ All invoices moved to Trash, stock returned.`);
         await logActivity('Bulk deleted invoices', 'Multiple', `${selectedInvoices.size} invoices`);
 
       } catch (error) {
@@ -835,7 +835,7 @@ const InventoryManagementApp = () => {
           <Suspense fallback={
             <Card className="p-12 text-center animate-pulse">
               <Upload className="h-20 w-20 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="2xl font-bold mb-2">Loading Data Management...</h3>
+              <h3 className="text-2xl font-bold mb-2">Loading Data Management...</h3>
               <p className="text-muted-foreground">Please wait while we load the data tools.</p>
             </Card>
           }>
