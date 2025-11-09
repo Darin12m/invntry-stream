@@ -3,12 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Printer, FileDown, X } from 'lucide-react';
 import { Invoice } from '../InventoryManagement';
+import { toast } from 'sonner'; // Import toast from sonner
 
 interface InvoiceViewerModalProps {
   showInvoiceViewer: boolean;
   setShowInvoiceViewer: (show: boolean) => void;
   viewingInvoice: Invoice | null;
-  toast: any; // Sonner toast instance
+  toast: typeof toast; // Corrected: Sonner toast instance
   Capacitor: any; // Capacitor instance
   html2canvas: any; // html2canvas library
   jsPDF: any; // jsPDF library

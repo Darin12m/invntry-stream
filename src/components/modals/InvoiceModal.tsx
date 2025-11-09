@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Search, Plus, Trash, X, Save, Loader2 } from 'lucide-react'; // Added Loader2 for spinner
 import { collection, addDoc, updateDoc, doc, getDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { Product, Invoice } from '../InventoryManagement'; // Import interfaces
-import { toast } from "sonner";
+import { toast } from "sonner"; // Import toast from sonner
 import { logActivity } from '@/utils/logActivity';
 import { User } from 'firebase/auth';
 
@@ -19,7 +19,7 @@ interface InvoiceModalProps {
   products: Product[];
   invoices: Invoice[]; // All invoices for generating new number
   db: any; // Firebase Firestore instance
-  toast: any; // Sonner toast instance
+  toast: typeof toast; // Corrected: Sonner toast instance
   currentUser: User | null;
 }
 
@@ -262,27 +262,36 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   };
 
   const handleSaveInvoice = async () => {
+    console.log("--- handleSaveInvoice initiated ---");
+    console.log("Current invoice state:", currentInvoice);
+    console.log("Invoice items:", invoiceItems);
+    console.log("Customer info:", customerInfo);
+
     if (!customerInfo.name.trim()) {
       toast.error('Please enter customer name');
+      console.log("Validation failed: Customer name missing.");
       return;
     }
     
     if (invoiceItems.length === 0) {
       toast.error('Please add at least one item to the invoice');
+      console.log("Validation failed: No invoice items.");
       return;
     }
 
     if (!validateInvoiceItems(invoiceItems)) {
       toast.error("Invalid invoice data: ensure all items have a valid product ID and non-negative numeric quantity.");
+      console.log("Validation failed: Invalid invoice items.");
       return;
     }
 
     if (!currentUser) {
       toast.error('User not authenticated.');
+      console.log("Validation failed: User not authenticated.");
       return;
     }
 
-    setIsSaving(true); // NEW: Set saving state
+    setIsSaving(true);
 
     const { subtotal, discount: discountAmount, total } = calculateInvoiceTotal();
     
@@ -304,67 +313,88 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
     try {
       if (editingInvoice) {
+        console.log("Action: Editing existing invoice.");
+        const payload = {
+          invoiceId: editingInvoice.id,
+          action: "edit",
+          newItems: invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+          idempotencyKey: `${editingInvoice.id}:edit:${Date.now()}`,
+          userId: currentUser.uid,
+          reason: `Invoice ${editingInvoice.number || editingInvoice.id} edited.`
+        };
+        console.log("Calling Netlify function apply-invoice-stock with payload:", payload);
+
         const response = await fetch('/.netlify/functions/apply-invoice-stock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            invoiceId: editingInvoice.id,
-            action: "edit",
-            newItems: invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
-            idempotencyKey: `${editingInvoice.id}:edit:${Date.now()}`,
-            userId: currentUser.uid,
-            reason: `Invoice ${editingInvoice.number || editingInvoice.id} edited.`
-          }),
+          body: JSON.stringify(payload),
         });
 
+        const responseText = await response.text(); // Get raw text to log
+        console.log("Netlify function response status:", response.status);
+        console.log("Netlify function response body:", responseText);
+
         if (!response.ok) {
-          const errorData = await response.json();
+          const errorData = JSON.parse(responseText); // Only parse if not ok
           throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
         }
 
         await updateDoc(doc(db, 'invoices', editingInvoice.id), {
           ...baseInvoiceData,
         });
-        toast.success('✅ Invoice updated successfully!'); // NEW: Success toast
+        toast.success('✅ Invoice updated successfully!');
         await logActivity("Updated invoice", baseInvoiceData.number || editingInvoice.id, `${invoiceItems.length} items`);
+        console.log("Invoice updated in Firestore.");
 
       } else {
+        console.log("Action: Creating new invoice.");
         const invoiceData = {
           ...baseInvoiceData,
           createdAt: serverTimestamp(),
         };
 
         const docRef = await addDoc(collection(db, "invoices"), invoiceData);
+        console.log("New invoice document created in Firestore with ID:", docRef.id);
         
+        const payload = {
+          invoiceId: docRef.id,
+          action: "create",
+          newItems: invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+          idempotencyKey: `${docRef.id}:create:${Date.now()}`,
+          userId: currentUser.uid,
+          reason: `Invoice ${invoiceData.number || docRef.id} created.`
+        };
+        console.log("Calling Netlify function apply-invoice-stock with payload:", payload);
+
         const response = await fetch('/.netlify/functions/apply-invoice-stock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            invoiceId: docRef.id,
-            action: "create",
-            newItems: invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
-            idempotencyKey: `${docRef.id}:create:${Date.now()}`,
-            userId: currentUser.uid,
-            reason: `Invoice ${invoiceData.number || docRef.id} created.`
-          }),
+          body: JSON.stringify(payload),
         });
 
+        const responseText = await response.text(); // Get raw text to log
+        console.log("Netlify function response status:", response.status);
+        console.log("Netlify function response body:", responseText);
+
         if (!response.ok) {
-          const errorData = await response.json();
+          const errorData = JSON.parse(responseText); // Only parse if not ok
           console.error("Netlify function error during invoice creation:", errorData);
           throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
         }
 
-        toast.success('✅ Invoice saved successfully!'); // NEW: Success toast
+        toast.success('✅ Invoice saved successfully!');
         await logActivity("Created invoice", invoiceData.number || docRef.id, `${invoiceItems.length} items`);
+        console.log("Stock changes applied via Netlify function.");
       }
       
       handleCloseInvoiceModal();
+      console.log("--- handleSaveInvoice completed successfully ---");
     } catch (error) {
       console.error('Error saving invoice:', error);
-      toast.error('❌ Failed to save invoice'); // NEW: Error toast
+      toast.error('❌ Failed to save invoice');
+      console.log("--- handleSaveInvoice failed ---");
     } finally {
-      setIsSaving(false); // NEW: Reset saving state
+      setIsSaving(false);
     }
   };
 
