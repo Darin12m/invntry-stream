@@ -33,7 +33,8 @@ import InvoiceModal from './modals/InvoiceModal';
 import InvoiceViewerModal from './modals/InvoiceViewerModal';
 import ColumnMappingModal from './modals/ColumnMappingModal';
 import SellHistoryModal from './modals/SellHistoryModal';
-import { ThemeToggle } from './ThemeToggle'; // NEW: Import ThemeToggle
+import SanityCheckModal from './modals/SanityCheckModal'; // NEW: Import SanityCheckModal
+import { ThemeToggle } from './ThemeToggle';
 
 import { logActivity } from '@/utils/logActivity';
 
@@ -414,7 +415,7 @@ const InventoryManagementApp = () => {
         });
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
-        toast.success(`🗑️ ${selectedInvoices.size} invoices moved to Trash, stock returned.`);
+        toast.success('🗑️ All invoices moved to Trash, stock returned.');
         await logActivity('Bulk deleted invoices', 'Multiple', `${selectedInvoices.size} invoices`);
 
       } catch (error) {
@@ -678,7 +679,7 @@ const InventoryManagementApp = () => {
 
             {/* User Profile Menu and Theme Toggle */}
             <div className="flex items-center space-x-4">
-              <ThemeToggle /> {/* NEW: Theme Toggle */}
+              <ThemeToggle />
               {currentUser && (
                 <Popover>
                   <PopoverTrigger asChild>
@@ -739,7 +740,7 @@ const InventoryManagementApp = () => {
                   </button>
                 ))}
               </div>
-              <ThemeToggle /> {/* NEW: Theme Toggle for mobile */}
+              <ThemeToggle />
               {currentUser && (
                 <Popover>
                   <PopoverTrigger asChild>
