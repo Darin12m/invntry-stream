@@ -518,9 +518,9 @@ const Settings: React.FC<SettingsProps> = ({ products, invoices, currentUser }) 
             <h4 className="font-semibold text-lg mb-4 flex items-center gap-2">
               <Download className="h-5 w-5 text-primary" /> Export Data
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <h5 className="font-medium text-sm text-muted-foreground">Inventory Exports</h5>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex flex-col gap-3">
+                <h5 className="text-sm font-semibold text-muted-foreground">Inventory Exports</h5>
                 <Button
                   onClick={() => exportToCSV(products, 'inventory-backup.csv')}
                   variant="outline"
@@ -540,8 +540,8 @@ const Settings: React.FC<SettingsProps> = ({ products, invoices, currentUser }) 
                   Export Inventory (JSON)
                 </Button>
               </div>
-              <div className="space-y-3">
-                <h5 className="font-medium text-sm text-muted-foreground">Invoice Exports</h5>
+              <div className="flex flex-col gap-3">
+                <h5 className="text-sm font-semibold text-muted-foreground">Invoice Exports</h5>
                 <Button
                   onClick={() => exportToCSV(invoices, 'invoice-log.csv')}
                   variant="outline"
@@ -593,7 +593,7 @@ const Settings: React.FC<SettingsProps> = ({ products, invoices, currentUser }) 
             variant="outline"
             className="flex-1"
           >
-            <Clock className="h-4 w-4 mr-2 text-indigo-600" />
+            <Clock className="w-4 h-4 mr-2 text-indigo-600" />
             View Activity Log
           </Button>
           <Button variant="outline" className="flex-1" disabled>
