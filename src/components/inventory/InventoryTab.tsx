@@ -243,7 +243,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                     </div>
                   </td>
                   <td className="p-4 text-right">
-                    <span className="font-medium text-primary">{product.price.toFixed(2)} ден.</span>
+                    <span className="font-medium text-primary">{(product.price ?? 0).toFixed(2)} ден.</span> {/* FIX: Added nullish coalescing for product.price */}
                   </td>
                   <td className="p-4">
                     <div className="flex gap-2 justify-end">
@@ -315,7 +315,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Price:</span>
-                    <span className="font-medium text-primary">{product.price.toFixed(2)} ден.</span>
+                    <span className="font-medium text-primary">{(product.price ?? 0).toFixed(2)} ден.</span> {/* FIX: Added nullish coalescing for product.price */}
                   </div>
                 </div>
               </div>
