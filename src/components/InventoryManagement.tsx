@@ -33,6 +33,7 @@ import InvoiceModal from './modals/InvoiceModal';
 import InvoiceViewerModal from './modals/InvoiceViewerModal';
 import ColumnMappingModal from './modals/ColumnMappingModal';
 import SellHistoryModal from './modals/SellHistoryModal';
+import { ThemeToggle } from './ThemeToggle'; // NEW: Import ThemeToggle
 
 import { logActivity } from '@/utils/logActivity';
 
@@ -143,7 +144,7 @@ const InventoryManagementApp = () => {
       setLoading(false);
     }, (error) => {
       console.error('Error loading products in real-time:', error);
-      toast.error('❌ Failed to load products'); // NEW: Error toast
+      toast.error('❌ Failed to load products');
       setLoading(false);
     });
 
@@ -160,7 +161,7 @@ const InventoryManagementApp = () => {
       setInvoices(invoicesData);
     }, (error) => {
       console.error('Error loading invoices in real-time:', error);
-      toast.error('❌ Failed to load invoices'); // NEW: Error toast
+      toast.error('❌ Failed to load invoices');
     });
 
     return () => unsubscribe();
@@ -169,11 +170,11 @@ const InventoryManagementApp = () => {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      toast.success('✅ Logged out successfully'); // NEW: Success toast
+      toast.success('✅ Logged out successfully');
       navigate('/login');
     } catch (error) {
       console.error('Logout error:', error);
-      toast.error('❌ Failed to log out'); // NEW: Error toast
+      toast.error('❌ Failed to log out');
     }
   };
 
@@ -278,11 +279,11 @@ const InventoryManagementApp = () => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
         await deleteDoc(doc(db, 'products', productId));
-        toast.success('✅ Product deleted successfully!'); // NEW: Success toast
+        toast.success('✅ Product deleted successfully!');
         await logActivity('Deleted product', productId);
       } catch (error) {
         console.error('Error deleting product:', error);
-        toast.error('❌ Failed to delete product'); // NEW: Error toast
+        toast.error('❌ Failed to delete product');
       }
     }
   };
@@ -300,11 +301,11 @@ const InventoryManagementApp = () => {
         );
         await Promise.all(deletePromises);
         setSelectedProducts(new Set());
-        toast.success(`✅ ${selectedProducts.size} products deleted successfully!`); // NEW: Success toast
+        toast.success(`✅ ${selectedProducts.size} products deleted successfully!`);
         await logActivity('Bulk deleted products', 'Multiple', `${selectedProducts.size} products`);
       } catch (error) {
         console.error('Error bulk deleting products:', error);
-        toast.error('❌ Failed to delete selected products'); // NEW: Error toast
+        toast.error('❌ Failed to delete selected products');
       }
     }
   };
@@ -321,11 +322,11 @@ const InventoryManagementApp = () => {
           deleteDoc(doc(db, 'products', product.id))
         );
         await Promise.all(deletePromises);
-        toast.success('✅ All products deleted successfully!'); // NEW: Success toast
+        toast.success('✅ All products deleted successfully!');
         await logActivity('Deleted all products', 'All', `${products.length} products`);
       } catch (error) {
         console.error('Error deleting all products:', error);
-        toast.error('❌ Failed to delete all products'); // NEW: Error toast
+        toast.error('❌ Failed to delete all products');
       }
     }
   };
@@ -333,7 +334,6 @@ const InventoryManagementApp = () => {
   async function handleDeleteInvoice(invoice: Invoice) {
     if (!invoice || !invoice.id || !currentUser) return;
 
-    // NEW: Specific confirmation dialog
     if (!window.confirm(`Are you sure you want to delete invoice #${invoice.number || invoice.id} for ${invoice.customer.name}? It will be moved to Trash and stock will be returned.`)) {
       return;
     }
@@ -364,11 +364,11 @@ const InventoryManagementApp = () => {
 
       await deleteDoc(doc(db, 'invoices', invoice.id));
 
-      toast.success('🗑️ Invoice moved to Trash, stock returned.'); // NEW: Success toast
+      toast.success('🗑️ Invoice moved to Trash, stock returned.');
       await logActivity('Deleted invoice', invoice.number || invoice.id, 'Moved to Trash');
     } catch (error) {
       console.error('Delete error:', error);
-      toast.error('❌ Failed to move invoice to Trash.'); // NEW: Error toast
+      toast.error('❌ Failed to move invoice to Trash.');
     }
   }
 
@@ -379,7 +379,7 @@ const InventoryManagementApp = () => {
     }
     if (!currentUser) return;
     
-    if (window.confirm(`Are you sure you want to delete ${selectedInvoices.size} selected invoice(s)? They will be moved to Trash and stock will be returned.`)) { // NEW: Specific confirmation
+    if (window.confirm(`Are you sure you want to delete ${selectedInvoices.size} selected invoice(s)? They will be moved to Trash and stock will be returned.`)) {
       try {
         const deletePromises = Array.from(selectedInvoices).map(async (invoiceId) => {
           const invoice = invoices.find(inv => inv.id === invoiceId);
@@ -414,12 +414,12 @@ const InventoryManagementApp = () => {
         });
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
-        toast.success(`🗑️ ${selectedInvoices.size} invoices moved to Trash, stock returned.`); // NEW: Success toast
+        toast.success(`🗑️ ${selectedInvoices.size} invoices moved to Trash, stock returned.`);
         await logActivity('Bulk deleted invoices', 'Multiple', `${selectedInvoices.size} invoices`);
 
       } catch (error) {
         console.error('Error bulk deleting invoices:', error);
-        toast.error('❌ Failed to delete invoices'); // NEW: Error toast
+        toast.error('❌ Failed to delete invoices');
       }
     }
   };
@@ -431,7 +431,7 @@ const InventoryManagementApp = () => {
     }
     if (!currentUser) return;
     
-    if (window.confirm(`Are you sure you want to delete ALL ${invoices.length} invoices? They will be moved to Trash and stock will be returned. This action cannot be undone.`)) { // NEW: Specific confirmation
+    if (window.confirm(`Are you sure you want to delete ALL ${invoices.length} invoices? They will be moved to Trash and stock will be returned. This action cannot be undone.`)) {
       try {
         const deletePromises = invoices.map(async (invoice) => {
           const response = await fetch('/.netlify/functions/apply-invoice-stock', {
@@ -462,12 +462,12 @@ const InventoryManagementApp = () => {
         });
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
-        toast.success('🗑️ All invoices moved to Trash, stock returned.'); // NEW: Success toast
+        toast.success('🗑️ All invoices moved to Trash, stock returned.');
         await logActivity('Deleted all invoices', 'All', `${invoices.length} invoices`);
 
       } catch (error) {
         console.error('Error deleting all invoices:', error);
-        toast.error('❌ Failed to delete all data'); // NEW: Error toast
+        toast.error('❌ Failed to delete all data');
       }
     }
   };
@@ -509,11 +509,11 @@ const InventoryManagementApp = () => {
         await Promise.all([...deleteProductsPromises, ...deleteInvoicesPromises]);
         
         setSelectedInvoices(new Set());
-        toast.success('✅ All data cleared successfully!'); // NEW: Success toast
+        toast.success('✅ All data cleared successfully!');
         await logActivity('Cleared all data', 'All Products and Invoices');
       } catch (error) {
         console.error('Error clearing all data:', error);
-        toast.error('❌ Failed to clear all data'); // NEW: Error toast
+        toast.error('❌ Failed to clear all data');
       }
     }
   };
@@ -565,7 +565,7 @@ const InventoryManagementApp = () => {
         setShowColumnMappingModal(true);
         
       } catch (error) {
-        toast.error('❌ Error reading Excel file. Please check the format.'); // NEW: Error toast
+        toast.error('❌ Error reading Excel file. Please check the format.');
       }
     };
     reader.readAsBinaryString(file);
@@ -583,7 +583,7 @@ const InventoryManagementApp = () => {
     a.href = url;
     a.download = filename;
     a.click();
-    toast.success(`✅ ${filename} exported successfully`); // NEW: Success toast
+    toast.success(`✅ ${filename} exported successfully`);
   };
 
   const exportToJSON = (data: any[], filename: string) => {
@@ -593,7 +593,7 @@ const InventoryManagementApp = () => {
     a.href = url;
     a.download = filename;
     a.click();
-    toast.success(`✅ ${filename} exported successfully`); // NEW: Success toast
+    toast.success(`✅ ${filename} exported successfully`);
   };
 
   const getFilteredInvoices = () => {
@@ -676,8 +676,9 @@ const InventoryManagementApp = () => {
               ))}
             </div>
 
-            {/* User Profile Menu */}
+            {/* User Profile Menu and Theme Toggle */}
             <div className="flex items-center space-x-4">
+              <ThemeToggle /> {/* NEW: Theme Toggle */}
               {currentUser && (
                 <Popover>
                   <PopoverTrigger asChild>
@@ -738,6 +739,7 @@ const InventoryManagementApp = () => {
                   </button>
                 ))}
               </div>
+              <ThemeToggle /> {/* NEW: Theme Toggle for mobile */}
               {currentUser && (
                 <Popover>
                   <PopoverTrigger asChild>
