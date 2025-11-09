@@ -1,198 +1,171 @@
+// netlify/functions/apply-invoice-stock.js
+// Safe, bulletproof stock movement handler for Netlify + Firestore
+
 const admin = require("firebase-admin");
 
-// Initialize Firebase Admin SDK
-let db;
-if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-  try {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: process.env.FIREBASE_PROJECT_ID
-      });
-    }
-    db = admin.firestore();
-  } catch (error) {
-    console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:", error);
-    throw new Error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON format.");
+if (!admin.apps.length) {
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON || !process.env.FIREBASE_PROJECT_ID) {
+    throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_PROJECT_ID env vars");
   }
-} else {
-  throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_JSON environment variable.");
+  const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  admin.initializeApp({
+    credential: admin.credential.cert(sa),
+    projectId: process.env.FIREBASE_PROJECT_ID,
+  });
 }
 
-exports.handler = async (event, context) => {
-  if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ message: "Method Not Allowed" }),
-    };
+const db = admin.firestore();
+
+/** Convert to safe number */
+const toNum = (val) => {
+  const n = Number(val);
+  return isNaN(n) || !isFinite(n) ? 0 : n;
+};
+
+/** Merge lines by productId, summing qty */
+function normalizeItems(items = []) {
+  const map = {};
+  for (const it of items) {
+    const pid = it.productId;
+    if (!pid) continue;
+    const qty = toNum(it.qty);
+    map[pid] = (map[pid] || 0) + qty;
+  }
+  return map;
+}
+
+/** Compute per-product qty deltas between old and new */
+function computeDeltas(oldItems = [], newItems = [], action) {
+  const oldMap = normalizeItems(oldItems);
+  const newMap = normalizeItems(newItems);
+  const deltas = {};
+
+  // CREATE or RESTORE → subtract from stock
+  if (action === "create" || action === "restore") {
+    for (const pid of Object.keys(newMap)) {
+      const q = -toNum(newMap[pid]);
+      if (q !== 0) deltas[pid] = q;
+    }
   }
 
-  try {
-    const { invoiceId, action, newItems, idempotencyKey, userId, reason } = JSON.parse(event.body);
+  // EDIT → diff old and new
+  if (action === "edit") {
+    const all = new Set([...Object.keys(oldMap), ...Object.keys(newMap)]);
+    for (const pid of all) {
+      const diff = toNum(oldMap[pid]) - toNum(newMap[pid]);
+      if (diff !== 0) deltas[pid] = diff;
+    }
+  }
 
-    if (!invoiceId || !action || !newItems || !idempotencyKey || !userId) {
+  // DELETE → restore old qty
+  if (action === "delete") {
+    for (const pid of Object.keys(oldMap)) {
+      const q = toNum(oldMap[pid]);
+      if (q !== 0) deltas[pid] = q;
+    }
+  }
+
+  return deltas;
+}
+
+exports.handler = async (event) => {
+  try {
+    if (event.httpMethod !== "POST") {
+      return { statusCode: 405, body: "Method not allowed" };
+    }
+
+    const body = JSON.parse(event.body || "{}");
+    const { invoiceId, action, newItems = [], idempotencyKey, userId, reason } = body;
+
+    if (!invoiceId || !action || !idempotencyKey) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ message: "Missing required parameters: invoiceId, action, newItems, idempotencyKey, userId." }),
+        body: JSON.stringify({ message: "Missing invoiceId, action, or idempotencyKey" }),
       };
     }
 
-    let movedCount = 0;
+    const invoiceRef = db.collection("invoices_server_copies").doc(invoiceId);
+    const movementsRef = db.collection("stock_movements");
 
-    await db.runTransaction(async (transaction) => {
-      const invoiceServerCopyRef = db.collection("invoices_server_copies").doc(invoiceId);
-      const invoiceServerCopySnap = await transaction.get(invoiceServerCopyRef);
+    let moved = 0;
 
-      const oldItems = invoiceServerCopySnap.exists
-        ? (invoiceServerCopySnap.data()).items || []
-        : [];
-
-      // Idempotency check: If a stock movement with this key already exists, skip.
-      const idempotencyQuery = db.collection("stock_movements").where("idempotencyKey", "==", idempotencyKey);
-      const existingMovementsSnap = await transaction.get(idempotencyQuery);
-      if (!existingMovementsSnap.empty) {
-        console.log(`Idempotency key ${idempotencyKey} already processed. Skipping.`);
-        return; // Exit transaction, no-op
+    await db.runTransaction(async (txn) => {
+      // Check idempotency
+      const idemSnap = await txn.get(
+        movementsRef.where("idempotencyKey", "==", idempotencyKey).limit(1)
+      );
+      if (!idemSnap.empty) {
+        console.log("Duplicate idempotent call:", idempotencyKey);
+        throw { code: "IDEMPOTENT", message: "Already processed" };
       }
 
-      const productUpdates = {}; // productId -> delta
-      const stockMovements = [];
+      // Load server copy
+      const invoiceSnap = await txn.get(invoiceRef);
+      const oldData = invoiceSnap.exists ? invoiceSnap.data() : {};
+      const oldItems = oldData.items || [];
 
-      // Helper to add a movement and update product delta
-      const addMovement = (
-        productId,
-        sku,
-        qtyDelta,
-        type,
-        reason,
-        docLineId = productId, // Default to productId if not provided
-        locationId = "main_warehouse" // Default location
-      ) => {
-        stockMovements.push({
-          productId,
-          sku,
-          qtyDelta,
-          locationId,
-          type,
-          docId: invoiceId,
-          docLineId,
-          idempotencyKey,
-          userId,
-          reason,
-          ts_utc: admin.firestore.FieldValue.serverTimestamp(),
+      const deltas = computeDeltas(oldItems, newItems, action);
+
+      // Record movements + update products
+      for (const [pid, qtyDeltaRaw] of Object.entries(deltas)) {
+        const qtyDelta = toNum(qtyDeltaRaw);
+        if (!qtyDelta || isNaN(qtyDelta)) continue; // skip invalid
+        const prodRef = db.collection("products").doc(pid);
+
+        txn.set(
+          movementsRef.doc(),
+          {
+            productId: pid,
+            qtyDelta,
+            type: `invoice_${action}`,
+            docId: invoiceId,
+            idempotencyKey,
+            userId: userId || "system",
+            reason: reason || "",
+            ts_utc: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        txn.update(prodRef, {
+          onHand: admin.firestore.FieldValue.increment(qtyDelta),
         });
-        productUpdates[productId] = (productUpdates[productId] || 0) + qtyDelta;
-      };
-
-      if (action === "create") {
-        for (const newItem of newItems) {
-          addMovement(
-            newItem.productId,
-            newItem.sku,
-            -newItem.quantity, // Stock decreases on creation
-            "invoice_create",
-            reason || `Invoice ${invoiceId} created: ${newItem.quantity} units of ${newItem.sku} sold.`
-          );
-        }
-      } else if (action === "edit") {
-        const oldItemsMap = new Map(oldItems.map((item) => [item.productId, item]));
-        const newItemsMap = new Map(newItems.map((item) => [item.productId, item]));
-
-        // Items present in old but not in new (removed or quantity reduced)
-        for (const oldItem of oldItems) {
-          if (!newItemsMap.has(oldItem.productId)) {
-            // Item removed
-            addMovement(
-              oldItem.productId,
-              oldItem.sku,
-              oldItem.quantity, // Stock increases (returned)
-              "invoice_edit",
-              reason || `Invoice ${invoiceId} edited: ${oldItem.quantity} units of ${oldItem.sku} returned.`
-            );
-          } else {
-            // Item quantity changed
-            const newItem = newItemsMap.get(oldItem.productId);
-            const delta = oldItem.quantity - newItem.quantity;
-            if (delta !== 0) {
-              addMovement(
-                oldItem.productId,
-                oldItem.sku,
-                delta,
-                "invoice_edit",
-                reason || `Invoice ${invoiceId} edited: ${newItem.sku} quantity changed by ${delta}.`
-              );
-            }
-          }
-        }
-
-        // Items present in new but not in old (added or quantity increased)
-        for (const newItem of newItems) {
-          if (!oldItemsMap.has(newItem.productId)) {
-            // Item added
-            addMovement(
-              newItem.productId,
-              newItem.sku,
-              -newItem.quantity, // Stock decreases
-              "invoice_edit",
-              reason || `Invoice ${invoiceId} edited: ${newItem.quantity} units of ${newItem.sku} added.`
-            );
-          }
-        }
-      } else if (action === "delete") {
-        for (const oldItem of oldItems) {
-          addMovement(
-            oldItem.productId,
-            oldItem.sku,
-            oldItem.quantity, // Stock increases (returned)
-            "invoice_delete",
-            reason || `Invoice ${invoiceId} deleted: ${oldItem.quantity} units of ${oldItem.sku} returned.`
-          );
-        }
-      } else if (action === "restore") {
-        for (const oldItem of oldItems) {
-          addMovement(
-            oldItem.productId,
-            oldItem.sku,
-            -oldItem.quantity, // Stock decreases (re-sold)
-            "invoice_restore",
-            reason || `Invoice ${invoiceId} restored: ${oldItem.quantity} units of ${oldItem.sku} re-sold.`
-          );
-        }
+        moved++;
       }
 
-      // Apply product updates and log movements
-      for (const productId in productUpdates) {
-        const productRef = db.collection("products").doc(productId);
-        transaction.update(productRef, {
-          onHand: admin.firestore.FieldValue.increment(productUpdates[productId]),
-        });
+      // Save server copy of invoice
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      if (action === "delete") {
+        txn.set(invoiceRef, { ...oldData, status: "deleted", updatedAt: now }, { merge: true });
+      } else {
+        txn.set(
+          invoiceRef,
+          { items: newItems, status: "active", updatedAt: now },
+          { merge: true }
+        );
       }
-
-      for (const movement of stockMovements) {
-        const movementRef = db.collection("stock_movements").doc(); // Auto-generate ID
-        transaction.set(movementRef, movement);
-        movedCount++;
-      }
-
-      // Save updated invoice copy
-      transaction.set(invoiceServerCopyRef, {
-        invoiceId,
-        items: action === "delete" ? oldItems : newItems, // If deleting, save old items for potential restore
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        status: action === "delete" ? "deleted" : "active", // Update status based on action
-      });
     });
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ ok: true, moved: movedCount }),
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ok: true, moved }),
     };
-  } catch (error) {
-    console.error("Error in apply-invoice-stock function:", error);
+  } catch (e) {
+    // Allow idempotent duplicate to return ok:true without movement
+    if (e && e.code === "IDEMPOTENT") {
+      return {
+        statusCode: 200,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ok: true, idempotent: true, moved: 0 }),
+      };
+    }
+
+    console.error("apply-invoice-stock error", e);
     return {
       statusCode: 500,
-      body: JSON.stringify({ message: error.message || "Failed to apply invoice stock changes." }),
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ok: false, message: e.message || String(e) }),
     };
   }
 };
