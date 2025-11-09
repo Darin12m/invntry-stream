@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useDeferredValue, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Sun, Moon } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown } } from 'lucide-react'; // Removed Sun, Moon icons
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -33,8 +33,8 @@ import InvoiceModal from './modals/InvoiceModal';
 import InvoiceViewerModal from './modals/InvoiceViewerModal';
 import ColumnMappingModal from './modals/ColumnMappingModal';
 import SellHistoryModal from './modals/SellHistoryModal';
-import SanityCheckModal from './modals/SanityCheckModal'; // NEW: Import SanityCheckModal
-import { ThemeToggle } from './ThemeToggle';
+import SanityCheckModal from './modals/SanityCheckModal'; 
+// import { ThemeToggle } from './ThemeToggle'; // REMOVED: ThemeToggle
 
 import { logActivity } from '@/utils/logActivity';
 
@@ -125,7 +125,7 @@ const InventoryManagementApp = () => {
   const [invoiceSortDirection, setInvoiceSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
-  const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
+  const [selectedInvoices, setSelectedInvoices] = new Set();
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -409,13 +409,13 @@ const InventoryManagementApp = () => {
               deletedAt: serverTimestamp(),
             });
 
-            return deleteDoc(doc(db, 'invoices', invoiceId));
+            return deleteDoc(doc(db, 'invoices', invoice.id));
           }
           return Promise.resolve();
         });
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
-        toast.success('🗑️ All invoices moved to Trash, stock returned.');
+        toast.success(`🗑️ ${selectedInvoices.size} invoices moved to Trash, stock returned.`);
         await logActivity('Bulk deleted invoices', 'Multiple', `${selectedInvoices.size} invoices`);
 
       } catch (error) {
@@ -677,9 +677,8 @@ const InventoryManagementApp = () => {
               ))}
             </div>
 
-            {/* User Profile Menu and Theme Toggle */}
+            {/* User Profile Menu */}
             <div className="flex items-center space-x-4">
-              <ThemeToggle />
               {currentUser && (
                 <Popover>
                   <PopoverTrigger asChild>
@@ -740,7 +739,6 @@ const InventoryManagementApp = () => {
                   </button>
                 ))}
               </div>
-              <ThemeToggle />
               {currentUser && (
                 <Popover>
                   <PopoverTrigger asChild>
@@ -837,7 +835,7 @@ const InventoryManagementApp = () => {
           <Suspense fallback={
             <Card className="p-12 text-center animate-pulse">
               <Upload className="h-20 w-20 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-2xl font-bold mb-2">Loading Data Management...</h3>
+              <h3 className="2xl font-bold mb-2">Loading Data Management...</h3>
               <p className="text-muted-foreground">Please wait while we load the data tools.</p>
             </Card>
           }>

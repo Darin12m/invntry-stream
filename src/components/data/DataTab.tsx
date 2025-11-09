@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Download, Trash, Clock, Loader2, BarChart3 } from 'lucide-react'; // Added Loader2 icon and BarChart3
+import { Upload, Download, Trash, Clock, Loader2, BarChart3, Sun, Moon } from 'lucide-react'; // Added Sun, Moon icons
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,8 @@ import { toast } from 'sonner';
 import { logActivity } from '@/utils/logActivity';
 import ActivityLogModal from '../modals/ActivityLogModal';
 import { User } from 'firebase/auth';
-import SanityCheckModal from '../modals/SanityCheckModal'; // NEW: Import SanityCheckModal
+import SanityCheckModal from '../modals/SanityCheckModal';
+import { useTheme } from 'next-themes'; // NEW: Import useTheme
 
 interface DataTabProps {
   products: Product[];
@@ -177,8 +178,10 @@ const DataTab: React.FC<DataTabProps> = ({
 }) => {
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [isClearingAll, setIsClearingAll] = useState(false);
-  const [showSanityCheckModal, setShowSanityCheckModal] = useState(false); // NEW: State for SanityCheckModal
-  const [isSanityCheckRunning, setIsSanityCheckRunning] = useState(false); // NEW: State for button loading
+  const [showSanityCheckModal, setShowSanityCheckModal] = useState(false);
+  const [isSanityCheckRunning, setIsSanityCheckRunning] = useState(false);
+
+  const { theme, setTheme } = useTheme(); // NEW: Get theme and setTheme
 
   const handleClearAllDataWithLoading = async () => {
     setIsClearingAll(true);
@@ -191,12 +194,12 @@ const DataTab: React.FC<DataTabProps> = ({
 
   const handleRunSanityCheck = () => {
     setShowSanityCheckModal(true);
-    setIsSanityCheckRunning(true); // Set loading state for the button
+    setIsSanityCheckRunning(true);
   };
 
   const handleCloseSanityCheckModal = (result?: SanityCheckResult | null) => {
     setShowSanityCheckModal(false);
-    setIsSanityCheckRunning(false); // Reset loading state for the button
+    setIsSanityCheckRunning(false);
 
     if (result) {
       if (result.ok) {
@@ -209,6 +212,10 @@ const DataTab: React.FC<DataTabProps> = ({
     }
   };
 
+  const toggleTheme = () => { // NEW: Theme toggle function
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -217,12 +224,30 @@ const DataTab: React.FC<DataTabProps> = ({
           <h2 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Data Management</h2>
           <p className="text-muted-foreground mt-1">Import, export, and manage your data</p>
         </div>
-        <div className="flex gap-3"> {/* NEW: Group buttons */}
+        <div className="flex gap-3">
+          {/* NEW: Theme Toggle Button */}
+          <Button
+            onClick={toggleTheme}
+            variant="outline"
+            className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 transition text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200"
+          >
+            {theme === 'dark' ? (
+              <>
+                <Sun className="w-4 h-4 text-yellow-500" />
+                <span className="text-sm font-medium">Light Mode</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-4 h-4 text-blue-500" />
+                <span className="text-sm font-medium">Dark Mode</span>
+              </>
+            )}
+          </Button>
           <Button
             onClick={handleRunSanityCheck}
             variant="outline"
             className="flex items-center gap-2 px-3 py-2 rounded-md bg-orange-100 hover:bg-orange-200 transition text-orange-700"
-            disabled={isSanityCheckRunning} // Disable button while check is running
+            disabled={isSanityCheckRunning}
           >
             {isSanityCheckRunning ? (
               <>
@@ -231,7 +256,7 @@ const DataTab: React.FC<DataTabProps> = ({
               </>
             ) : (
               <>
-                <BarChart3 className="w-4 h-4 text-orange-600" /> {/* Using BarChart3 for sanity check */}
+                <BarChart3 className="w-4 h-4 text-orange-600" />
                 <span className="text-sm font-medium">Run Sanity Check</span>
               </>
             )}

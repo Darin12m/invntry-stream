@@ -7,13 +7,13 @@ import Index from './pages/Index';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
 import ScrollToTop from './components/ScrollToTop';
-import { ThemeProvider } from './components/ThemeProvider'; // NEW: Import ThemeProvider
+import { ThemeProvider } from './components/ThemeProvider';
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme"> {/* NEW: Wrap with ThemeProvider */}
+    <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme"> {/* UPDATED: defaultTheme to 'light' */}
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -27,7 +27,7 @@ const App = () => (
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
-    </ThemeProvider> {/* NEW: Close ThemeProvider */}
+    </ThemeProvider>
   </QueryClientProvider>
 );
 
