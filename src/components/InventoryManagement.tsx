@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useDeferredValue, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react'; // Removed Sun, Moon icons
+import { Search, Plus, Edit, Trash2, Package, FileText, Upload, Download, Save, Printer, X, Eye, Calendar, DollarSign, Hash, ShoppingCart, Trash, FileDown, BarChart3, TrendingUp, Users, TrendingDown, LogOut, User as UserIcon, ArrowUpDown, ChevronUp, ChevronDown, Settings as SettingsIcon } from 'lucide-react'; // Added SettingsIcon
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -24,8 +24,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import InventoryTab from './inventory/InventoryTab';
 import InvoicesTab from './invoices/InvoicesTab';
 import DashboardTab from './dashboard/DashboardTab';
-// Lazy load DataTab for code splitting
-const LazyDataTab = React.lazy(() => import('./data/DataTab'));
+import Settings from '@/pages/Settings'; // Import the new Settings page
 
 // Import new modal components
 import ProductModal from './modals/ProductModal';
@@ -33,8 +32,7 @@ import InvoiceModal from './modals/InvoiceModal';
 import InvoiceViewerModal from './modals/InvoiceViewerModal';
 import ColumnMappingModal from './modals/ColumnMappingModal';
 import SellHistoryModal from './modals/SellHistoryModal';
-import SanityCheckModal from './modals/SanityCheckModal'; 
-// import { ThemeToggle } from './ThemeToggle'; // REMOVED: ThemeToggle
+// SanityCheckModal and ActivityLogModal are now handled within Settings.tsx
 
 import { logActivity } from '@/utils/logActivity';
 
@@ -100,23 +98,13 @@ const InventoryManagementApp = () => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showInvoiceViewer, setShowInvoiceViewer] = useState(false);
-  const [showColumnMappingModal, setShowColumnMappingModal] = useState(false);
+  // ColumnMappingModal is now handled within Settings.tsx
   const [selectedProductForHistory, setSelectedProductForHistory] = useState<Product | null>(null);
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
-  const [excelData, setExcelData] = useState<any[]>([]);
-  const [excelColumns, setExcelColumns] = useState<string[]>([]);
-  const [columnMapping, setColumnMapping] = useState({
-    name: '',
-    sku: '',
-    quantity: '',
-    price: '',
-    category: '',
-    purchasePrice: '',
-  });
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Excel related states are now handled within Settings.tsx
   
   const [sortColumn, setSortColumn] = useState<'name' | 'sku' | 'category' | 'quantity' | 'price'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -473,51 +461,7 @@ const InventoryManagementApp = () => {
     }
   };
 
-  const handleClearAllData = async () => {
-    if (products.length === 0 && invoices.length === 0) {
-      toast.error('No data to clear');
-      return;
-    }
-    if (!currentUser) return;
-    
-    if (window.confirm('⚠️ WARNING: This will delete ALL products and invoices permanently. This action cannot be undone. Are you absolutely sure?')) {
-      try {
-        const deleteProductsPromises = products.map((product) =>
-          deleteDoc(doc(db, 'products', product.id))
-        );
-        const deleteInvoicesPromises = invoices.map(async (invoice) => {
-          const response = await fetch('/.netlify/functions/apply-invoice-stock', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              invoiceId: invoice.id,
-              action: 'delete',
-              newItems: invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
-              idempotencyKey: `${invoice.id}:clear-all:${Date.now()}`,
-              userId: currentUser.uid,
-              reason: `Invoice ${invoice.number || invoice.id} deleted (clear all).`,
-            }),
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
-          }
-
-          return deleteDoc(doc(db, 'invoices', invoice.id));
-        });
-        
-        await Promise.all([...deleteProductsPromises, ...deleteInvoicesPromises]);
-        
-        setSelectedInvoices(new Set());
-        toast.success('✅ All data cleared successfully!');
-        await logActivity('Cleared all data', 'All Products and Invoices');
-      } catch (error) {
-        console.error('Error clearing all data:', error);
-        toast.error('❌ Failed to clear all data');
-      }
-    }
-  };
+  // handleClearAllData is now moved to Settings.tsx
 
   const handleCreateInvoice = () => {
     setEditingInvoice(null);
@@ -534,68 +478,7 @@ const InventoryManagementApp = () => {
     setShowInvoiceViewer(true);
   };
 
-  const handleImportExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const workbook = XLSX.read(e.target?.result, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-        if (jsonData.length === 0) {
-          toast.error('Excel file is empty');
-          return;
-        }
-
-        const columns = Object.keys(jsonData[0]);
-        
-        setExcelData(jsonData);
-        setExcelColumns(columns);
-        setColumnMapping({
-          name: '',
-          sku: '',
-          quantity: '',
-          price: '',
-          category: '',
-          purchasePrice: '',
-        });
-        setShowColumnMappingModal(true);
-        
-      } catch (error) {
-        toast.error('❌ Error reading Excel file. Please check the format.');
-      }
-    };
-    reader.readAsBinaryString(file);
-  };
-
-  const exportToCSV = (data: any[], filename: string) => {
-    const csv = [
-      Object.keys(data[0]).join(','),
-      ...data.map(row => Object.values(row).join(',')),
-    ].join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    toast.success(`✅ ${filename} exported successfully`);
-  };
-
-  const exportToJSON = (data: any[], filename: string) => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    toast.success(`✅ ${filename} exported successfully`);
-  };
+  // handleImportExcel, exportToCSV, exportToJSON are now moved to Settings.tsx
 
   const getFilteredInvoices = () => {
     return invoices.filter(invoice => {
@@ -660,7 +543,7 @@ const InventoryManagementApp = () => {
                 { key: 'inventory', label: 'Inventory', icon: Package },
                 { key: 'invoices', label: 'Invoices', icon: FileText },
                 { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-                { key: 'data', label: 'Data', icon: Upload },
+                { key: 'settings', label: 'Settings', icon: SettingsIcon }, // Changed 'data' to 'settings'
               ].map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
@@ -724,7 +607,7 @@ const InventoryManagementApp = () => {
                   { key: 'inventory', icon: Package },
                   { key: 'invoices', icon: FileText },
                   { key: 'dashboard', icon: BarChart3 },
-                  { key: 'data', icon: Upload },
+                  { key: 'settings', icon: SettingsIcon }, // Changed 'data' to 'settings'
                 ].map(({ key, icon: Icon }) => (
                   <button
                     key={key}
@@ -831,27 +714,12 @@ const InventoryManagementApp = () => {
             products={products}
           />
         )}
-        {activeTab === 'data' && (
-          <Suspense fallback={
-            <Card className="p-12 text-center animate-pulse">
-              <Upload className="h-20 w-20 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-2xl font-bold mb-2">Loading Data Management...</h3>
-              <p className="text-muted-foreground">Please wait while we load the data tools.</p>
-            </Card>
-          }>
-            <LazyDataTab
-              products={products}
-              invoices={invoices}
-              handleClearAllData={handleClearAllData}
-              handleImportExcel={handleImportExcel}
-              exportToCSV={exportToCSV}
-              exportToJSON={exportToJSON}
-              fileInputRef={fileInputRef}
-              db={db}
-              toast={toast}
-              currentUser={currentUser}
-            />
-          </Suspense>
+        {activeTab === 'settings' && ( // Changed 'data' to 'settings'
+          <Settings
+            products={products}
+            invoices={invoices}
+            currentUser={currentUser}
+          />
         )}
       </main>
 
@@ -889,17 +757,7 @@ const InventoryManagementApp = () => {
         jsPDF={jsPDF}
       />
 
-      {/* Column Mapping Modal */}
-      <ColumnMappingModal
-        showColumnMappingModal={showColumnMappingModal}
-        setShowColumnMappingModal={setShowColumnMappingModal}
-        excelData={excelData}
-        excelColumns={excelColumns}
-        columnMapping={columnMapping}
-        setColumnMapping={setColumnMapping}
-        db={db}
-        toast={toast}
-      />
+      {/* Column Mapping Modal is now handled within Settings.tsx */}
 
       {/* Sell History Modal */}
       {selectedProductForHistory && (
