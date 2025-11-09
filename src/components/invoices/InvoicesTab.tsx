@@ -1,8 +1,8 @@
 import React from 'react';
 import { FileText, Trash2, Plus, Eye, Edit, Trash, CheckSquare, Square, ChevronUp, ChevronDown, User as UserIcon, Calendar, DollarSign } from 'lucide-react';
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Invoice } from '../InventoryManagement'; // Import Invoice interface
 
 interface InvoicesTabProps {
@@ -110,7 +110,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
             { key: 'number' as const, label: 'Invoice #' },
             { key: 'date' as const, label: 'Date' },
             { key: 'customer' as const, label: 'Customer' },
-            { key: 'total' as const, label: 'Amount' }
+            { key: 'total' as const, label: 'Amount' },
           ].map(({ key, label }) => (
             <Button
               key={key}

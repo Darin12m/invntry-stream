@@ -1,7 +1,7 @@
 import React from 'react';
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { X, Upload } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 import { Product } from '../InventoryManagement'; // Import Product interface
@@ -44,7 +44,7 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
 
   const handleConfirmImport = async () => {
     if (!columnMapping.name || !columnMapping.sku || !columnMapping.quantity || !columnMapping.price) {
-      toast.error("Please map all required fields (Name, SKU, Quantity, Price)");
+      toast.error('Please map all required fields (Name, SKU, Quantity, Price)');
       return;
     }
 
@@ -56,8 +56,8 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
         price: parseFloat(row[columnMapping.price] || 0),
         category: columnMapping.category ? (row[columnMapping.category] || 'Uncategorized') : 'Uncategorized',
         ...(columnMapping.purchasePrice && row[columnMapping.purchasePrice] && { 
-          purchasePrice: parseFloat(row[columnMapping.purchasePrice] || 0) 
-        })
+          purchasePrice: parseFloat(row[columnMapping.purchasePrice] || 0), 
+        }),
       })).filter(product => product.name && product.sku); // Filter out invalid rows
 
       const importPromises = importedProducts.map((product) =>
@@ -67,7 +67,7 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
 
       setShowColumnMappingModal(false);
       setColumnMapping({
-        name: '', sku: '', quantity: '', price: '', category: '', purchasePrice: ''
+        name: '', sku: '', quantity: '', price: '', category: '', purchasePrice: '',
       });
       
       toast.success(`Successfully imported ${importedProducts.length} products!`);

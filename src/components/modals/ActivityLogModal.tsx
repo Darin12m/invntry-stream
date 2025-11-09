@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   collection,
   query,
@@ -8,11 +8,11 @@ import {
   getDocs,
   DocumentData,
   QueryDocumentSnapshot,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Corrected Firebase import path
-import { Clock, X } from "lucide-react"; // Added X icon for close button
-import { Button } from "@/components/ui/button"; // Using shadcn Button
-import { Card } from "@/components/ui/card"; // Using shadcn Card
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase'; // Corrected Firebase import path
+import { Clock, X } from 'lucide-react'; // Added X icon for close button
+import { Button } from '@/components/ui/button'; // Using shadcn Button
+import { Card } from '@/components/ui/card'; // Using shadcn Card
 
 interface ActivityLogEntry extends DocumentData {
   id: string;
@@ -40,8 +40,8 @@ export default function ActivityLogModal({ onClose }: ActivityLogModalProps) {
     setLoading(true);
     try {
       const baseQuery = query(
-        collection(db, "activityLogs"),
-        orderBy("timestamp", "desc"),
+        collection(db, 'activityLogs'),
+        orderBy('timestamp', 'desc'),
         ...(isInitial || !lastDoc ? [limit(25)] : [startAfter(lastDoc), limit(25)])
       );
 
@@ -53,7 +53,7 @@ export default function ActivityLogModal({ onClose }: ActivityLogModalProps) {
       setLastDoc(lastVisible || null);
       setHasMore(snap.docs.length === 25);
     } catch (err) {
-      console.error("Failed to load logs:", err);
+      console.error('Failed to load logs:', err);
     } finally {
       setLoading(false);
     }
@@ -92,14 +92,14 @@ export default function ActivityLogModal({ onClose }: ActivityLogModalProps) {
                 key={log.id}
                 className="border-b border-border/50 pb-2 text-sm text-foreground last:border-b-0"
               >
-                <span className="font-medium">{log.user || "Unknown user"}</span>{" "}
-                {log.action}{" "}
+                <span className="font-medium">{log.user || 'Unknown user'}</span>{' '}
+                {log.action}{' '}
                 <span className="font-semibold">{log.target}</span>
                 {log.details ? <span> — {log.details}</span> : null}
                 <div className="text-xs text-muted-foreground mt-1">
                   {log.timestamp?.toDate
                     ? log.timestamp.toDate().toLocaleString()
-                    : ""}
+                    : ''}
                 </div>
               </li>
             ))}

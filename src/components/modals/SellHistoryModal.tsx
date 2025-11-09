@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   collection,
   getDocs,
   query,
   where,
   Timestamp,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Correct Firebase import path
-import { Clock, X } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner"; // Correct toast import
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase'; // Correct Firebase import path
+import { Clock, X } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner'; // Correct toast import
 import { Product, Invoice } from '../InventoryManagement'; // Import Product and Invoice interfaces
 
 interface SellHistoryModalProps {
@@ -21,7 +21,7 @@ interface SellHistoryModalProps {
 }
 
 const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, db, toast }) => {
-  const [history, setHistory] = useState<Array<Invoice & { status: "Active" | "Deleted" }>>([]);
+  const [history, setHistory] = useState<Array<Invoice & { status: 'Active' | 'Deleted' }>>([]);
 
   useEffect(() => {
     if (!product) {
@@ -33,14 +33,14 @@ const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, d
       try {
         // Active invoices
         const activeQ = query(
-          collection(db, "invoices"),
-          where("itemsIds", "array-contains", product.id)
+          collection(db, 'invoices'),
+          where('itemsIds', 'array-contains', product.id)
         );
 
         // Deleted invoices
         const deletedQ = query(
-          collection(db, "deletedInvoices"),
-          where("itemsIds", "array-contains", product.id)
+          collection(db, 'deletedInvoices'),
+          where('itemsIds', 'array-contains', product.id)
         );
 
         const [activeSnap, deletedSnap] = await Promise.all([
@@ -51,27 +51,27 @@ const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, d
         const active = activeSnap.docs.map((d) => ({
           id: d.id,
           ...d.data(),
-          status: "Active",
-        })) as Array<Invoice & { status: "Active" | "Deleted" }>;
+          status: 'Active',
+        })) as Array<Invoice & { status: 'Active' | 'Deleted' }>;
 
         const deleted = deletedSnap.docs.map((d) => ({
           id: d.id,
           ...d.data(),
-          status: "Deleted",
-        })) as Array<Invoice & { status: "Active" | "Deleted" }>;
+          status: 'Deleted',
+        })) as Array<Invoice & { status: 'Active' | 'Deleted' }>;
 
         const combined = [...active, ...deleted].sort(
           (a, b) => {
-            const dateA = a.status === "Active" ? (a.createdAt?.toDate().getTime() || new Date(a.date).getTime()) : (a.deletedAt?.toDate().getTime() || new Date(a.date).getTime());
-            const dateB = b.status === "Active" ? (b.createdAt?.toDate().getTime() || new Date(b.date).getTime()) : (b.deletedAt?.toDate().getTime() || new Date(b.date).getTime());
+            const dateA = a.status === 'Active' ? (a.createdAt?.toDate().getTime() || new Date(a.date).getTime()) : (a.deletedAt?.toDate().getTime() || new Date(a.date).getTime());
+            const dateB = b.status === 'Active' ? (b.createdAt?.toDate().getTime() || new Date(b.date).getTime()) : (b.deletedAt?.toDate().getTime() || new Date(b.date).getTime());
             return dateB - dateA; // Descending order
           }
         );
 
         setHistory(combined);
       } catch (err) {
-        console.error("Failed to load product history:", err);
-        toast.error("Failed to load sell history.");
+        console.error('Failed to load product history:', err);
+        toast.error('Failed to load sell history.');
       }
     }
 
@@ -123,10 +123,10 @@ const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, d
                       (i) => i.productId === product.id
                     );
 
-                    const isDeleted = inv.status === "Deleted";
+                    const isDeleted = inv.status === 'Deleted';
                     const rowStyle = isDeleted
-                      ? "text-muted-foreground italic"
-                      : "text-foreground";
+                      ? 'text-muted-foreground italic'
+                      : 'text-foreground';
 
                     return (
                       <tr key={inv.id} className="border-b border-border hover:bg-muted/20 transition-colors">
@@ -136,13 +136,13 @@ const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, d
                         <td className={`py-2 px-4 ${rowStyle}`}>{inv.number || inv.id}</td>
                         <td
                           className={`py-2 px-4 font-medium ${
-                            isDeleted ? "text-destructive" : "text-success"
+                            isDeleted ? 'text-destructive' : 'text-success'
                           }`}
                         >
-                          {isDeleted ? "🔴 Deleted" : "🟢 Active"}
+                          {isDeleted ? '🔴 Deleted' : '🟢 Active'}
                         </td>
                         <td className={`py-2 px-4 ${rowStyle} capitalize`}>
-                          {inv.invoiceType || "sale"}
+                          {inv.invoiceType || 'sale'}
                         </td>
                         <td className={`py-2 px-4 text-right ${rowStyle}`}>{item?.quantity || 0}</td>
                       </tr>

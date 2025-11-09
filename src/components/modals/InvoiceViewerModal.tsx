@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Printer, FileDown, X } from 'lucide-react';
 import { Invoice } from '../InventoryManagement'; // Import Invoice interface
 
@@ -67,7 +67,7 @@ const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
         allowTaint: true,
         backgroundColor: '#ffffff',
         windowWidth: 794,
-        windowHeight: 1123
+        windowHeight: 1123,
       });
 
       document.body.removeChild(tempContainer);
@@ -197,62 +197,62 @@ const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
             <div className="invoice-container">
               {/* Header */}
               <div className="invoice-header" style={{
-                display: "flex",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                marginBottom: "30px",
+                display: 'flex',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                marginBottom: '30px',
               }}>
-                <div style={{ flex: "1" }}>
+                <div style={{ flex: '1' }}>
                   <h1 style={{
-                    margin: "0",
-                    fontSize: "32px",
-                    fontWeight: "bold",
+                    margin: '0',
+                    fontSize: '32px',
+                    fontWeight: 'bold',
                   }}>WeParty.</h1>
                   <p style={{
-                    margin: "0",
-                    fontSize: "14px",
-                    color: "#666",
+                    margin: '0',
+                    fontSize: '14px',
+                    color: '#666',
                   }}>PARTY DECOR</p>
                 </div>
                 <div className="company-info" style={{
-                  textAlign: "right",
-                  fontSize: "12px",
-                  flex: "1",
-                  lineHeight: "1.6",
+                  textAlign: 'right',
+                  fontSize: '12px',
+                  flex: '1',
+                  lineHeight: '1.6',
                 }}>
-                  <p style={{ margin: "2px 0" }}>ПАРТИЛАБ увоз-извоз ДОО Скопје</p>
-                  <p style={{ margin: "2px 0" }}>Друштво за трговија и услуги</p>
-                  <p style={{ margin: "2px 0" }}>ул. Гари 65Б/1-2, Карпош, Скопје</p>
-                  <p style={{ margin: "2px 0" }}>Даночен број: 4057025575047</p>
-                  <p style={{ margin: "2px 0" }}>Трансакциска сметка: 270078458980186</p>
-                  <p style={{ margin: "2px 0" }}>Халк Банка АД Скопје</p>
+                  <p style={{ margin: '2px 0' }}>ПАРТИЛАБ увоз-извоз ДОО Скопје</p>
+                  <p style={{ margin: '2px 0' }}>Друштво за трговија и услуги</p>
+                  <p style={{ margin: '2px 0' }}>ул. Гари 65Б/1-2, Карпош, Скопје</p>
+                  <p style={{ margin: '2px 0' }}>Даночен број: 4057025575047</p>
+                  <p style={{ margin: '2px 0' }}>Трансакциска сметка: 270078458980186</p>
+                  <p style={{ margin: '2px 0' }}>Халк Банка АД Скопје</p>
                 </div>
               </div>
 
               {/* Invoice Number and Customer Info Row */}
               <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: "30px",
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginBottom: '30px',
               }}>
                 {/* Left - Invoice Number */}
                 <div>
                   <h2 style={{
-                    margin: "0 0 5px 0",
-                    fontSize: "22px",
-                    fontWeight: "bold",
-                    color: "#6366f1",
+                    margin: '0 0 5px 0',
+                    fontSize: '22px',
+                    fontWeight: 'bold',
+                    color: '#6366f1',
                   }}>
                     ФАКТУРА Бр. #{viewingInvoice.number}
                   </h2>
                   <p style={{
-                    margin: "0",
-                    fontSize: "14px",
-                    color: "#666",
+                    margin: '0',
+                    fontSize: '14px',
+                    color: '#666',
                   }}>
                     Датум: {new Date(viewingInvoice.date).toLocaleDateString('mk-MK', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')}г.
                   </p>
-                  <p style={{ margin: "0", fontSize: "14px", color: "#666" }}>
+                  <p style={{ margin: '0', fontSize: '14px', color: '#666' }}>
                     Тип: {viewingInvoice.invoiceType === 'refund'
                       ? 'ВРАЌАЊЕ / РЕФУНД'
                       : viewingInvoice.invoiceType === 'writeoff'
@@ -262,20 +262,20 @@ const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
                 </div>
                 
                 {/* Right - Customer Info */}
-                <div style={{ textAlign: "right" }}>
+                <div style={{ textAlign: 'right' }}>
                   <p style={{
-                    margin: "0 0 5px 0",
-                    fontSize: "14px",
-                    fontWeight: "bold",
-                    color: "#6366f1",
+                    margin: '0 0 5px 0',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: '#6366f1',
                   }}>
                     Клиент:
                   </p>
-                  <p style={{ margin: "2px 0", fontSize: "14px", fontWeight: "bold" }}>
+                  <p style={{ margin: '2px 0', fontSize: '14px', fontWeight: 'bold' }}>
                     {viewingInvoice.customer.name}
                   </p>
                   {viewingInvoice.customer.phone && (
-                    <p style={{ margin: "2px 0", fontSize: "14px" }}>
+                    <p style={{ margin: '2px 0', fontSize: '14px' }}>
                       Телефон: {viewingInvoice.customer.phone}
                     </p>
                   )}
@@ -284,73 +284,73 @@ const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
 
               {/* Table */}
               <table style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                marginBottom: "20px",
+                width: '100%',
+                borderCollapse: 'collapse',
+                marginBottom: '20px',
               }}>
                 <thead>
                   <tr>
                     <th style={{
-                      border: "1px solid #ddd",
-                      padding: "8px",
-                      textAlign: "center",
-                      fontSize: "12px",
-                      backgroundColor: "#f9f9f9",
-                      fontWeight: "bold",
-                      width: "40px",
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                      fontSize: '12px',
+                      backgroundColor: '#f9f9f9',
+                      fontWeight: 'bold',
+                      width: '40px',
                     }}>Бр.</th>
                     <th style={{
-                      border: "1px solid #ddd",
-                      padding: "8px",
-                      textAlign: "left",
-                      fontSize: "12px",
-                      backgroundColor: "#f9f9f9",
-                      fontWeight: "bold",
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'left',
+                      fontSize: '12px',
+                      backgroundColor: '#f9f9f9',
+                      fontWeight: 'bold',
                     }}>Име на производ</th>
                     <th style={{
-                      border: "1px solid #ddd",
-                      padding: "8px",
-                      textAlign: "center",
-                      fontSize: "12px",
-                      backgroundColor: "#f9f9f9",
-                      fontWeight: "bold",
-                      width: "80px",
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                      fontSize: '12px',
+                      backgroundColor: '#f9f9f9',
+                      fontWeight: 'bold',
+                      width: '80px',
                     }}>Количина</th>
                     <th style={{
-                      border: "1px solid #ddd",
-                      padding: "8px",
-                      textAlign: "right",
-                      fontSize: "12px",
-                      backgroundColor: "#f9f9f9",
-                      fontWeight: "bold",
-                      width: "100px",
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'right',
+                      fontSize: '12px',
+                      backgroundColor: '#f9f9f9',
+                      fontWeight: 'bold',
+                      width: '100px',
                     }}>Цена без ДДВ</th>
                     <th style={{
-                      border: "1px solid #ddd",
-                      padding: "8px",
-                      textAlign: "center",
-                      fontSize: "12px",
-                      backgroundColor: "#f9f9f9",
-                      fontWeight: "bold",
-                      width: "70px",
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                      fontSize: '12px',
+                      backgroundColor: '#f9f9f9',
+                      fontWeight: 'bold',
+                      width: '70px',
                     }}>ДДВ (%)</th>
                     <th style={{
-                      border: "1px solid #ddd",
-                      padding: "8px",
-                      textAlign: "center",
-                      fontSize: "12px",
-                      backgroundColor: "#f9f9f9",
-                      fontWeight: "bold",
-                      width: "80px",
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'center',
+                      fontSize: '12px',
+                      backgroundColor: '#f9f9f9',
+                      fontWeight: 'bold',
+                      width: '80px',
                     }}>Попуст (%)</th>
                     <th style={{
-                      border: "1px solid #ddd",
-                      padding: "8px",
-                      textAlign: "right",
-                      fontSize: "12px",
-                      backgroundColor: "#f9f9f9",
-                      fontWeight: "bold",
-                      width: "100px",
+                      border: '1px solid #ddd',
+                      padding: '8px',
+                      textAlign: 'right',
+                      fontSize: '12px',
+                      backgroundColor: '#f9f9f9',
+                      fontWeight: 'bold',
+                      width: '100px',
                     }}>Вкупно</th>
                   </tr>
                 </thead>
@@ -359,59 +359,59 @@ const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
                     viewingInvoice.items.map((item, i) => (
                       <tr key={i}>
                         <td style={{
-                          border: "1px solid #ddd",
-                          padding: "8px",
-                          textAlign: "center",
-                          fontSize: "12px",
+                          border: '1px solid #ddd',
+                          padding: '8px',
+                          textAlign: 'center',
+                          fontSize: '12px',
                         }}>{i + 1}</td>
                         <td style={{
-                          border: "1px solid #ddd",
-                          padding: "8px",
-                          textAlign: "left",
-                          fontSize: "12px",
+                          border: '1px solid #ddd',
+                          padding: '8px',
+                          textAlign: 'left',
+                          fontSize: '12px',
                         }}>{item.name}</td>
                         <td style={{
-                          border: "1px solid #ddd",
-                          padding: "8px",
-                          textAlign: "center",
-                          fontSize: "12px",
+                          border: '1px solid #ddd',
+                          padding: '8px',
+                          textAlign: 'center',
+                          fontSize: '12px',
                           color: item.quantity < 0 ? '#dc2626' : 'inherit',
-                          fontWeight: item.quantity < 0 ? 'bold' : 'normal'
+                          fontWeight: item.quantity < 0 ? 'bold' : 'normal',
                         }}>{item.quantity}</td>
                         <td style={{
-                          border: "1px solid #ddd",
-                          padding: "8px",
-                          textAlign: "right",
-                          fontSize: "12px",
+                          border: '1px solid #ddd',
+                          padding: '8px',
+                          textAlign: 'right',
+                          fontSize: '12px',
                         }}>{item.price.toFixed(2)} ден</td>
                         <td style={{
-                          border: "1px solid #ddd",
-                          padding: "8px",
-                          textAlign: "center",
-                          fontSize: "12px",
+                          border: '1px solid #ddd',
+                          padding: '8px',
+                          textAlign: 'center',
+                          fontSize: '12px',
                         }}>0%</td>
                         <td style={{
-                          border: "1px solid #ddd",
-                          padding: "8px",
-                          textAlign: "center",
-                          fontSize: "12px",
+                          border: '1px solid #ddd',
+                          padding: '8px',
+                          textAlign: 'center',
+                          fontSize: '12px',
                         }}>{viewingInvoice.discountPercentage > 0 ? `${viewingInvoice.discountPercentage}%` : '5%'}</td>
                         <td style={{
-                          border: "1px solid #ddd",
-                          padding: "8px",
-                          textAlign: "right",
-                          fontSize: "12px",
+                          border: '1px solid #ddd',
+                          padding: '8px',
+                          textAlign: 'right',
+                          fontSize: '12px',
                         }}>{(item.price * item.quantity).toFixed(2)} ден</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
                       <td colSpan={7} style={{
-                        border: "1px solid #ddd",
-                        padding: "10px",
-                        textAlign: "center",
-                        fontSize: "12px",
-                        color: "#888"
+                        border: '1px solid #ddd',
+                        padding: '10px',
+                        textAlign: 'center',
+                        fontSize: '12px',
+                        color: '#888',
                       }}>
                         Нема внесени ставки
                       </td>
@@ -422,64 +422,64 @@ const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
 
               {/* Totals */}
               <div style={{
-                textAlign: "right",
-                fontSize: "14px",
-                marginTop: "10px",
-                marginBottom: "40px",
+                textAlign: 'right',
+                fontSize: '14px',
+                marginTop: '10px',
+                marginBottom: '40px',
               }}>
-                <p style={{ margin: "5px 0" }}>
-                  Меѓузбир: <span style={{ marginLeft: "20px" }}>{viewingInvoice.subtotal.toFixed(2)} ден</span>
+                <p style={{ margin: '5px 0' }}>
+                  Меѓузбир: <span style={{ marginLeft: '20px' }}>{viewingInvoice.subtotal.toFixed(2)} ден</span>
                 </p>
                 {viewingInvoice.discountPercentage > 0 && (
-                  <p style={{ margin: "5px 0", color: "#dc2626" }}>
-                    Попуст: <span style={{ marginLeft: "20px" }}>-{viewingInvoice.discount.toFixed(2)} ден</span>
+                  <p style={{ margin: '5px 0', color: '#dc2626' }}>
+                    Попуст: <span style={{ marginLeft: '20px' }}>-{viewingInvoice.discount.toFixed(2)} ден</span>
                   </p>
                 )}
-                <p style={{ margin: "5px 0" }}>
-                  ДДВ (18%): <span style={{ marginLeft: "20px" }}>0.00 ден</span>
+                <p style={{ margin: '5px 0' }}>
+                  ДДВ (18%): <span style={{ marginLeft: '20px' }}>0.00 ден</span>
                 </p>
                 <p style={{ 
-                  margin: "10px 0 0 0",
-                  fontSize: "18px",
-                  fontWeight: "bold",
-                  color: "#6366f1",
-                  borderTop: "2px solid #ddd",
-                  paddingTop: "10px"
+                  margin: '10px 0 0 0',
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#6366f1',
+                  borderTop: '2px solid #ddd',
+                  paddingTop: '10px',
                 }}>
-                  ВКУПНО: <span style={{ marginLeft: "20px" }}>{viewingInvoice.total.toFixed(2)} ден</span>
+                  ВКУПНО: <span style={{ marginLeft: '20px' }}>{viewingInvoice.total.toFixed(2)} ден</span>
                 </p>
               </div>
 
               {/* Signature Section */}
               <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginTop: "60px",
-                marginBottom: "40px",
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginTop: '60px',
+                marginBottom: '40px',
               }}>
-                <div style={{ textAlign: "center", flex: "1" }}>
-                  <p style={{ margin: "0 0 40px 0", fontSize: "14px" }}>Издал</p>
-                  <div style={{ borderBottom: "1px solid #000", width: "200px", margin: "0 auto" }}></div>
+                <div style={{ textAlign: 'center', flex: '1' }}>
+                  <p style={{ margin: '0 0 40px 0', fontSize: '14px' }}>Издал</p>
+                  <div style={{ borderBottom: '1px solid #000', width: '200px', margin: '0 auto' }}></div>
                 </div>
-                <div style={{ textAlign: "center", flex: "1" }}>
-                  <p style={{ margin: "0 0 40px 0", fontSize: "14px" }}>Примил</p>
-                  <div style={{ borderBottom: "1px solid #000", width: "200px", margin: "0 auto" }}></div>
+                <div style={{ textAlign: 'center', flex: '1' }}>
+                  <p style={{ margin: '0 0 40px 0', fontSize: '14px' }}>Примил</p>
+                  <div style={{ borderBottom: '1px solid #000', width: '200px', margin: '0 auto' }}></div>
                 </div>
               </div>
 
               {/* Footer */}
               <div style={{
-                textAlign: "center",
-                fontSize: "12px",
-                color: "#666",
-                marginTop: "20px",
-                borderTop: "1px solid #ddd",
-                paddingTop: "15px",
+                textAlign: 'center',
+                fontSize: '12px',
+                color: '#666',
+                marginTop: '20px',
+                borderTop: '1px solid #ddd',
+                paddingTop: '15px',
               }}>
-                <p style={{ margin: "0" }}>
+                <p style={{ margin: '0' }}>
                   Благодариме за вашата доверба!
                 </p>
-                <p style={{ margin: "5px 0 0 0", fontSize: "11px" }}>
+                <p style={{ margin: '5px 0 0 0', fontSize: '11px' }}>
                   Генерирано на: {new Date().toLocaleDateString('mk-MK', { day: '2-digit', month: '2-digit', year: 'numeric' })} во {new Date().toLocaleTimeString('mk-MK', { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>

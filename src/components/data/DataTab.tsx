@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, Download, Trash, Clock } from 'lucide-react'; // Added Clock icon
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; // Import Timestamp
 import { Product, Invoice } from '../InventoryManagement'; // Import Product and Invoice interfaces
-import { toast } from "sonner"; // Correct import for sonner toast
+import { toast } from 'sonner'; // Correct import for sonner toast
 import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
 import ActivityLogModal from '../modals/ActivityLogModal'; // NEW: Import ActivityLogModal
 import { User } from 'firebase/auth'; // NEW: Import User type
@@ -28,7 +28,7 @@ function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: an
   const [trashInvoices, setTrashInvoices] = useState<Invoice[]>([]); // Use Invoice interface
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "deletedInvoices"), (snap) => {
+    const unsub = onSnapshot(collection(db, 'deletedInvoices'), (snap) => {
       setTrashInvoices(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Invoice))); // Cast to Invoice
     });
     return () => unsub();
@@ -44,11 +44,11 @@ function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: an
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           invoiceId: invoice.id,
-          action: "restore",
+          action: 'restore',
           newItems: invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
           idempotencyKey: `${invoice.id}:restore:${Date.now()}`,
           userId: currentUser.uid,
-          reason: `Invoice ${invoice.number || invoice.id} restored.`
+          reason: `Invoice ${invoice.number || invoice.id} restored.`,
         }),
       });
 
@@ -58,35 +58,35 @@ function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: an
       }
 
       // 2️⃣ Restore invoice to main collection
-      await setDoc(doc(db, "invoices", invoice.id), {
+      await setDoc(doc(db, 'invoices', invoice.id), {
         ...invoice,
         restoredAt: serverTimestamp(),
       });
 
       // 3️⃣ Remove from deletedInvoices
-      await deleteDoc(doc(db, "deletedInvoices", invoice.id));
+      await deleteDoc(doc(db, 'deletedInvoices', invoice.id));
 
-      toast.success("♻️ Invoice restored and stock adjusted.");
-      await logActivity("Restored invoice", invoice.number || invoice.id); // Log activity
+      toast.success('♻️ Invoice restored and stock adjusted.');
+      await logActivity('Restored invoice', invoice.number || invoice.id); // Log activity
     } catch (error) {
-      console.error("Restore error:", error);
-      toast.error("❌ Failed to restore invoice.");
+      console.error('Restore error:', error);
+      toast.error('❌ Failed to restore invoice.');
     }
   };
 
   const handleDeleteForever = async (invoice: Invoice) => {
     if (!invoice || !currentUser) return;
     const confirmDel = window.confirm(
-      `Permanently delete invoice for ${invoice.customer?.name || "Unnamed"}? This will NOT affect stock.`
+      `Permanently delete invoice for ${invoice.customer?.name || 'Unnamed'}? This will NOT affect stock.`
     );
     if (!confirmDel) return;
 
     // No stock adjustment needed here as stock was already returned when it was "deleted"
     // and this is a permanent deletion from trash.
 
-    await deleteDoc(doc(db, "deletedInvoices", invoice.id));
-    toast.success("🔥 Invoice permanently deleted (stock unchanged).");
-    await logActivity("Deleted invoice permanently", invoice.number || invoice.id); // Log activity
+    await deleteDoc(doc(db, 'deletedInvoices', invoice.id));
+    toast.success('🔥 Invoice permanently deleted (stock unchanged).');
+    await logActivity('Deleted invoice permanently', invoice.number || invoice.id); // Log activity
   };
 
   return (
@@ -100,11 +100,11 @@ function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: an
           className="flex justify-between items-center p-3 rounded-lg shadow-card"
         >
           <div>
-            <p className="font-semibold">{inv.customer?.name || "Unnamed"}</p>
+            <p className="font-semibold">{inv.customer?.name || 'Unnamed'}</p>
             <p className="text-xs text-muted-foreground">
               {inv.deletedAt?.seconds // Access seconds property of Timestamp
                 ? new Date(inv.deletedAt.seconds * 1000).toLocaleDateString()
-                : "Unknown Date"}
+                : 'Unknown Date'}
             </p>
           </div>
           <div className="flex gap-3">

@@ -1,10 +1,10 @@
 import React from 'react';
 import { Search, Plus, Edit, Trash2, Trash, X, ChevronUp, ChevronDown, Package, CheckSquare, Square, Clock } from 'lucide-react'; // NEW: Import Clock icon
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Product } from '../InventoryManagement'; // Import Product interface
 
 interface InventoryTabProps {
@@ -365,10 +365,10 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
           </h3>
           <p className="text-muted-foreground mb-6">
             {products.length === 0 
-              ? "Add your first product using the + button above to get started with your inventory." 
+              ? 'Add your first product using the + button above to get started with your inventory.' 
               : localSearchInput 
                 ? `No products match "${localSearchInput}". Try adjusting your search.`
-                : "No products match the selected filters. Try different filter options."}
+                : 'No products match the selected filters. Try different filter options.'}
           </p>
           {products.length === 0 && (
             <Button onClick={handleAddProduct} className="transition-all duration-200 hover:scale-105">

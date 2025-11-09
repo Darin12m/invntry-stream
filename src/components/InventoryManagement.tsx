@@ -5,20 +5,20 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
 import { Capacitor } from '@capacitor/core';
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { toast } from "sonner";
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { toast } from 'sonner';
 import { db, auth, storage } from '@/lib/firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, getDocs, where, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; // Import Timestamp
 import { signOut, User } from 'firebase/auth';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 // Import the new tab components
 import InventoryTab from './inventory/InventoryTab';
@@ -89,7 +89,7 @@ const InventoryManagementApp = () => {
   const [activeTab, setActiveTab] = useState('inventory');
   const [dateFilter, setDateFilter] = useState({ 
     from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // Start of year
-    to: new Date().toISOString().split('T')[0] // Today
+    to: new Date().toISOString().split('T')[0], // Today
   });
   const [products, setProducts] = useState<Product[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -118,7 +118,7 @@ const InventoryManagementApp = () => {
     quantity: '',
     price: '',
     category: '',
-    purchasePrice: ''
+    purchasePrice: '',
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -148,7 +148,7 @@ const InventoryManagementApp = () => {
     const unsubscribe = onSnapshot(productsQuery, (querySnapshot) => {
       const productsData = querySnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Product[];
       setProducts(productsData);
       setLoading(false);
@@ -167,7 +167,7 @@ const InventoryManagementApp = () => {
     const unsubscribe = onSnapshot(invoicesQuery, (querySnapshot) => {
       const invoicesData = querySnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Invoice[];
       setInvoices(invoicesData);
     }, (error) => {
@@ -181,7 +181,7 @@ const InventoryManagementApp = () => {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      toast.success("Logged out successfully");
+      toast.success('Logged out successfully');
       navigate('/login');
     } catch (error) {
       console.error('Logout error:', error);
@@ -298,8 +298,8 @@ const InventoryManagementApp = () => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
         await deleteDoc(doc(db, 'products', productId));
-        toast.success("Product deleted successfully");
-        await logActivity("Deleted product", productId); // Log activity
+        toast.success('Product deleted successfully');
+        await logActivity('Deleted product', productId); // Log activity
         // Data will reload automatically via onSnapshot
       } catch (error) {
         console.error('Error deleting product:', error);
@@ -311,7 +311,7 @@ const InventoryManagementApp = () => {
   // 2. Bulk delete products
   const handleBulkDeleteProducts = async () => {
     if (selectedProducts.size === 0) {
-      toast.error("Please select products to delete.");
+      toast.error('Please select products to delete.');
       return;
     }
 
@@ -323,7 +323,7 @@ const InventoryManagementApp = () => {
         await Promise.all(deletePromises);
         setSelectedProducts(new Set()); // Clear selection after deletion
         toast.success(`${selectedProducts.size} products deleted successfully`);
-        await logActivity("Bulk deleted products", "Multiple", `${selectedProducts.size} products`); // Log activity
+        await logActivity('Bulk deleted products', 'Multiple', `${selectedProducts.size} products`); // Log activity
       } catch (error) {
         console.error('Error bulk deleting products:', error);
         toast.error('Failed to delete selected products');
@@ -334,7 +334,7 @@ const InventoryManagementApp = () => {
   // 3. Delete all products
   const handleDeleteAllProducts = async () => {
     if (products.length === 0) {
-      toast.error("No products to delete");
+      toast.error('No products to delete');
       return;
     }
     
@@ -344,8 +344,8 @@ const InventoryManagementApp = () => {
           deleteDoc(doc(db, 'products', product.id))
         );
         await Promise.all(deletePromises);
-        toast.success("All products deleted successfully");
-        await logActivity("Deleted all products", "All", `${products.length} products`); // Log activity
+        toast.success('All products deleted successfully');
+        await logActivity('Deleted all products', 'All', `${products.length} products`); // Log activity
         // Data will reload automatically via onSnapshot
       } catch (error) {
         console.error('Error deleting all products:', error);
@@ -369,11 +369,11 @@ const InventoryManagementApp = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           invoiceId: invoice.id,
-          action: "delete",
+          action: 'delete',
           newItems: invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
           idempotencyKey: `${invoice.id}:delete:${Date.now()}`,
           userId: currentUser.uid,
-          reason: `Invoice ${invoice.number || invoice.id} deleted.`
+          reason: `Invoice ${invoice.number || invoice.id} deleted.`,
         }),
       });
 
@@ -383,26 +383,26 @@ const InventoryManagementApp = () => {
       }
 
       // 2️⃣ Move invoice to deletedInvoices
-      await setDoc(doc(db, "deletedInvoices", invoice.id), {
+      await setDoc(doc(db, 'deletedInvoices', invoice.id), {
         ...invoice,
         deletedAt: serverTimestamp(),
       });
 
       // 3️⃣ Delete from main collection
-      await deleteDoc(doc(db, "invoices", invoice.id));
+      await deleteDoc(doc(db, 'invoices', invoice.id));
 
-      toast.success("🗑️ Invoice moved to Trash, stock returned.");
-      await logActivity("Deleted invoice", invoice.number || invoice.id, "Moved to Trash"); // Log activity
+      toast.success('🗑️ Invoice moved to Trash, stock returned.');
+      await logActivity('Deleted invoice', invoice.number || invoice.id, 'Moved to Trash'); // Log activity
     } catch (error) {
-      console.error("Delete error:", error);
-      toast.error("❌ Failed to move invoice to Trash.");
+      console.error('Delete error:', error);
+      toast.error('❌ Failed to move invoice to Trash.');
     }
   }
 
   // 5. Bulk delete invoices
   const handleBulkDeleteInvoices = async () => {
     if (selectedInvoices.size === 0) {
-      toast.error("Please select invoices to delete");
+      toast.error('Please select invoices to delete');
       return;
     }
     if (!currentUser) return;
@@ -418,11 +418,11 @@ const InventoryManagementApp = () => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 invoiceId: invoice.id,
-                action: "delete",
+                action: 'delete',
                 newItems: invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
                 idempotencyKey: `${invoice.id}:bulk-delete:${Date.now()}`,
                 userId: currentUser.uid,
-                reason: `Invoice ${invoice.number || invoice.id} bulk deleted.`
+                reason: `Invoice ${invoice.number || invoice.id} bulk deleted.`,
               }),
             });
 
@@ -438,7 +438,7 @@ const InventoryManagementApp = () => {
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
         toast.success(`${selectedInvoices.size} invoices deleted successfully`);
-        await logActivity("Bulk deleted invoices", "Multiple", `${selectedInvoices.size} invoices`); // Log activity
+        await logActivity('Bulk deleted invoices', 'Multiple', `${selectedInvoices.size} invoices`); // Log activity
 
       } catch (error) {
         console.error('Error bulk deleting invoices:', error);
@@ -450,7 +450,7 @@ const InventoryManagementApp = () => {
   // 6. Delete all invoices
   const handleDeleteAllInvoices = async () => {
     if (invoices.length === 0) {
-      toast.error("No invoices to delete");
+      toast.error('No invoices to delete');
       return;
     }
     if (!currentUser) return;
@@ -464,11 +464,11 @@ const InventoryManagementApp = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               invoiceId: invoice.id,
-              action: "delete",
+              action: 'delete',
               newItems: invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
               idempotencyKey: `${invoice.id}:delete-all:${Date.now()}`,
               userId: currentUser.uid,
-              reason: `Invoice ${invoice.number || invoice.id} deleted (all).`
+              reason: `Invoice ${invoice.number || invoice.id} deleted (all).`,
             }),
           });
 
@@ -481,8 +481,8 @@ const InventoryManagementApp = () => {
         });
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
-        toast.success("All invoices deleted successfully");
-        await logActivity("Deleted all invoices", "All", `${invoices.length} invoices`); // Log activity
+        toast.success('All invoices deleted successfully');
+        await logActivity('Deleted all invoices', 'All', `${invoices.length} invoices`); // Log activity
 
       } catch (error) {
         console.error('Error deleting all invoices:', error);
@@ -494,12 +494,12 @@ const InventoryManagementApp = () => {
   // 9. Clear all data (nuclear option)
   const handleClearAllData = async () => {
     if (products.length === 0 && invoices.length === 0) {
-      toast.error("No data to clear");
+      toast.error('No data to clear');
       return;
     }
     if (!currentUser) return;
     
-    if (window.confirm("⚠️ WARNING: This will delete ALL products and invoices permanently. This action cannot be undone. Are you absolutely sure?")) {
+    if (window.confirm('⚠️ WARNING: This will delete ALL products and invoices permanently. This action cannot be undone. Are you absolutely sure?')) {
       try {
         // Delete all products and invoices in parallel
         const deleteProductsPromises = products.map((product) =>
@@ -512,11 +512,11 @@ const InventoryManagementApp = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               invoiceId: invoice.id,
-              action: "delete",
+              action: 'delete',
               newItems: invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
               idempotencyKey: `${invoice.id}:clear-all:${Date.now()}`,
               userId: currentUser.uid,
-              reason: `Invoice ${invoice.number || invoice.id} deleted (clear all).`
+              reason: `Invoice ${invoice.number || invoice.id} deleted (clear all).`,
             }),
           });
 
@@ -531,8 +531,8 @@ const InventoryManagementApp = () => {
         await Promise.all([...deleteProductsPromises, ...deleteInvoicesPromises]);
         
         setSelectedInvoices(new Set());
-        toast.success("All data cleared successfully");
-        await logActivity("Cleared all data", "All Products and Invoices"); // Log activity
+        toast.success('All data cleared successfully');
+        await logActivity('Cleared all data', 'All Products and Invoices'); // Log activity
       } catch (error) {
         console.error('Error clearing all data:', error);
         toast.error('Failed to clear all data');
@@ -570,7 +570,7 @@ const InventoryManagementApp = () => {
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
         if (jsonData.length === 0) {
-          toast.error("Excel file is empty");
+          toast.error('Excel file is empty');
           return;
         }
 
@@ -586,12 +586,12 @@ const InventoryManagementApp = () => {
           quantity: '',
           price: '',
           category: '',
-          purchasePrice: ''
+          purchasePrice: '',
         });
         setShowColumnMappingModal(true);
         
       } catch (error) {
-        toast.error("Error reading Excel file. Please check the format.");
+        toast.error('Error reading Excel file. Please check the format.');
       }
     };
     reader.readAsBinaryString(file);
@@ -600,7 +600,7 @@ const InventoryManagementApp = () => {
   const exportToCSV = (data: any[], filename: string) => {
     const csv = [
       Object.keys(data[0]).join(','),
-      ...data.map(row => Object.values(row).join(','))
+      ...data.map(row => Object.values(row).join(',')),
     ].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -667,7 +667,7 @@ const InventoryManagementApp = () => {
       numberOfInvoices,
       totalNegativeQuantity,
       totalNegativeValue,
-      filteredInvoices
+      filteredInvoices,
     };
   };
 
@@ -688,7 +688,7 @@ const InventoryManagementApp = () => {
                 { key: 'inventory', label: 'Inventory', icon: Package },
                 { key: 'invoices', label: 'Invoices', icon: FileText },
                 { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-                { key: 'data', label: 'Data', icon: Upload }
+                { key: 'data', label: 'Data', icon: Upload },
               ].map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
@@ -752,7 +752,7 @@ const InventoryManagementApp = () => {
                   { key: 'inventory', icon: Package },
                   { key: 'invoices', icon: FileText },
                   { key: 'dashboard', icon: BarChart3 },
-                  { key: 'data', icon: Upload }
+                  { key: 'data', icon: Upload },
                 ].map(({ key, icon: Icon }) => (
                   <button
                     key={key}

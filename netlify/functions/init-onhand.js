@@ -1,4 +1,4 @@
-const admin = require("firebase-admin");
+const admin = require('firebase-admin');
 
 // Initialize Firebase Admin SDK
 let db;
@@ -8,37 +8,37 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
     if (!admin.apps.length) {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
-        projectId: process.env.FIREBASE_PROJECT_ID
+        projectId: process.env.FIREBASE_PROJECT_ID,
       });
     }
     db = admin.firestore();
   } catch (error) {
-    console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:", error);
-    throw new Error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON format.");
+    console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:', error);
+    throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT_JSON format.');
   }
 } else {
-  throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_JSON environment variable.");
+  throw new Error('Missing FIREBASE_SERVICE_ACCOUNT_JSON environment variable.');
 }
 
 exports.handler = async (event, context) => {
-  if (event.httpMethod !== "GET") {
+  if (event.httpMethod !== 'GET') {
     return {
       statusCode: 405,
-      body: JSON.stringify({ message: "Method Not Allowed" }),
+      body: JSON.stringify({ message: 'Method Not Allowed' }),
     };
   }
 
-  console.log("Starting Netlify-triggered onHand initialization...");
+  console.log('Starting Netlify-triggered onHand initialization...');
 
   try {
-    const productsRef = db.collection("products");
+    const productsRef = db.collection('products');
     const snapshot = await productsRef.get();
 
     if (snapshot.empty) {
-      console.log("No products found to initialize.");
+      console.log('No products found to initialize.');
       return {
         statusCode: 200,
-        body: JSON.stringify({ ok: true, updated: 0, message: "No products found to initialize." }),
+        body: JSON.stringify({ ok: true, updated: 0, message: 'No products found to initialize.' }),
       };
     }
 
@@ -74,12 +74,12 @@ exports.handler = async (event, context) => {
       };
     }
   } catch (error) {
-    console.error("Error initializing onHand field:", error);
+    console.error('Error initializing onHand field:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ message: error.message || "Error initializing onHand field." }),
+      body: JSON.stringify({ message: error.message || 'Error initializing onHand field.' }),
     };
   } finally {
-    console.log("onHand initialization function finished.");
+    console.log('onHand initialization function finished.');
   }
 };
