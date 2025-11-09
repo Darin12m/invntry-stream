@@ -254,6 +254,14 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
   };
 
+  // Frontend validation function
+  const validateInvoiceItems = (items: any[]) => {
+    return items.every(item =>
+      item.productId && typeof item.productId === 'string' &&
+      !isNaN(Number(item.quantity)) && Number(item.quantity) >= 0
+    );
+  };
+
   const handleSaveInvoice = async () => {
     if (!customerInfo.name.trim()) {
       toast.error('Please enter customer name');
@@ -264,6 +272,13 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       toast.error('Please add at least one item to the invoice');
       return;
     }
+
+    // Frontend validation check
+    if (!validateInvoiceItems(invoiceItems)) {
+      toast.error("Invalid invoice data: ensure all items have a valid product ID and non-negative numeric quantity.");
+      return;
+    }
+
     if (!currentUser) {
       toast.error('User not authenticated.');
       return;

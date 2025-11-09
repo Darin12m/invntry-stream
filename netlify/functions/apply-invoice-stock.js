@@ -164,8 +164,17 @@ exports.handler = async (event, context) => {
       // Apply product updates and log movements
       for (const productId in productUpdates) {
         const productRef = db.collection("products").doc(productId);
+        const productSnap = await transaction.get(productRef);
+        const currentOnHand = productSnap.exists ? (productSnap.data().onHand || 0) : 0;
+        const qtyDelta = productUpdates[productId];
+
+        // Prevent negative stock
+        if (currentOnHand + qtyDelta < 0) {
+          throw new Error(`Stock too low for product ${productId}. Current: ${currentOnHand}, Change: ${qtyDelta}`);
+        }
+
         transaction.update(productRef, {
-          onHand: admin.firestore.FieldValue.increment(productUpdates[productId]),
+          onHand: admin.firestore.FieldValue.increment(qtyDelta),
         });
       }
 
