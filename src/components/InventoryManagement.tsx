@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { db, auth, storage } from '@/lib/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, getDocs, where, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; // Import Timestamp
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, getDocs, where, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { signOut, User } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -34,21 +34,19 @@ import InvoiceViewerModal from './modals/InvoiceViewerModal';
 import ColumnMappingModal from './modals/ColumnMappingModal';
 import SellHistoryModal from './modals/SellHistoryModal';
 
-// Import logActivity (recalcProductStock and applyInvoiceStock are removed)
 import { logActivity } from '@/utils/logActivity';
 
-// Product interface with purchase price for profit calculations
 export interface Product {
   id: string;
   name: string;
   sku: string;
-  quantity: number; // Existing stock field
-  onHand?: number; // NEW: Bulletproof stock field
+  quantity: number;
+  onHand?: number;
   price: number;
   category: string;
-  purchasePrice?: number; // Admin-only field for profit calculations
-  shortDescription?: string; // Short text description
-  initialStock?: number; // NEW: Initial stock for deterministic calculations
+  purchasePrice?: number;
+  shortDescription?: string;
+  initialStock?: number;
 }
 
 export interface Invoice {
@@ -68,45 +66,41 @@ export interface Invoice {
     price: number;
     quantity: number;
     purchasePrice?: number;
-    discount?: number; // Per-item discount percentage
+    discount?: number;
   }[];
-  itemsIds?: string[]; // NEW: Array of product IDs for easier querying
+  itemsIds?: string[];
   subtotal: number;
   discount: number;
   discountPercentage: number;
   total: number;
   status: string;
-  invoiceType?: 'sale' | 'refund' | 'writeoff'; // NEW: Invoice Type
-  deletedAt?: Timestamp; // NEW: Add deletedAt property for invoices moved to trash
-  createdAt?: Timestamp; // NEW: Add createdAt property for sorting
+  invoiceType?: 'sale' | 'refund' | 'writeoff';
+  deletedAt?: Timestamp;
+  createdAt?: Timestamp;
 }
 
 const InventoryManagementApp = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
-  // Top-level state management
   const [activeTab, setActiveTab] = useState('inventory');
   const [dateFilter, setDateFilter] = useState({ 
-    from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // Start of year
-    to: new Date().toISOString().split('T')[0], // Today
+    from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
+    to: new Date().toISOString().split('T')[0],
   });
   const [products, setProducts] = useState<Product[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Search term state for InventoryTab
-  const [localSearchInput, setLocalSearchInput] = useState(''); // Local state for the input field
-  const deferredSearchTerm = useDeferredValue(localSearchInput); // Corrected: use localSearchInput
+  const [localSearchInput, setLocalSearchInput] = useState('');
+  const deferredSearchTerm = useDeferredValue(localSearchInput);
   
-  // Modal visibility states
   const [showProductModal, setShowProductModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showInvoiceViewer, setShowInvoiceViewer] = useState(false);
   const [showColumnMappingModal, setShowColumnMappingModal] = useState(false);
-  const [selectedProductForHistory, setSelectedProductForHistory] = useState<Product | null>(null); // NEW: State for SellHistoryModal
+  const [selectedProductForHistory, setSelectedProductForHistory] = useState<Product | null>(null);
 
-  // Data for modals
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
@@ -122,19 +116,15 @@ const InventoryManagementApp = () => {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Sorting state for InventoryTab (products)
   const [sortColumn, setSortColumn] = useState<'name' | 'sku' | 'category' | 'quantity' | 'price'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
-  // Sorting state for InvoicesTab (invoices)
   const [invoiceSortBy, setInvoiceSortBy] = useState<'number' | 'date' | 'customer' | 'total'>('number');
   const [invoiceSortDirection, setInvoiceSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  // Product and Invoice selection states
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
 
-  // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       setCurrentUser(user);
@@ -142,7 +132,6 @@ const InventoryManagementApp = () => {
     return () => unsubscribe();
   }, []);
 
-  // Real-time product loading from Firebase
   useEffect(() => {
     const productsQuery = query(collection(db, 'products'), orderBy('name'));
     const unsubscribe = onSnapshot(productsQuery, (querySnapshot) => {
@@ -154,14 +143,13 @@ const InventoryManagementApp = () => {
       setLoading(false);
     }, (error) => {
       console.error('Error loading products in real-time:', error);
-      toast.error('Failed to load products');
+      toast.error('❌ Failed to load products'); // NEW: Error toast
       setLoading(false);
     });
 
-    return () => unsubscribe(); // Cleanup listener on component unmount
+    return () => unsubscribe();
   }, []);
 
-  // Real-time invoice loading from Firebase
   useEffect(() => {
     const invoicesQuery = query(collection(db, 'invoices'), orderBy('date', 'desc'));
     const unsubscribe = onSnapshot(invoicesQuery, (querySnapshot) => {
@@ -172,24 +160,23 @@ const InventoryManagementApp = () => {
       setInvoices(invoicesData);
     }, (error) => {
       console.error('Error loading invoices in real-time:', error);
-      toast.error('Failed to load invoices');
+      toast.error('❌ Failed to load invoices'); // NEW: Error toast
     });
 
-    return () => unsubscribe(); // Cleanup listener on component unmount
+    return () => unsubscribe();
   }, []);
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      toast.success('Logged out successfully');
+      toast.success('✅ Logged out successfully'); // NEW: Success toast
       navigate('/login');
     } catch (error) {
       console.error('Logout error:', error);
-      toast.error('Failed to log out');
+      toast.error('❌ Failed to log out'); // NEW: Error toast
     }
   };
 
-  // Filter products based on search (memoized)
   const filteredProducts = React.useMemo(() => {
     return products.filter(product => {
       const matchesSearch = (product.name || '').toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
@@ -200,15 +187,14 @@ const InventoryManagementApp = () => {
     });
   }, [products, deferredSearchTerm]);
 
-  // Sort products (memoized)
   const sortedProducts = React.useMemo(() => {
     return [...filteredProducts].sort((a, b) => {
       let aValue: string | number = a[sortColumn];
       let bValue: string | number = b[sortColumn];
       
       if (sortColumn === 'name' || sortColumn === 'sku' || sortColumn === 'category') {
-        aValue = (aValue as string || '').toLowerCase(); // Explicitly cast to string
-        bValue = (bValue as string || '').toLowerCase(); // Explicitly cast to string
+        aValue = (aValue as string || '').toLowerCase();
+        bValue = (bValue as string || '').toLowerCase();
       }
       
       if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
@@ -217,7 +203,6 @@ const InventoryManagementApp = () => {
     });
   }, [filteredProducts, sortColumn, sortDirection]);
 
-  // Handle column sorting for products
   const handleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -227,7 +212,6 @@ const InventoryManagementApp = () => {
     }
   };
 
-  // Handle column sorting for invoices
   const handleInvoiceSort = (column: typeof invoiceSortBy) => {
     if (invoiceSortBy === column) {
       setInvoiceSortDirection(invoiceSortDirection === 'asc' ? 'desc' : 'asc');
@@ -237,7 +221,6 @@ const InventoryManagementApp = () => {
     }
   };
 
-  // Get stock status
   const getStockStatus = (quantity: number) => {
     if (quantity === 0) return { label: 'Out of Stock', variant: 'destructive' as const };
     if (quantity < 10) return { label: 'Low', variant: 'warning' as const };
@@ -245,7 +228,6 @@ const InventoryManagementApp = () => {
     return { label: 'In Stock', variant: 'default' as const };
   };
 
-  // Selection handlers
   const toggleProductSelection = (productId: string) => {
     const newSelected = new Set(selectedProducts);
     if (newSelected.has(productId)) {
@@ -282,7 +264,6 @@ const InventoryManagementApp = () => {
     }
   };
 
-  // Product CRUD operations (handlers to open modal)
   const handleAddProduct = () => {
     setEditingProduct(null);
     setShowProductModal(true);
@@ -293,22 +274,19 @@ const InventoryManagementApp = () => {
     setShowProductModal(true);
   };
 
-  // 1. Delete single product
   const handleDeleteProduct = async (productId: string) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
         await deleteDoc(doc(db, 'products', productId));
-        toast.success('Product deleted successfully');
-        await logActivity('Deleted product', productId); // Log activity
-        // Data will reload automatically via onSnapshot
+        toast.success('✅ Product deleted successfully!'); // NEW: Success toast
+        await logActivity('Deleted product', productId);
       } catch (error) {
         console.error('Error deleting product:', error);
-        toast.error('Failed to delete product');
+        toast.error('❌ Failed to delete product'); // NEW: Error toast
       }
     }
   };
 
-  // 2. Bulk delete products
   const handleBulkDeleteProducts = async () => {
     if (selectedProducts.size === 0) {
       toast.error('Please select products to delete.');
@@ -321,17 +299,16 @@ const InventoryManagementApp = () => {
           deleteDoc(doc(db, 'products', productId))
         );
         await Promise.all(deletePromises);
-        setSelectedProducts(new Set()); // Clear selection after deletion
-        toast.success(`${selectedProducts.size} products deleted successfully`);
-        await logActivity('Bulk deleted products', 'Multiple', `${selectedProducts.size} products`); // Log activity
+        setSelectedProducts(new Set());
+        toast.success(`✅ ${selectedProducts.size} products deleted successfully!`); // NEW: Success toast
+        await logActivity('Bulk deleted products', 'Multiple', `${selectedProducts.size} products`);
       } catch (error) {
         console.error('Error bulk deleting products:', error);
-        toast.error('Failed to delete selected products');
+        toast.error('❌ Failed to delete selected products'); // NEW: Error toast
       }
     }
   };
 
-  // 3. Delete all products
   const handleDeleteAllProducts = async () => {
     if (products.length === 0) {
       toast.error('No products to delete');
@@ -344,26 +321,24 @@ const InventoryManagementApp = () => {
           deleteDoc(doc(db, 'products', product.id))
         );
         await Promise.all(deletePromises);
-        toast.success('All products deleted successfully');
-        await logActivity('Deleted all products', 'All', `${products.length} products`); // Log activity
-        // Data will reload automatically via onSnapshot
+        toast.success('✅ All products deleted successfully!'); // NEW: Success toast
+        await logActivity('Deleted all products', 'All', `${products.length} products`);
       } catch (error) {
         console.error('Error deleting all products:', error);
-        toast.error('Failed to delete all products');
+        toast.error('❌ Failed to delete all products'); // NEW: Error toast
       }
     }
   };
 
-  // 4. Delete single invoice
   async function handleDeleteInvoice(invoice: Invoice) {
     if (!invoice || !invoice.id || !currentUser) return;
 
-    if (!window.confirm('Are you sure you want to delete this invoice? It will be moved to Trash.')) {
+    // NEW: Specific confirmation dialog
+    if (!window.confirm(`Are you sure you want to delete invoice #${invoice.number || invoice.id} for ${invoice.customer.name}? It will be moved to Trash and stock will be returned.`)) {
       return;
     }
 
     try {
-      // 1️⃣ Call Netlify Function to revert stock
       const response = await fetch('/.netlify/functions/apply-invoice-stock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -382,24 +357,21 @@ const InventoryManagementApp = () => {
         throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
       }
 
-      // 2️⃣ Move invoice to deletedInvoices
       await setDoc(doc(db, 'deletedInvoices', invoice.id), {
         ...invoice,
         deletedAt: serverTimestamp(),
       });
 
-      // 3️⃣ Delete from main collection
       await deleteDoc(doc(db, 'invoices', invoice.id));
 
-      toast.success('🗑️ Invoice moved to Trash, stock returned.');
-      await logActivity('Deleted invoice', invoice.number || invoice.id, 'Moved to Trash'); // Log activity
+      toast.success('🗑️ Invoice moved to Trash, stock returned.'); // NEW: Success toast
+      await logActivity('Deleted invoice', invoice.number || invoice.id, 'Moved to Trash');
     } catch (error) {
       console.error('Delete error:', error);
-      toast.error('❌ Failed to move invoice to Trash.');
+      toast.error('❌ Failed to move invoice to Trash.'); // NEW: Error toast
     }
   }
 
-  // 5. Bulk delete invoices
   const handleBulkDeleteInvoices = async () => {
     if (selectedInvoices.size === 0) {
       toast.error('Please select invoices to delete');
@@ -407,12 +379,11 @@ const InventoryManagementApp = () => {
     }
     if (!currentUser) return;
     
-    if (window.confirm(`Are you sure you want to delete ${selectedInvoices.size} selected invoice(s)?`)) {
+    if (window.confirm(`Are you sure you want to delete ${selectedInvoices.size} selected invoice(s)? They will be moved to Trash and stock will be returned.`)) { // NEW: Specific confirmation
       try {
         const deletePromises = Array.from(selectedInvoices).map(async (invoiceId) => {
           const invoice = invoices.find(inv => inv.id === invoiceId);
           if (invoice) {
-            // Call Netlify Function for each invoice deletion
             const response = await fetch('/.netlify/functions/apply-invoice-stock', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -431,23 +402,28 @@ const InventoryManagementApp = () => {
               throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
             }
 
+            // Move to deletedInvoices before deleting from main collection
+            await setDoc(doc(db, 'deletedInvoices', invoice.id), {
+              ...invoice,
+              deletedAt: serverTimestamp(),
+            });
+
             return deleteDoc(doc(db, 'invoices', invoiceId));
           }
           return Promise.resolve();
         });
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
-        toast.success(`${selectedInvoices.size} invoices deleted successfully`);
-        await logActivity('Bulk deleted invoices', 'Multiple', `${selectedInvoices.size} invoices`); // Log activity
+        toast.success(`🗑️ ${selectedInvoices.size} invoices moved to Trash, stock returned.`); // NEW: Success toast
+        await logActivity('Bulk deleted invoices', 'Multiple', `${selectedInvoices.size} invoices`);
 
       } catch (error) {
         console.error('Error bulk deleting invoices:', error);
-        toast.error('Failed to delete invoices');
+        toast.error('❌ Failed to delete invoices'); // NEW: Error toast
       }
     }
   };
 
-  // 6. Delete all invoices
   const handleDeleteAllInvoices = async () => {
     if (invoices.length === 0) {
       toast.error('No invoices to delete');
@@ -455,10 +431,9 @@ const InventoryManagementApp = () => {
     }
     if (!currentUser) return;
     
-    if (window.confirm(`Are you sure you want to delete ALL ${invoices.length} invoices? This action cannot be undone.`)) {
+    if (window.confirm(`Are you sure you want to delete ALL ${invoices.length} invoices? They will be moved to Trash and stock will be returned. This action cannot be undone.`)) { // NEW: Specific confirmation
       try {
         const deletePromises = invoices.map(async (invoice) => {
-          // Call Netlify Function for each invoice deletion
           const response = await fetch('/.netlify/functions/apply-invoice-stock', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -477,21 +452,26 @@ const InventoryManagementApp = () => {
             throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
           }
 
+          // Move to deletedInvoices before deleting from main collection
+          await setDoc(doc(db, 'deletedInvoices', invoice.id), {
+            ...invoice,
+            deletedAt: serverTimestamp(),
+          });
+
           return deleteDoc(doc(db, 'invoices', invoice.id));
         });
         await Promise.all(deletePromises);
         setSelectedInvoices(new Set());
-        toast.success('All invoices deleted successfully');
-        await logActivity('Deleted all invoices', 'All', `${invoices.length} invoices`); // Log activity
+        toast.success('🗑️ All invoices moved to Trash, stock returned.'); // NEW: Success toast
+        await logActivity('Deleted all invoices', 'All', `${invoices.length} invoices`);
 
       } catch (error) {
         console.error('Error deleting all invoices:', error);
-        toast.error('Failed to delete all data');
+        toast.error('❌ Failed to delete all data'); // NEW: Error toast
       }
     }
   };
 
-  // 9. Clear all data (nuclear option)
   const handleClearAllData = async () => {
     if (products.length === 0 && invoices.length === 0) {
       toast.error('No data to clear');
@@ -501,12 +481,10 @@ const InventoryManagementApp = () => {
     
     if (window.confirm('⚠️ WARNING: This will delete ALL products and invoices permanently. This action cannot be undone. Are you absolutely sure?')) {
       try {
-        // Delete all products and invoices in parallel
         const deleteProductsPromises = products.map((product) =>
           deleteDoc(doc(db, 'products', product.id))
         );
         const deleteInvoicesPromises = invoices.map(async (invoice) => {
-          // Call Netlify Function for each invoice deletion
           const response = await fetch('/.netlify/functions/apply-invoice-stock', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -531,16 +509,15 @@ const InventoryManagementApp = () => {
         await Promise.all([...deleteProductsPromises, ...deleteInvoicesPromises]);
         
         setSelectedInvoices(new Set());
-        toast.success('All data cleared successfully');
-        await logActivity('Cleared all data', 'All Products and Invoices'); // Log activity
+        toast.success('✅ All data cleared successfully!'); // NEW: Success toast
+        await logActivity('Cleared all data', 'All Products and Invoices');
       } catch (error) {
         console.error('Error clearing all data:', error);
-        toast.error('Failed to clear all data');
+        toast.error('❌ Failed to clear all data'); // NEW: Error toast
       }
     }
   };
 
-  // Invoice operations (handlers to open modal)
   const handleCreateInvoice = () => {
     setEditingInvoice(null);
     setShowInvoiceModal(true);
@@ -556,7 +533,6 @@ const InventoryManagementApp = () => {
     setShowInvoiceViewer(true);
   };
 
-  // Import/Export functions
   const handleImportExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -574,10 +550,8 @@ const InventoryManagementApp = () => {
           return;
         }
 
-        // Get column names from the first row
         const columns = Object.keys(jsonData[0]);
         
-        // Store data and show mapping modal
         setExcelData(jsonData);
         setExcelColumns(columns);
         setColumnMapping({
@@ -591,7 +565,7 @@ const InventoryManagementApp = () => {
         setShowColumnMappingModal(true);
         
       } catch (error) {
-        toast.error('Error reading Excel file. Please check the format.');
+        toast.error('❌ Error reading Excel file. Please check the format.'); // NEW: Error toast
       }
     };
     reader.readAsBinaryString(file);
@@ -609,7 +583,7 @@ const InventoryManagementApp = () => {
     a.href = url;
     a.download = filename;
     a.click();
-    toast.success(`${filename} exported successfully`);
+    toast.success(`✅ ${filename} exported successfully`); // NEW: Success toast
   };
 
   const exportToJSON = (data: any[], filename: string) => {
@@ -619,10 +593,9 @@ const InventoryManagementApp = () => {
     a.href = url;
     a.download = filename;
     a.click();
-    toast.success(`${filename} exported successfully`);
+    toast.success(`✅ ${filename} exported successfully`); // NEW: Success toast
   };
 
-  // Dashboard calculations
   const getFilteredInvoices = () => {
     return invoices.filter(invoice => {
       const invoiceDate = new Date(invoice.date);
@@ -643,13 +616,11 @@ const InventoryManagementApp = () => {
     filteredInvoices.forEach(invoice => {
       totalSales += invoice.total;
       
-      // Calculate costs and track negative quantities
       invoice.items.forEach(item => {
         const product = products.find(p => p.id === item.productId);
         const purchasePrice = product?.purchasePrice || item.purchasePrice || 0;
         totalCosts += purchasePrice * item.quantity;
         
-        // Track negative quantities (returns/damaged/free items)
         if (item.quantity < 0) {
           totalNegativeQuantity += Math.abs(item.quantity);
           totalNegativeValue += Math.abs(item.price * item.quantity);
@@ -829,8 +800,8 @@ const InventoryManagementApp = () => {
             selectedProducts={selectedProducts}
             toggleProductSelection={toggleProductSelection}
             selectAllProducts={selectAllProducts}
-            selectedProductForHistory={selectedProductForHistory} // NEW: Pass state
-            setSelectedProductForHistory={setSelectedProductForHistory} // NEW: Pass setter
+            selectedProductForHistory={selectedProductForHistory}
+            setSelectedProductForHistory={setSelectedProductForHistory}
           />
         )}
         {activeTab === 'invoices' && (
@@ -877,7 +848,7 @@ const InventoryManagementApp = () => {
               fileInputRef={fileInputRef}
               db={db}
               toast={toast}
-              currentUser={currentUser} // Pass currentUser to DataTab
+              currentUser={currentUser}
             />
           </Suspense>
         )}
@@ -903,7 +874,7 @@ const InventoryManagementApp = () => {
         invoices={invoices}
         db={db}
         toast={toast}
-        currentUser={currentUser} // Pass currentUser to InvoiceModal
+        currentUser={currentUser}
       />
 
       {/* Invoice Viewer Modal */}

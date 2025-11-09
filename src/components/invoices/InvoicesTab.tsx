@@ -1,9 +1,9 @@
 import React from 'react';
-import { FileText, Trash2, Plus, Eye, Edit, Trash, CheckSquare, Square, ChevronUp, ChevronDown, User as UserIcon, Calendar, DollarSign } from 'lucide-react';
+import { FileText, Trash2, Plus, Eye, Edit, Trash, CheckSquare, Square, ChevronUp, ChevronDown, User as UserIcon, Calendar, DollarSign, BarChart3 } from 'lucide-react'; // Added BarChart3 for empty state
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Invoice } from '../InventoryManagement'; // Import Invoice interface
+import { Invoice } from '../InventoryManagement';
 
 interface InvoicesTabProps {
   invoices: Invoice[];
@@ -15,7 +15,7 @@ interface InvoicesTabProps {
   handleCreateInvoice: () => void;
   handleViewInvoice: (invoice: Invoice) => void;
   handleEditInvoice: (invoice: Invoice) => void;
-  handleDeleteInvoice: (invoice: Invoice) => Promise<void>; // Updated prop type
+  handleDeleteInvoice: (invoice: Invoice) => Promise<void>;
   invoiceSortBy: 'number' | 'date' | 'customer' | 'total';
   invoiceSortDirection: 'asc' | 'desc';
   handleInvoiceSort: (column: 'number' | 'date' | 'customer' | 'total') => void;
@@ -36,9 +36,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
   invoiceSortDirection,
   handleInvoiceSort,
 }) => {
-  // Sort invoices
   const sortedInvoices = [...invoices].sort((a, b) => {
-    // First, sort by whether they have invoice numbers
     const aHasNumber = a.number && a.number.trim() !== '';
     const bHasNumber = b.number && b.number.trim() !== '';
     
@@ -103,53 +101,55 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
       </div>
 
       {/* Sort Controls */}
-      <Card className="p-4 shadow-card">
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-sm font-medium">Sort by:</span>
-          {[
-            { key: 'number' as const, label: 'Invoice #' },
-            { key: 'date' as const, label: 'Date' },
-            { key: 'customer' as const, label: 'Customer' },
-            { key: 'total' as const, label: 'Amount' },
-          ].map(({ key, label }) => (
-            <Button
-              key={key}
-              onClick={() => handleInvoiceSort(key)}
-              variant={invoiceSortBy === key ? 'default' : 'outline'}
-              size="sm"
-              className="gap-1"
-            >
-              {label}
-              {invoiceSortBy === key && (
-                invoiceSortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-              )}
-            </Button>
-          ))}
-        </div>
-      </Card>
+      {invoices.length > 0 && ( // NEW: Only show sort controls if there are invoices
+        <Card className="p-4 shadow-card">
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-sm font-medium">Sort by:</span>
+            {[
+              { key: 'number' as const, label: 'Invoice #' },
+              { key: 'date' as const, label: 'Date' },
+              { key: 'customer' as const, label: 'Customer' },
+              { key: 'total' as const, label: 'Amount' },
+            ].map(({ key, label }) => (
+              <Button
+                key={key}
+                onClick={() => handleInvoiceSort(key)}
+                variant={invoiceSortBy === key ? 'default' : 'outline'}
+                size="sm"
+                className="gap-1"
+              >
+                {label}
+                {invoiceSortBy === key && (
+                  invoiceSortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                )}
+              </Button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Invoice Actions */}
-      <Card className="p-4 shadow-card">
-        <div className="flex gap-2 justify-end">
-          <Button
-            onClick={selectAllInvoices}
-            variant="outline"
-            size="sm"
-            disabled={invoices.length === 0}
-          >
-            {selectedInvoices.size === invoices.length && invoices.length > 0 ? (
-              <>
-                <Square className="h-4 w-4 mr-2" />
-                Deselect All
-              </>
-            ) : (
-              <>
-                <CheckSquare className="h-4 w-4 mr-2" />
-                Select All
-              </>
-            )}
-          </Button>
-          {invoices.length > 0 && (
+      {invoices.length > 0 && ( // NEW: Only show actions if there are invoices
+        <Card className="p-4 shadow-card">
+          <div className="flex gap-2 justify-end">
+            <Button
+              onClick={selectAllInvoices}
+              variant="outline"
+              size="sm"
+              disabled={invoices.length === 0}
+            >
+              {selectedInvoices.size === invoices.length && invoices.length > 0 ? (
+                <>
+                  <Square className="h-4 w-4 mr-2" />
+                  Deselect All
+                </>
+              ) : (
+                <>
+                  <CheckSquare className="h-4 w-4 mr-2" />
+                  Select All
+                </>
+              )}
+            </Button>
             <Button
               onClick={handleDeleteAllInvoices}
               variant="destructive"
@@ -158,9 +158,9 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
               <Trash className="h-4 w-4 mr-2" />
               Delete All
             </Button>
-          )}
-        </div>
-      </Card>
+          </div>
+        </Card>
+      )}
 
       {/* Invoice History */}
       <Card className="shadow-card">
@@ -191,7 +191,6 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-bold text-lg truncate">{invoice.number || 'No Number'}</h4>
-                        {/* NEW: Invoice Type Badge */}
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium ${
                             invoice.invoiceType === 'refund'
@@ -244,7 +243,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
                       Edit
                     </Button>
                     <Button
-                      onClick={() => handleDeleteInvoice(invoice)} // Updated call site
+                      onClick={() => handleDeleteInvoice(invoice)}
                       variant="destructive"
                       size="sm"
                     >

@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Download, Trash, Clock } from 'lucide-react'; // Added Clock icon
+import { Upload, Download, Trash, Clock, Loader2 } from 'lucide-react'; // Added Loader2 icon
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; // Import Timestamp
-import { Product, Invoice } from '../InventoryManagement'; // Import Product and Invoice interfaces
-import { toast } from 'sonner'; // Correct import for sonner toast
-import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
-import ActivityLogModal from '../modals/ActivityLogModal'; // NEW: Import ActivityLogModal
-import { User } from 'firebase/auth'; // NEW: Import User type
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { Product, Invoice } from '../InventoryManagement';
+import { toast } from 'sonner';
+import { logActivity } from '@/utils/logActivity';
+import ActivityLogModal from '../modals/ActivityLogModal';
+import { User } from 'firebase/auth';
 
 interface DataTabProps {
   products: Product[];
@@ -18,27 +18,28 @@ interface DataTabProps {
   exportToCSV: (data: any[], filename: string) => void;
   exportToJSON: (data: any[], filename: string) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
-  db: any; // NEW PROP
-  toast: any; // Changed from typeof toast to any to resolve circular reference
-  currentUser: User | null; // NEW: Add currentUser prop
+  db: any;
+  toast: any;
+  currentUser: User | null;
 }
 
-// Helper component for deleted invoices
-function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: any, currentUser: User | null }) { // Accept db, toast, and currentUser as props
-  const [trashInvoices, setTrashInvoices] = useState<Invoice[]>([]); // Use Invoice interface
+function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: any, currentUser: User | null }) {
+  const [trashInvoices, setTrashInvoices] = useState<Invoice[]>([]);
+  const [isRestoring, setIsRestoring] = useState<string | null>(null); // NEW: State for restoring specific invoice
+  const [isDeletingForever, setIsDeletingForever] = useState<string | null>(null); // NEW: State for deleting forever specific invoice
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'deletedInvoices'), (snap) => {
-      setTrashInvoices(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Invoice))); // Cast to Invoice
+      setTrashInvoices(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Invoice)));
     });
     return () => unsub();
-  }, [db]); // Add db to dependency array
+  }, [db]);
 
   const handleRestore = async (invoice: Invoice) => {
     if (!invoice || !currentUser) return;
+    setIsRestoring(invoice.id); // NEW: Set restoring state
 
     try {
-      // 1️⃣ Call Netlify Function to re-apply stock changes
       const response = await fetch('/.netlify/functions/apply-invoice-stock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -57,20 +58,20 @@ function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: an
         throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
       }
 
-      // 2️⃣ Restore invoice to main collection
       await setDoc(doc(db, 'invoices', invoice.id), {
         ...invoice,
         restoredAt: serverTimestamp(),
       });
 
-      // 3️⃣ Remove from deletedInvoices
       await deleteDoc(doc(db, 'deletedInvoices', invoice.id));
 
-      toast.success('♻️ Invoice restored and stock adjusted.');
-      await logActivity('Restored invoice', invoice.number || invoice.id); // Log activity
+      toast.success('♻️ Invoice restored and stock adjusted.'); // NEW: Success toast
+      await logActivity('Restored invoice', invoice.number || invoice.id);
     } catch (error) {
       console.error('Restore error:', error);
-      toast.error('❌ Failed to restore invoice.');
+      toast.error('❌ Failed to restore invoice.'); // NEW: Error toast
+    } finally {
+      setIsRestoring(null); // NEW: Reset restoring state
     }
   };
 
@@ -81,12 +82,18 @@ function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: an
     );
     if (!confirmDel) return;
 
-    // No stock adjustment needed here as stock was already returned when it was "deleted"
-    // and this is a permanent deletion from trash.
+    setIsDeletingForever(invoice.id); // NEW: Set deleting state
 
-    await deleteDoc(doc(db, 'deletedInvoices', invoice.id));
-    toast.success('🔥 Invoice permanently deleted (stock unchanged).');
-    await logActivity('Deleted invoice permanently', invoice.number || invoice.id); // Log activity
+    try {
+      await deleteDoc(doc(db, 'deletedInvoices', invoice.id));
+      toast.success('🔥 Invoice permanently deleted (stock unchanged).'); // NEW: Success toast
+      await logActivity('Deleted invoice permanently', invoice.number || invoice.id);
+    } catch (error) {
+      console.error('Delete forever error:', error);
+      toast.error('❌ Failed to permanently delete invoice.'); // NEW: Error toast
+    } finally {
+      setIsDeletingForever(null); // NEW: Reset deleting state
+    }
   };
 
   return (
@@ -97,12 +104,13 @@ function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: an
       {trashInvoices.map((inv) => (
         <Card
           key={inv.id}
-          className="flex justify-between items-center p-3 rounded-lg shadow-card"
+          className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 rounded-lg shadow-card gap-2 sm:gap-4"
         >
           <div>
             <p className="font-semibold">{inv.customer?.name || 'Unnamed'}</p>
             <p className="text-xs text-muted-foreground">
-              {inv.deletedAt?.seconds // Access seconds property of Timestamp
+              Deleted:{' '}
+              {inv.deletedAt?.seconds
                 ? new Date(inv.deletedAt.seconds * 1000).toLocaleDateString()
                 : 'Unknown Date'}
             </p>
@@ -112,15 +120,25 @@ function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: an
               onClick={() => handleRestore(inv)}
               variant="outline"
               size="sm"
+              disabled={isRestoring === inv.id || isDeletingForever === inv.id} // NEW: Disable while processing
             >
-              ♻️ Restore
+              {isRestoring === inv.id ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                '♻️ Restore'
+              )}
             </Button>
             <Button
               onClick={() => handleDeleteForever(inv)}
               variant="destructive"
               size="sm"
+              disabled={isRestoring === inv.id || isDeletingForever === inv.id} // NEW: Disable while processing
             >
-              🔥 Delete Forever
+              {isDeletingForever === inv.id ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                '🔥 Delete Forever'
+              )}
             </Button>
           </div>
         </Card>
@@ -137,11 +155,21 @@ const DataTab: React.FC<DataTabProps> = ({
   exportToCSV,
   exportToJSON,
   fileInputRef,
-  db, // Accept db prop
-  toast, // Accept toast prop
-  currentUser, // Accept currentUser prop
+  db,
+  toast,
+  currentUser,
 }) => {
-  const [showActivityLog, setShowActivityLog] = useState(false); // NEW: State for ActivityLogModal
+  const [showActivityLog, setShowActivityLog] = useState(false);
+  const [isClearingAll, setIsClearingAll] = useState(false); // NEW: State for clearing all data
+
+  const handleClearAllDataWithLoading = async () => {
+    setIsClearingAll(true); // NEW: Set loading state
+    try {
+      await handleClearAllData();
+    } finally {
+      setIsClearingAll(false); // NEW: Reset loading state
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -151,7 +179,6 @@ const DataTab: React.FC<DataTabProps> = ({
           <h2 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Data Management</h2>
           <p className="text-muted-foreground mt-1">Import, export, and manage your data</p>
         </div>
-        {/* NEW: Activity Log Button */}
         <Button
           onClick={() => setShowActivityLog(true)}
           variant="outline"
@@ -177,12 +204,22 @@ const DataTab: React.FC<DataTabProps> = ({
               This will permanently delete all products and invoices. This action cannot be undone.
             </p>
             <Button
-              onClick={handleClearAllData}
+              onClick={handleClearAllDataWithLoading} // NEW: Use loading wrapper
               variant="destructive"
               className="shadow-elegant"
+              disabled={isClearingAll} // NEW: Disable while clearing
             >
-              <Trash className="h-4 w-4 mr-2" />
-              Clear All Data
+              {isClearingAll ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Clearing...
+                </>
+              ) : (
+                <>
+                  <Trash className="h-4 w-4 mr-2" />
+                  Clear All Data
+                </>
+              )}
             </Button>
           </div>
         </div>

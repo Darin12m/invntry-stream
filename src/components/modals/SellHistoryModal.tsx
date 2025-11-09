@@ -6,12 +6,12 @@ import {
   where,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // Correct Firebase import path
+import { db } from '@/lib/firebase';
 import { Clock, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner'; // Correct toast import
-import { Product, Invoice } from '../InventoryManagement'; // Import Product and Invoice interfaces
+import { toast } from 'sonner';
+import { Product, Invoice } from '../InventoryManagement';
 
 interface SellHistoryModalProps {
   product: Product | null;
@@ -31,13 +31,11 @@ const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, d
 
     async function loadHistory() {
       try {
-        // Active invoices
         const activeQ = query(
           collection(db, 'invoices'),
           where('itemsIds', 'array-contains', product.id)
         );
 
-        // Deleted invoices
         const deletedQ = query(
           collection(db, 'deletedInvoices'),
           where('itemsIds', 'array-contains', product.id)
@@ -64,14 +62,14 @@ const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, d
           (a, b) => {
             const dateA = a.status === 'Active' ? (a.createdAt?.toDate().getTime() || new Date(a.date).getTime()) : (a.deletedAt?.toDate().getTime() || new Date(a.date).getTime());
             const dateB = b.status === 'Active' ? (b.createdAt?.toDate().getTime() || new Date(b.date).getTime()) : (b.deletedAt?.toDate().getTime() || new Date(b.date).getTime());
-            return dateB - dateA; // Descending order
+            return dateB - dateA;
           }
         );
 
         setHistory(combined);
       } catch (err) {
         console.error('Failed to load product history:', err);
-        toast.error('Failed to load sell history.');
+        toast.error('❌ Failed to load sell history.'); // NEW: Error toast
       }
     }
 
@@ -112,13 +110,13 @@ const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, d
                   <tr className="text-left text-muted-foreground border-b border-border">
                     <th className="py-2 px-4 font-medium">Date</th>
                     <th className="py-2 px-4 font-medium">Invoice #</th>
-                    <th className="py-2 px-4 font-medium">Status</th> {/* NEW Status Column */}
+                    <th className="py-2 px-4 font-medium">Status</th>
                     <th className="py-2 px-4 font-medium">Type</th>
                     <th className="py-2 px-4 font-medium text-right">Qty</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {history.map((inv) => {
+                  {history.map((inv, index) => {
                     const item = (inv.items || []).find(
                       (i) => i.productId === product.id
                     );
@@ -129,7 +127,7 @@ const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, d
                       : 'text-foreground';
 
                     return (
-                      <tr key={inv.id} className="border-b border-border hover:bg-muted/20 transition-colors">
+                      <tr key={inv.id} className={`border-b hover:bg-muted/20 transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}>
                         <td className={`py-2 px-4 ${rowStyle}`}>
                           {new Date(inv.date).toLocaleDateString()}
                         </td>
@@ -166,6 +164,6 @@ const SellHistoryModal: React.FC<SellHistoryModalProps> = ({ product, onClose, d
       </Card>
     </div>
   );
-}
+};
 
 export default SellHistoryModal;

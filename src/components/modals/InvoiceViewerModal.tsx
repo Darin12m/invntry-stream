@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Printer, FileDown, X } from 'lucide-react';
-import { Invoice } from '../InventoryManagement'; // Import Invoice interface
+import { Invoice } from '../InventoryManagement';
 
 interface InvoiceViewerModalProps {
   showInvoiceViewer: boolean;
@@ -32,14 +32,14 @@ const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
           toast.error('Invoice content not found');
           return;
         }
-        await saveInvoiceAsPDF(); // Fallback to PDF generation for native print
-        toast.success('Ready to print via AirPrint');
+        await saveInvoiceAsPDF();
+        toast.success('✅ Ready to print via AirPrint'); // NEW: Success toast
       } else {
         window.print();
       }
     } catch (error) {
       console.error('Error printing:', error);
-      toast.error('Failed to print invoice');
+      toast.error('❌ Failed to print invoice'); // NEW: Error toast
     }
   };
 
@@ -93,10 +93,10 @@ const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
       }
 
       pdf.save(`${viewingInvoice?.number || 'invoice'}.pdf`);
-      toast.success('PDF downloaded successfully');
+      toast.success('✅ PDF downloaded successfully'); // NEW: Success toast
     } catch (error) {
       console.error('Error saving PDF:', error);
-      toast.error('Failed to save PDF');
+      toast.error('❌ Failed to save PDF'); // NEW: Error toast
     }
   };
 
