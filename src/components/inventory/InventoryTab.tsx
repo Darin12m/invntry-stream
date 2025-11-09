@@ -1,11 +1,11 @@
 import React from 'react';
-import { Search, Plus, Edit, Trash2, Trash, X, ChevronUp, ChevronDown, Package, CheckSquare, Square, Clock } from 'lucide-react'; // NEW: Import Clock icon
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Product } from '../InventoryManagement'; // Import Product interface
+import { Search, Plus, Edit, Trash2, Trash, X, ChevronUp, ChevronDown, Package, CheckSquare, Square, Clock, BarChart3 } from 'lucide-react'; // Added BarChart3 for empty state
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Product } from '../InventoryManagement';
 
 interface InventoryTabProps {
   localSearchInput: string;
@@ -25,8 +25,8 @@ interface InventoryTabProps {
   selectedProducts: Set<string>;
   toggleProductSelection: (productId: string) => void;
   selectAllProducts: () => void;
-  selectedProductForHistory: Product | null; // NEW: Prop for SellHistoryModal
-  setSelectedProductForHistory: (product: Product | null) => void; // NEW: Setter for SellHistoryModal
+  selectedProductForHistory: Product | null;
+  setSelectedProductForHistory: (product: Product | null) => void;
 }
 
 const InventoryTab: React.FC<InventoryTabProps> = ({
@@ -47,7 +47,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
   selectedProducts,
   toggleProductSelection,
   selectAllProducts,
-  setSelectedProductForHistory, // NEW: Destructure setter
+  setSelectedProductForHistory,
 }) => (
   <div className="space-y-6 animate-fade-in">
     {/* Header */}
@@ -210,7 +210,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
           </thead>
           <tbody>
             {sortedProducts.map((product, index) => {
-              const displayQuantity = product.onHand ?? product.quantity ?? 0; // Use onHand if exists, else quantity, else 0
+              const displayQuantity = product.onHand ?? product.quantity ?? 0;
               const stockStatus = getStockStatus(displayQuantity);
               return (
                 <tr 
@@ -243,7 +243,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                     </div>
                   </td>
                   <td className="p-4 text-right">
-                    <span className="font-medium text-primary">{product.price.toFixed(2)} ден.</span>
+                    <span className="font-medium text-primary">{(product.price ?? 0).toFixed(2)} ден.</span> {/* FIX: Added nullish coalescing for product.price */}
                   </td>
                   <td className="p-4">
                     <div className="flex gap-2 justify-end">
@@ -254,7 +254,6 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      {/* NEW: Sell History Button */}
                       <Button
                         onClick={() => setSelectedProductForHistory(product)}
                         variant="outline"
@@ -282,7 +281,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
     {/* Mobile Card View - Hidden on desktop */}
     <div className="space-y-4 md:hidden">
       {sortedProducts.map(product => {
-        const displayQuantity = product.onHand ?? product.quantity ?? 0; // Use onHand if exists, else quantity, else 0
+        const displayQuantity = product.onHand ?? product.quantity ?? 0;
         const stockStatus = getStockStatus(displayQuantity);
         return (
           <Card key={product.id} className="p-4 hover:shadow-lg transition-all duration-300 animate-scale-in">
@@ -316,7 +315,7 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Price:</span>
-                    <span className="font-medium text-primary">{product.price.toFixed(2)} ден.</span>
+                    <span className="font-medium text-primary">{(product.price ?? 0).toFixed(2)} ден.</span> {/* FIX: Added nullish coalescing for product.price */}
                   </div>
                 </div>
               </div>
@@ -331,7 +330,6 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
               </Button>
-              {/* NEW: Sell History Button */}
               <Button
                 onClick={() => setSelectedProductForHistory(product)}
                 variant="outline"
@@ -365,10 +363,10 @@ const InventoryTab: React.FC<InventoryTabProps> = ({
           </h3>
           <p className="text-muted-foreground mb-6">
             {products.length === 0 
-              ? "Add your first product using the + button above to get started with your inventory." 
+              ? 'Add your first product using the + button above to get started with your inventory.' 
               : localSearchInput 
                 ? `No products match "${localSearchInput}". Try adjusting your search.`
-                : "No products match the selected filters. Try different filter options."}
+                : 'No products match the selected filters. Try different filter options.'}
           </p>
           {products.length === 0 && (
             <Button onClick={handleAddProduct} className="transition-all duration-200 hover:scale-105">

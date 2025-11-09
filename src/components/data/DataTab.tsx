@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Download, Trash, Clock } from 'lucide-react'; // Added Clock icon
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; // Import Timestamp
-import { Product, Invoice } from '../InventoryManagement'; // Import Product and Invoice interfaces
-import { toast } from "sonner"; // Correct import for sonner toast
-import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
-import ActivityLogModal from '../modals/ActivityLogModal'; // NEW: Import ActivityLogModal
-import { User } from 'firebase/auth'; // NEW: Import User type
+import { Upload, Download, Trash, Clock, Loader2, BarChart3, Sun, Moon } from 'lucide-react'; // Added Sun, Moon icons
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { Product, Invoice } from '../InventoryManagement';
+import { toast } from 'sonner';
+import { logActivity } from '@/utils/logActivity';
+import ActivityLogModal from '../modals/ActivityLogModal';
+import { User } from 'firebase/auth';
+import SanityCheckModal from '../modals/SanityCheckModal';
+import { useTheme } from 'next-themes'; // NEW: Import useTheme
 
 interface DataTabProps {
   products: Product[];
@@ -18,37 +20,53 @@ interface DataTabProps {
   exportToCSV: (data: any[], filename: string) => void;
   exportToJSON: (data: any[], filename: string) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
-  db: any; // NEW PROP
-  toast: any; // Changed from typeof toast to any to resolve circular reference
-  currentUser: User | null; // NEW: Add currentUser prop
+  db: any;
+  toast: any;
+  currentUser: User | null;
 }
 
-// Helper component for deleted invoices
-function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: any, currentUser: User | null }) { // Accept db, toast, and currentUser as props
-  const [trashInvoices, setTrashInvoices] = useState<Invoice[]>([]); // Use Invoice interface
+// Define SanityCheckResult interface here for use in DataTab's onClose handler
+interface SanityCheckResult {
+  ok: boolean;
+  checked: number;
+  mismatched: number;
+  issues: Array<{
+    productId: string;
+    productName: string;
+    onHand: number;
+    sumOfMovements: number;
+    difference: number;
+  }>;
+  message?: string;
+}
+
+function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: any, currentUser: User | null }) {
+  const [trashInvoices, setTrashInvoices] = useState<Invoice[]>([]);
+  const [isRestoring, setIsRestoring] = useState<string | null>(null);
+  const [isDeletingForever, setIsDeletingForever] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "deletedInvoices"), (snap) => {
-      setTrashInvoices(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Invoice))); // Cast to Invoice
+    const unsub = onSnapshot(collection(db, 'deletedInvoices'), (snap) => {
+      setTrashInvoices(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Invoice)));
     });
     return () => unsub();
-  }, [db]); // Add db to dependency array
+  }, [db]);
 
   const handleRestore = async (invoice: Invoice) => {
     if (!invoice || !currentUser) return;
+    setIsRestoring(invoice.id);
 
     try {
-      // 1️⃣ Call Netlify Function to re-apply stock changes
       const response = await fetch('/.netlify/functions/apply-invoice-stock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           invoiceId: invoice.id,
-          action: "restore",
+          action: 'restore',
           newItems: invoice.items.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
           idempotencyKey: `${invoice.id}:restore:${Date.now()}`,
           userId: currentUser.uid,
-          reason: `Invoice ${invoice.number || invoice.id} restored.`
+          reason: `Invoice ${invoice.number || invoice.id} restored.`,
         }),
       });
 
@@ -57,36 +75,42 @@ function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: an
         throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
       }
 
-      // 2️⃣ Restore invoice to main collection
-      await setDoc(doc(db, "invoices", invoice.id), {
+      await setDoc(doc(db, 'invoices', invoice.id), {
         ...invoice,
         restoredAt: serverTimestamp(),
       });
 
-      // 3️⃣ Remove from deletedInvoices
-      await deleteDoc(doc(db, "deletedInvoices", invoice.id));
+      await deleteDoc(doc(db, 'deletedInvoices', invoice.id));
 
-      toast.success("♻️ Invoice restored and stock adjusted.");
-      await logActivity("Restored invoice", invoice.number || invoice.id); // Log activity
+      toast.success('♻️ Invoice restored and stock adjusted.');
+      await logActivity('Restored invoice', invoice.number || invoice.id);
     } catch (error) {
-      console.error("Restore error:", error);
-      toast.error("❌ Failed to restore invoice.");
+      console.error('Restore error:', error);
+      toast.error('❌ Failed to restore invoice.');
+    } finally {
+      setIsRestoring(null);
     }
   };
 
   const handleDeleteForever = async (invoice: Invoice) => {
     if (!invoice || !currentUser) return;
     const confirmDel = window.confirm(
-      `Permanently delete invoice for ${invoice.customer?.name || "Unnamed"}? This will NOT affect stock.`
+      `Permanently delete invoice for ${invoice.customer?.name || 'Unnamed'}? This will NOT affect stock.`
     );
     if (!confirmDel) return;
 
-    // No stock adjustment needed here as stock was already returned when it was "deleted"
-    // and this is a permanent deletion from trash.
+    setIsDeletingForever(invoice.id);
 
-    await deleteDoc(doc(db, "deletedInvoices", invoice.id));
-    toast.success("🔥 Invoice permanently deleted (stock unchanged).");
-    await logActivity("Deleted invoice permanently", invoice.number || invoice.id); // Log activity
+    try {
+      await deleteDoc(doc(db, 'deletedInvoices', invoice.id));
+      toast.success('🔥 Invoice permanently deleted (stock unchanged).');
+      await logActivity('Deleted invoice permanently', invoice.number || invoice.id);
+    } catch (error) {
+      console.error('Delete forever error:', error);
+      toast.error('❌ Failed to permanently delete invoice.');
+    } finally {
+      setIsDeletingForever(null);
+    }
   };
 
   return (
@@ -97,14 +121,15 @@ function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: an
       {trashInvoices.map((inv) => (
         <Card
           key={inv.id}
-          className="flex justify-between items-center p-3 rounded-lg shadow-card"
+          className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 rounded-lg shadow-card gap-2 sm:gap-4"
         >
           <div>
-            <p className="font-semibold">{inv.customer?.name || "Unnamed"}</p>
+            <p className="font-semibold">{inv.customer?.name || 'Unnamed'}</p>
             <p className="text-xs text-muted-foreground">
-              {inv.deletedAt?.seconds // Access seconds property of Timestamp
+              Deleted:{' '}
+              {inv.deletedAt?.seconds
                 ? new Date(inv.deletedAt.seconds * 1000).toLocaleDateString()
-                : "Unknown Date"}
+                : 'Unknown Date'}
             </p>
           </div>
           <div className="flex gap-3">
@@ -112,15 +137,25 @@ function DeletedInvoicesSection({ db, toast, currentUser }: { db: any, toast: an
               onClick={() => handleRestore(inv)}
               variant="outline"
               size="sm"
+              disabled={isRestoring === inv.id || isDeletingForever === inv.id}
             >
-              ♻️ Restore
+              {isRestoring === inv.id ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                '♻️ Restore'
+              )}
             </Button>
             <Button
               onClick={() => handleDeleteForever(inv)}
               variant="destructive"
               size="sm"
+              disabled={isRestoring === inv.id || isDeletingForever === inv.id}
             >
-              🔥 Delete Forever
+              {isDeletingForever === inv.id ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                '🔥 Delete Forever'
+              )}
             </Button>
           </div>
         </Card>
@@ -137,11 +172,49 @@ const DataTab: React.FC<DataTabProps> = ({
   exportToCSV,
   exportToJSON,
   fileInputRef,
-  db, // Accept db prop
-  toast, // Accept toast prop
-  currentUser, // Accept currentUser prop
+  db,
+  toast,
+  currentUser,
 }) => {
-  const [showActivityLog, setShowActivityLog] = useState(false); // NEW: State for ActivityLogModal
+  const [showActivityLog, setShowActivityLog] = useState(false);
+  const [isClearingAll, setIsClearingAll] = useState(false);
+  const [showSanityCheckModal, setShowSanityCheckModal] = useState(false);
+  const [isSanityCheckRunning, setIsSanityCheckRunning] = useState(false);
+
+  const { theme, setTheme } = useTheme(); // NEW: Get theme and setTheme
+
+  const handleClearAllDataWithLoading = async () => {
+    setIsClearingAll(true);
+    try {
+      await handleClearAllData();
+    } finally {
+      setIsClearingAll(false);
+    }
+  };
+
+  const handleRunSanityCheck = () => {
+    setShowSanityCheckModal(true);
+    setIsSanityCheckRunning(true);
+  };
+
+  const handleCloseSanityCheckModal = (result?: SanityCheckResult | null) => {
+    setShowSanityCheckModal(false);
+    setIsSanityCheckRunning(false);
+
+    if (result) {
+      if (result.ok) {
+        toast.success('✅ Sanity check completed — all good!');
+      } else {
+        toast.warning('⚠️ Sanity check completed — review results.');
+      }
+    } else {
+      toast.error('❌ Sanity check closed without result.');
+    }
+  };
+
+  const toggleTheme = () => { // NEW: Theme toggle function
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -151,15 +224,52 @@ const DataTab: React.FC<DataTabProps> = ({
           <h2 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Data Management</h2>
           <p className="text-muted-foreground mt-1">Import, export, and manage your data</p>
         </div>
-        {/* NEW: Activity Log Button */}
-        <Button
-          onClick={() => setShowActivityLog(true)}
-          variant="outline"
-          className="flex items-center gap-2 px-3 py-2 rounded-md bg-indigo-100 hover:bg-indigo-200 transition"
-        >
-          <Clock className="w-4 h-4 text-indigo-600" />
-          <span className="text-indigo-700 text-sm font-medium">View Activity Log</span>
-        </Button>
+        <div className="flex gap-3">
+          {/* NEW: Theme Toggle Button */}
+          <Button
+            onClick={toggleTheme}
+            variant="outline"
+            className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 transition text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200"
+          >
+            {theme === 'dark' ? (
+              <>
+                <Sun className="w-4 h-4 text-yellow-500" />
+                <span className="text-sm font-medium">Light Mode</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-4 h-4 text-blue-500" />
+                <span className="text-sm font-medium">Dark Mode</span>
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={handleRunSanityCheck}
+            variant="outline"
+            className="flex items-center gap-2 px-3 py-2 rounded-md bg-orange-100 hover:bg-orange-200 transition text-orange-700"
+            disabled={isSanityCheckRunning}
+          >
+            {isSanityCheckRunning ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Running Check...
+              </>
+            ) : (
+              <>
+                <BarChart3 className="w-4 h-4 text-orange-600" />
+                <span className="text-sm font-medium">Run Sanity Check</span>
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={() => setShowActivityLog(true)}
+            variant="outline"
+            className="flex items-center gap-2 px-3 py-2 rounded-md bg-indigo-100 hover:bg-indigo-200 transition"
+          >
+            <Clock className="w-4 h-4 text-indigo-600" />
+            <span className="text-indigo-700 text-sm font-medium">View Activity Log</span>
+          </Button>
+        </div>
       </div>
 
       {/* Danger Zone */}
@@ -177,12 +287,22 @@ const DataTab: React.FC<DataTabProps> = ({
               This will permanently delete all products and invoices. This action cannot be undone.
             </p>
             <Button
-              onClick={handleClearAllData}
+              onClick={handleClearAllDataWithLoading}
               variant="destructive"
               className="shadow-elegant"
+              disabled={isClearingAll}
             >
-              <Trash className="h-4 w-4 mr-2" />
-              Clear All Data
+              {isClearingAll ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Clearing...
+                </>
+              ) : (
+                <>
+                  <Trash className="h-4 w-4 mr-2" />
+                  Clear All Data
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -289,6 +409,12 @@ const DataTab: React.FC<DataTabProps> = ({
       {showActivityLog && (
         <ActivityLogModal onClose={() => setShowActivityLog(false)} />
       )}
+
+      {/* Sanity Check Modal */}
+      <SanityCheckModal
+        showModal={showSanityCheckModal}
+        onClose={handleCloseSanityCheckModal}
+      />
     </div>
   );
 };

@@ -1,10 +1,10 @@
-import React from 'react';
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { X, Upload } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { X, Upload, Loader2 } from 'lucide-react'; // Added Loader2 for spinner
 import { collection, addDoc } from 'firebase/firestore';
-import { Product } from '../InventoryManagement'; // Import Product interface
+import { Product } from '../InventoryManagement';
 
 interface ColumnMappingModalProps {
   showColumnMappingModal: boolean;
@@ -41,12 +41,23 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
   db,
   toast,
 }) => {
+  const [isImporting, setIsImporting] = useState(false); // NEW: Importing state
+  const nameMappingRef = useRef<HTMLSelectElement>(null); // NEW: Ref for auto-focus
+
+  useEffect(() => {
+    // NEW: Auto-focus on modal open
+    if (showColumnMappingModal) {
+      setTimeout(() => nameMappingRef.current?.focus(), 100);
+    }
+  }, [showColumnMappingModal]);
 
   const handleConfirmImport = async () => {
     if (!columnMapping.name || !columnMapping.sku || !columnMapping.quantity || !columnMapping.price) {
-      toast.error("Please map all required fields (Name, SKU, Quantity, Price)");
+      toast.error('Please map all required fields (Name, SKU, Quantity, Price)');
       return;
     }
+
+    setIsImporting(true); // NEW: Set importing state
 
     try {
       const importedProducts = excelData.map((row) => ({
@@ -56,9 +67,9 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
         price: parseFloat(row[columnMapping.price] || 0),
         category: columnMapping.category ? (row[columnMapping.category] || 'Uncategorized') : 'Uncategorized',
         ...(columnMapping.purchasePrice && row[columnMapping.purchasePrice] && { 
-          purchasePrice: parseFloat(row[columnMapping.purchasePrice] || 0) 
-        })
-      })).filter(product => product.name && product.sku); // Filter out invalid rows
+          purchasePrice: parseFloat(row[columnMapping.purchasePrice] || 0), 
+        }),
+      })).filter(product => product.name && product.sku);
 
       const importPromises = importedProducts.map((product) =>
         addDoc(collection(db, 'products'), product)
@@ -67,13 +78,26 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
 
       setShowColumnMappingModal(false);
       setColumnMapping({
-        name: '', sku: '', quantity: '', price: '', category: '', purchasePrice: ''
+        name: '', sku: '', quantity: '', price: '', category: '', purchasePrice: '',
       });
       
-      toast.success(`Successfully imported ${importedProducts.length} products!`);
+      toast.success(`✅ Successfully imported ${importedProducts.length} products!`); // NEW: Success toast
     } catch (error) {
       console.error('Error importing products:', error);
-      toast.error('Failed to import products');
+      toast.error('❌ Failed to import products'); // NEW: Error toast
+    } finally {
+      setIsImporting(false); // NEW: Reset importing state
+    }
+  };
+
+  // NEW: Keyboard shortcuts
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleConfirmImport();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setShowColumnMappingModal(false);
     }
   };
 
@@ -81,7 +105,7 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <Card className="w-full max-w-2xl mx-4 animate-scale-in shadow-glow">
+      <Card className="w-full max-w-2xl mx-4 animate-scale-in shadow-glow" onKeyDown={handleKeyDown}>
         <div className="p-6 max-h-[70vh] overflow-y-auto">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-semibold">Map Excel Columns</h3>
@@ -89,6 +113,7 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
               onClick={() => setShowColumnMappingModal(false)}
               variant="ghost"
               size="sm"
+              disabled={isImporting} // NEW: Disable close button while importing
             >
               <X className="h-4 w-4" />
             </Button>
@@ -105,9 +130,11 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
                 <Label htmlFor="name-mapping">Product Name * → Excel Column</Label>
                 <select
                   id="name-mapping"
+                  ref={nameMappingRef} // NEW: Attach ref
                   value={columnMapping.name}
                   onChange={(e) => setColumnMapping({ ...columnMapping, name: e.target.value })}
                   className="w-full p-2 border border-border rounded-md bg-background"
+                  disabled={isImporting} // NEW: Disable inputs while importing
                 >
                   <option value="">Select column...</option>
                   {excelColumns.map(col => (
@@ -123,6 +150,7 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
                   value={columnMapping.sku}
                   onChange={(e) => setColumnMapping({ ...columnMapping, sku: e.target.value })}
                   className="w-full p-2 border border-border rounded-md bg-background"
+                  disabled={isImporting}
                 >
                   <option value="">Select column...</option>
                   {excelColumns.map(col => (
@@ -140,6 +168,7 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
                   value={columnMapping.quantity}
                   onChange={(e) => setColumnMapping({ ...columnMapping, quantity: e.target.value })}
                   className="w-full p-2 border border-border rounded-md bg-background"
+                  disabled={isImporting}
                 >
                   <option value="">Select column...</option>
                   {excelColumns.map(col => (
@@ -155,6 +184,7 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
                   value={columnMapping.price}
                   onChange={(e) => setColumnMapping({ ...columnMapping, price: e.target.value })}
                   className="w-full p-2 border border-border rounded-md bg-background"
+                  disabled={isImporting}
                 >
                   <option value="">Select column...</option>
                   {excelColumns.map(col => (
@@ -171,6 +201,7 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
                 value={columnMapping.category}
                 onChange={(e) => setColumnMapping({ ...columnMapping, category: e.target.value })}
                 className="w-full p-2 border border-border rounded-md bg-background"
+                disabled={isImporting}
                 >
                 <option value="">Select column or leave empty...</option>
                 {excelColumns.map(col => (
@@ -186,6 +217,7 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
                 value={columnMapping.purchasePrice}
                 onChange={(e) => setColumnMapping({ ...columnMapping, purchasePrice: e.target.value })}
                 className="w-full p-2 border border-border rounded-md bg-background"
+                disabled={isImporting}
               >
                 <option value="">Select column or leave empty...</option>
                 {excelColumns.map(col => (
@@ -217,16 +249,26 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
             <Button
               onClick={() => setShowColumnMappingModal(false)}
               variant="outline"
+              disabled={isImporting}
             >
               Cancel
             </Button>
             <Button
               onClick={handleConfirmImport}
-              disabled={!columnMapping.name || !columnMapping.sku || !columnMapping.quantity || !columnMapping.price}
+              disabled={!columnMapping.name || !columnMapping.sku || !columnMapping.quantity || !columnMapping.price || isImporting}
               className="bg-success"
             >
-              <Upload className="h-4 w-4 mr-2" />
-              Import {excelData.length} Products
+              {isImporting ? ( // NEW: Show spinner and text when importing
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import {excelData.length} Products
+                </>
+              )}
             </Button>
           </div>
           

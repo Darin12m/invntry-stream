@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, Trash, X, Save } from 'lucide-react';
+import { Search, Plus, Trash, X, Save, Loader2 } from 'lucide-react'; // Added Loader2 for spinner
 import { collection, addDoc, updateDoc, doc, getDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { Product, Invoice } from '../InventoryManagement'; // Import interfaces
-import { toast } from "sonner"; // Correct import for sonner toast
-import { logActivity } from '@/utils/logActivity'; // NEW: Import logActivity
-import { User } from 'firebase/auth'; // NEW: Import User type
+import { toast } from "sonner";
+import { logActivity } from '@/utils/logActivity';
+import { User } from 'firebase/auth';
 
 interface InvoiceModalProps {
   showInvoiceModal: boolean;
@@ -20,7 +20,7 @@ interface InvoiceModalProps {
   invoices: Invoice[]; // All invoices for generating new number
   db: any; // Firebase Firestore instance
   toast: any; // Sonner toast instance
-  currentUser: User | null; // NEW: Add currentUser prop
+  currentUser: User | null;
 }
 
 const InvoiceModal: React.FC<InvoiceModalProps> = ({
@@ -32,20 +32,22 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   invoices,
   db,
   toast,
-  currentUser, // Destructure currentUser
+  currentUser,
 }) => {
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
   const [customerInfo, setCustomerInfo] = useState({ name: '', email: '', address: '', phone: '' });
   const [invoiceProductSearch, setInvoiceProductSearch] = useState('');
   const [discount, setDiscount] = useState(0);
-  const [selectedInvoiceType, setSelectedInvoiceType] = useState<'sale' | 'refund' | 'writeoff'>('sale'); // Added state for invoice type
-  const [liveStockMap, setLiveStockMap] = useState<Map<string, number>>(new Map()); // NEW: Live stock map
+  const [selectedInvoiceType, setSelectedInvoiceType] = useState<'sale' | 'refund' | 'writeoff'>('sale');
+  const [liveStockMap, setLiveStockMap] = useState<Map<string, number>>(new Map());
+  const [isSaving, setIsSaving] = useState(false); // NEW: Saving state
+  const customerNameInputRef = useRef<HTMLInputElement>(null); // NEW: Ref for auto-focus
 
   useEffect(() => {
     const initialLiveStockMap = new Map<string, number>();
     products.forEach(p => {
-      initialLiveStockMap.set(p.id, p.onHand ?? p.quantity); // Use onHand if available, else quantity
+      initialLiveStockMap.set(p.id, p.onHand ?? p.quantity);
     });
 
     if (editingInvoice) {
@@ -60,13 +62,11 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         discountPercentage: editingInvoice.discountPercentage,
         total: editingInvoice.total,
         status: editingInvoice.status,
-        invoiceType: editingInvoice.invoiceType // Set existing type
+        invoiceType: editingInvoice.invoiceType
       });
 
       const refreshedItems = editingInvoice.items.map((item) => {
         const latestProduct = products.find(p => p.id === item.productId);
-        // When editing, "free up" the quantity of items already in this invoice
-        // so they can be adjusted within the modal's context.
         const currentStock = initialLiveStockMap.get(item.productId) || 0;
         initialLiveStockMap.set(item.productId, currentStock + item.quantity);
 
@@ -83,9 +83,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
       setCustomerInfo({ ...editingInvoice.customer, phone: editingInvoice.customer.phone || '' });
       setDiscount(editingInvoice.discountPercentage || 0);
-      setSelectedInvoiceType(editingInvoice.invoiceType || 'sale'); // Set invoice type from editingInvoice
+      setSelectedInvoiceType(editingInvoice.invoiceType || 'sale');
     } else {
-      // Generate invoice number in format 001/25, 002/25, etc.
       const year = new Date().getFullYear().toString().slice(-2);
       const nextNumber = (invoices.length + 1).toString().padStart(3, '0');
       
@@ -100,17 +99,22 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         discountPercentage: 0,
         total: 0,
         status: 'draft',
-        invoiceType: 'sale' // Default to 'sale' for new invoices
+        invoiceType: 'sale'
       });
       setInvoiceItems([]);
       setCustomerInfo({ name: '', email: '', address: '', phone: '' });
       setInvoiceProductSearch('');
       setDiscount(0);
-      setSelectedInvoiceType('sale'); // Reset invoice type for new invoices
+      setSelectedInvoiceType('sale');
     }
-    setLiveStockMap(initialLiveStockMap); // Initialize live stock map
-    setInvoiceProductSearch(''); // Always clear search on modal open/edit
-  }, [editingInvoice, products, invoices]);
+    setLiveStockMap(initialLiveStockMap);
+    setInvoiceProductSearch('');
+
+    // NEW: Auto-focus on modal open
+    if (showInvoiceModal) {
+      setTimeout(() => customerNameInputRef.current?.focus(), 100);
+    }
+  }, [editingInvoice, products, invoices, showInvoiceModal]);
 
   const handleCloseInvoiceModal = () => {
     setShowInvoiceModal(false);
@@ -120,8 +124,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     setCustomerInfo({ name: '', email: '', address: '', phone: '' });
     setInvoiceProductSearch('');
     setDiscount(0);
-    setSelectedInvoiceType('sale'); // Reset invoice type on close
-    setLiveStockMap(new Map()); // Clear live stock map on close
+    setSelectedInvoiceType('sale');
+    setLiveStockMap(new Map());
   };
 
   const filteredInvoiceProducts = products.filter(product =>
@@ -138,7 +142,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       return;
     }
 
-    // Deduct 1 from liveStockMap for in-modal validation
     setLiveStockMap(prevMap => {
       const newMap = new Map(prevMap);
       newMap.set(product.id, currentLiveStock - 1);
@@ -163,7 +166,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         discount: 0
       }]);
     }
-    toast.success(`${product.name} added to invoice`);
+    toast.success(`✅ ${product.name} added to invoice`); // NEW: Success toast
   };
 
   const updateInvoiceItemQuantity = (productId: string, newQuantity: number) => {
@@ -171,21 +174,20 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       return prevItems.map(item => {
         if (item.productId === productId) {
           const oldQuantity = item.quantity;
-          const quantityDifference = newQuantity - oldQuantity; // positive if increasing, negative if decreasing
+          const quantityDifference = newQuantity - oldQuantity;
 
           const currentLiveStock = liveStockMap.get(productId) || 0;
 
-          if (newQuantity < 0) { // Prevent negative quantities in invoice item
+          if (newQuantity < 0) {
             toast.error("Quantity cannot be negative.");
             return item;
           }
 
           if (quantityDifference > 0 && currentLiveStock < quantityDifference) {
-            toast.error(`Not enough stock to increase quantity for "${item.name}". Available: ${currentLiveStock}`);
-            return item; // Don't update if not enough stock
+            toast.error(`❌ Not enough stock to increase quantity for "${item.name}". Available: ${currentLiveStock}`);
+            return item;
           }
 
-          // Update liveStockMap for in-modal validation
           setLiveStockMap(prevMap => {
             const newMap = new Map(prevMap);
             newMap.set(productId, currentLiveStock - quantityDifference);
@@ -221,7 +223,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const removeInvoiceItem = (productId: string) => {
     const itemToRemove = invoiceItems.find(item => item.productId === productId);
     if (itemToRemove) {
-      // Restore quantity to liveStockMap for in-modal validation
       setLiveStockMap(prevMap => {
         const newMap = new Map(prevMap);
         const currentStock = newMap.get(productId) || 0;
@@ -230,7 +231,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       });
     }
     setInvoiceItems(invoiceItems.filter(item => item.productId !== productId));
-    toast.success("Item removed from invoice");
+    toast.success("✅ Item removed from invoice"); // NEW: Success toast
   };
 
   const clearAllInvoiceItems = () => {
@@ -240,7 +241,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
     
     if (window.confirm(`Are you sure you want to remove all ${invoiceItems.length} items from this invoice?`)) {
-      // Restore all quantities to liveStockMap for in-modal validation
       setLiveStockMap(prevMap => {
         const newMap = new Map(prevMap);
         invoiceItems.forEach(item => {
@@ -250,8 +250,15 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         return newMap;
       });
       setInvoiceItems([]);
-      toast.success("All items cleared from invoice");
+      toast.success("✅ All items cleared from invoice"); // NEW: Success toast
     }
+  };
+
+  const validateInvoiceItems = (items: any[]) => {
+    return items.every(item =>
+      item.productId && typeof item.productId === 'string' &&
+      !isNaN(Number(item.quantity)) && Number(item.quantity) >= 0
+    );
   };
 
   const handleSaveInvoice = async () => {
@@ -264,14 +271,21 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       toast.error('Please add at least one item to the invoice');
       return;
     }
+
+    if (!validateInvoiceItems(invoiceItems)) {
+      toast.error("Invalid invoice data: ensure all items have a valid product ID and non-negative numeric quantity.");
+      return;
+    }
+
     if (!currentUser) {
       toast.error('User not authenticated.');
       return;
     }
 
+    setIsSaving(true); // NEW: Set saving state
+
     const { subtotal, discount: discountAmount, total } = calculateInvoiceTotal();
     
-    // Create an array of product IDs for easier querying
     const itemsIds = invoiceItems.map(item => item.productId);
 
     const baseInvoiceData = {
@@ -285,13 +299,11 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       total,
       status: 'saved',
       invoiceType: selectedInvoiceType,
-      items: invoiceItems, // Always save current items
+      items: invoiceItems,
     };
 
     try {
       if (editingInvoice) {
-        // --- EDITING INVOICE LOGIC ---
-        // Call Netlify Function to update stock
         const response = await fetch('/.netlify/functions/apply-invoice-stock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -313,25 +325,22 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         await updateDoc(doc(db, 'invoices', editingInvoice.id), {
           ...baseInvoiceData,
         });
-        toast.success('Invoice updated successfully!');
-        await logActivity("Updated invoice", baseInvoiceData.number || editingInvoice.id, `${invoiceItems.length} items`); // Log activity
+        toast.success('✅ Invoice updated successfully!'); // NEW: Success toast
+        await logActivity("Updated invoice", baseInvoiceData.number || editingInvoice.id, `${invoiceItems.length} items`);
 
       } else {
-        // --- CREATING NEW INVOICE LOGIC ---
         const invoiceData = {
           ...baseInvoiceData,
-          createdAt: serverTimestamp(), // Add createdAt timestamp
+          createdAt: serverTimestamp(),
         };
 
-        // First, add the invoice to get an ID for the stock movement
         const docRef = await addDoc(collection(db, "invoices"), invoiceData);
         
-        // Call Netlify Function to update stock
         const response = await fetch('/.netlify/functions/apply-invoice-stock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            invoiceId: docRef.id, // Use the newly created invoice ID
+            invoiceId: docRef.id,
             action: "create",
             newItems: invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
             idempotencyKey: `${docRef.id}:create:${Date.now()}`,
@@ -342,20 +351,31 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
         if (!response.ok) {
           const errorData = await response.json();
-          // If stock update fails, consider rolling back the invoice creation or logging a critical error
           console.error("Netlify function error during invoice creation:", errorData);
-          // For now, we'll just throw, but a more robust solution might handle this differently
           throw new Error(errorData.message || 'Failed to apply stock changes via Netlify function.');
         }
 
-        toast.success('Invoice saved successfully!');
-        await logActivity("Created invoice", invoiceData.number || docRef.id, `${invoiceItems.length} items`); // Log activity
+        toast.success('✅ Invoice saved successfully!'); // NEW: Success toast
+        await logActivity("Created invoice", invoiceData.number || docRef.id, `${invoiceItems.length} items`);
       }
       
       handleCloseInvoiceModal();
     } catch (error) {
       console.error('Error saving invoice:', error);
-      toast.error('Failed to save invoice');
+      toast.error('❌ Failed to save invoice'); // NEW: Error toast
+    } finally {
+      setIsSaving(false); // NEW: Reset saving state
+    }
+  };
+
+  // NEW: Keyboard shortcuts
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) { // Prevent Enter in textarea from submitting
+      e.preventDefault();
+      handleSaveInvoice();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCloseInvoiceModal();
     }
   };
 
@@ -364,12 +384,12 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 overflow-y-auto">
       <div className="min-h-full flex items-center justify-center p-2 sm:p-4">
-        <Card className="w-full max-w-7xl max-h-[95vh] sm:h-5/6 flex flex-col animate-scale-in shadow-glow">
+        <Card className="w-full max-w-7xl max-h-[95vh] sm:h-5/6 flex flex-col animate-scale-in shadow-glow" onKeyDown={handleKeyDown}>
           
           {/* Header */}
           <div className="flex justify-between items-center p-6 border-b">
             <h2 className="text-2xl font-bold">Create New Invoice</h2>
-            <Button onClick={handleCloseInvoiceModal} variant="ghost">
+            <Button onClick={handleCloseInvoiceModal} variant="ghost" disabled={isSaving}>
               <X className="h-6 w-6" />
             </Button>
           </div>
@@ -390,6 +410,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       value={invoiceProductSearch}
                       onChange={(e) => setInvoiceProductSearch(e.target.value)}
                       className="pl-10"
+                      disabled={isSaving}
                     />
                   </div>
                   {invoiceProductSearch && (
@@ -403,12 +424,12 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 <div className="flex-1 overflow-y-auto p-4">
                   <div className="space-y-3">
                     {filteredInvoiceProducts.map(product => {
-                      const currentLiveStock = liveStockMap.get(product.id) || 0; // Get live stock
+                      const currentLiveStock = liveStockMap.get(product.id) || 0;
                       return (
                         <Card
                           key={product.id}
-                          onClick={() => addItemToInvoice(product)}
-                          className={`p-4 cursor-pointer hover:shadow-elegant transition-all duration-300 ${currentLiveStock <= 0 ? 'opacity-50 cursor-not-allowed border-destructive/50' : 'hover:border-primary/50'}`}
+                          onClick={() => !isSaving && addItemToInvoice(product)} // NEW: Disable click while saving
+                          className={`p-4 cursor-pointer hover:shadow-elegant transition-all duration-300 ${currentLiveStock <= 0 || isSaving ? 'opacity-50 cursor-not-allowed border-destructive/50' : 'hover:border-primary/50'}`}
                         >
                           <div className="flex justify-between items-center">
                             <div>
@@ -417,7 +438,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                               <p className="text-primary font-semibold">{product.price.toFixed(2)} ден.</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-sm text-muted-foreground">Stock: {currentLiveStock}</p> {/* Display live stock */}
+                              <p className="text-sm text-muted-foreground">Stock: {currentLiveStock}</p>
                               <div className={`rounded-full p-2 mt-2 ${currentLiveStock <= 0 ? 'bg-gray-400' : 'bg-primary text-primary-foreground'}`}>
                                 <Plus className="h-4 w-4" />
                               </div>
@@ -441,6 +462,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                     <Input
                       value={currentInvoice.number}
                       onChange={(e) => setCurrentInvoice({ ...currentInvoice, number: e.target.value })}
+                      disabled={isSaving}
                     />
                   </div>
                   <div>
@@ -450,6 +472,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       type="date"
                       value={currentInvoice.date}
                       onChange={(e) => setCurrentInvoice({ ...currentInvoice, date: e.target.value })}
+                      disabled={isSaving}
                     />
                   </div>
                 </div>
@@ -461,6 +484,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                     value={selectedInvoiceType}
                     onChange={(e) => setSelectedInvoiceType(e.target.value as 'sale' | 'refund' | 'writeoff')}
                     className="w-full border rounded-md p-2 bg-background text-foreground"
+                    disabled={isSaving}
                   >
                     <option value="sale">Sale / Outgoing</option>
                     <option value="refund">Refund / Return</option>
@@ -473,27 +497,32 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                   <h3 className="font-bold text-lg mb-3">Customer Information</h3>
                   <div className="space-y-3">
                     <Input
+                      ref={customerNameInputRef} // NEW: Attach ref
                       placeholder="Customer Name *"
                       value={customerInfo.name}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
+                      disabled={isSaving}
                     />
                     <Input
                       type="tel"
                       placeholder="Phone Number"
                       value={customerInfo.phone}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                      disabled={isSaving}
                     />
                     <Input
                       type="email"
                       placeholder="Email"
                       value={customerInfo.email}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
+                      disabled={isSaving}
                       />
                     <Textarea
                       placeholder="Address"
                       value={customerInfo.address}
                       onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
                       rows={3}
+                      disabled={isSaving}
                     />
                   </div>
                 </div>
@@ -507,6 +536,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                         onClick={clearAllInvoiceItems}
                         variant="outline"
                         size="sm"
+                        disabled={isSaving}
                       >
                         <Trash className="h-4 w-4 mr-2" />
                         Clear All
@@ -537,6 +567,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                   variant="destructive"
                                   size="sm"
                                   className="h-8 w-8 p-0 flex-shrink-0"
+                                  disabled={isSaving}
                                 >
                                   <X className="h-4 w-4" />
                                 </Button>
@@ -551,7 +582,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                       variant="outline"
                                       size="sm"
                                       className="h-8 w-8 p-0"
-                                      disabled={item.quantity <= 1} // Disable if quantity is 1
+                                      disabled={item.quantity <= 1 || isSaving}
                                     >
                                       -
                                     </Button>
@@ -561,12 +592,14 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                       onChange={(e) => updateInvoiceItemQuantity(item.productId, parseInt(e.target.value) || 0)}
                                       className="w-full h-8 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                       placeholder="0"
+                                      disabled={isSaving}
                                     />
                                     <Button
                                       onClick={() => updateInvoiceItemQuantity(item.productId, item.quantity + 1)}
                                       variant="outline"
                                       size="sm"
                                       className="h-8 w-8 p-0"
+                                      disabled={isSaving}
                                     >
                                       +
                                     </Button>
@@ -583,6 +616,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                     onChange={(e) => updateInvoiceItemDiscount(item.productId, parseFloat(e.target.value) || 0)}
                                     className="h-8"
                                     placeholder="0"
+                                    disabled={isSaving}
                                   />
                                 </div>
                               </div>
@@ -624,6 +658,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                           value={discount}
                           onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                           placeholder="0"
+                          disabled={isSaving}
                         />
                       </div>
                       <div className="space-y-2 text-right">
@@ -654,16 +689,26 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
               <Button
                 onClick={handleCloseInvoiceModal}
                 variant="outline"
+                disabled={isSaving}
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleSaveInvoice}
-                disabled={invoiceItems.length === 0 || !customerInfo.name.trim()}
+                disabled={invoiceItems.length === 0 || !customerInfo.name.trim() || isSaving} // NEW: Disable save button while saving
                 className="bg-success"
               >
-                <Save className="h-4 w-4 mr-2" />
-                Save Invoice
+                {isSaving ? ( // NEW: Show spinner and text when saving
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Invoice
+                  </>
+                )}
               </Button>
             </div>
             
