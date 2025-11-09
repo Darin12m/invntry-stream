@@ -428,14 +428,7 @@ const Settings: React.FC<SettingsProps> = ({ products, invoices, currentUser }) 
             )}
           </Button>
           {/* Removed the "Run Sanity Check" button from here */}
-          <Button
-            onClick={() => setShowActivityLog(true)}
-            variant="outline"
-            className="flex items-center gap-2 px-3 py-2 rounded-md transition"
-          >
-            <Clock className="w-4 h-4 text-indigo-600" />
-            <span className="text-sm font-medium">View Activity Log</span>
-          </Button>
+          {/* Removed the "View Activity Log" button from here */}
         </div>
       </div>
 
@@ -600,7 +593,7 @@ const Settings: React.FC<SettingsProps> = ({ products, invoices, currentUser }) 
             variant="outline"
             className="flex-1"
           >
-            <Clock className="w-4 h-4 mr-2 text-indigo-600" />
+            <Clock className="h-4 w-4 mr-2 text-indigo-600" />
             View Activity Log
           </Button>
           <Button variant="outline" className="flex-1" disabled>
