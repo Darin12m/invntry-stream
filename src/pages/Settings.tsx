@@ -465,22 +465,7 @@ const Settings: React.FC<SettingsProps> = ({ products, invoices, currentUser }) 
               <Label htmlFor="theme-toggle" className="text-base">
                 App Theme
               </Label>
-              <Button
-                onClick={toggleTheme}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                {theme === 'dark' ? (
-                  <>
-                    <Sun className="w-4 h-4 text-yellow-500" /> Light
-                  </>
-                ) : (
-                  <>
-                    <Moon className="w-4 h-4 text-blue-500" /> Dark
-                  </>
-                )}
-              </Button>
+              {/* Removed the duplicate theme toggle button here */}
             </div>
             <div className="flex items-center justify-between">
               <Label className="text-base">App Version</Label>
