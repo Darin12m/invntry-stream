@@ -524,7 +524,7 @@ const Settings: React.FC<SettingsProps> = ({ products, invoices, currentUser }) 
                 <Button
                   onClick={() => exportToCSV(products, 'inventory-backup.csv')}
                   variant="outline"
-                  className="w-full justify-start"
+                  className="w-full justify-start whitespace-normal"
                   disabled={products.length === 0}
                 >
                   <Download className="h-4 w-4 mr-2" />
@@ -533,7 +533,7 @@ const Settings: React.FC<SettingsProps> = ({ products, invoices, currentUser }) 
                 <Button
                   onClick={() => exportToJSON(products, 'inventory-backup.json')}
                   variant="outline"
-                  className="w-full justify-start"
+                  className="w-full justify-start whitespace-normal"
                   disabled={products.length === 0}
                 >
                   <Download className="h-4 w-4 mr-2" />
@@ -545,7 +545,7 @@ const Settings: React.FC<SettingsProps> = ({ products, invoices, currentUser }) 
                 <Button
                   onClick={() => exportToCSV(invoices, 'invoice-log.csv')}
                   variant="outline"
-                  className="w-full justify-start"
+                  className="w-full justify-start whitespace-normal"
                   disabled={invoices.length === 0}
                 >
                   <Download className="h-4 w-4 mr-2" />
@@ -554,7 +554,7 @@ const Settings: React.FC<SettingsProps> = ({ products, invoices, currentUser }) 
                 <Button
                   onClick={() => exportToJSON(invoices, 'invoice-log.json')}
                   variant="outline"
-                  className="w-full justify-start"
+                  className="w-full justify-start whitespace-normal"
                   disabled={invoices.length === 0}
                 >
                   <Download className="h-4 w-4 mr-2" />
