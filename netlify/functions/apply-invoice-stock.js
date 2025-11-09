@@ -1,11 +1,12 @@
 // netlify/functions/apply-invoice-stock.js
-// Safe, bulletproof stock movement handler for Netlify + Firestore
+// FINAL BULLETPROOF VERSION — handles all math scenarios safely and consistently
 
 const admin = require("firebase-admin");
 
+// Initialize Firebase Admin SDK
 if (!admin.apps.length) {
   if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON || !process.env.FIREBASE_PROJECT_ID) {
-    throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_PROJECT_ID env vars");
+    throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_PROJECT_ID environment variables");
   }
   const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
   admin.initializeApp({
@@ -16,13 +17,13 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-/** Convert to safe number */
+/** Safe number conversion */
 const toNum = (val) => {
   const n = Number(val);
   return isNaN(n) || !isFinite(n) ? 0 : n;
 };
 
-/** Merge lines by productId, summing qty */
+/** Normalize items into a map of { productId: totalQty } */
 function normalizeItems(items = []) {
   const map = {};
   for (const it of items) {
@@ -34,21 +35,21 @@ function normalizeItems(items = []) {
   return map;
 }
 
-/** Compute per-product qty deltas between old and new */
+/** Compute per-product quantity deltas for stock movement */
 function computeDeltas(oldItems = [], newItems = [], action) {
   const oldMap = normalizeItems(oldItems);
   const newMap = normalizeItems(newItems);
   const deltas = {};
 
-  // CREATE or RESTORE → subtract from stock
-  if (action === "create" || action === "restore") {
+  // CREATE → subtract new qty
+  if (action === "create") {
     for (const pid of Object.keys(newMap)) {
       const q = -toNum(newMap[pid]);
       if (q !== 0) deltas[pid] = q;
     }
   }
 
-  // EDIT → diff old and new
+  // EDIT → restore old, subtract new
   if (action === "edit") {
     const all = new Set([...Object.keys(oldMap), ...Object.keys(newMap)]);
     for (const pid of all) {
@@ -61,6 +62,14 @@ function computeDeltas(oldItems = [], newItems = [], action) {
   if (action === "delete") {
     for (const pid of Object.keys(oldMap)) {
       const q = toNum(oldMap[pid]);
+      if (q !== 0) deltas[pid] = q;
+    }
+  }
+
+  // RESTORE → reapply old qty (subtract it again)
+  if (action === "restore") {
+    for (const pid of Object.keys(oldMap)) {
+      const q = -toNum(oldMap[pid]);
       if (q !== 0) deltas[pid] = q;
     }
   }
@@ -90,7 +99,7 @@ exports.handler = async (event) => {
     let moved = 0;
 
     await db.runTransaction(async (txn) => {
-      // Check idempotency
+      // ✅ Idempotency check
       const idemSnap = await txn.get(
         movementsRef.where("idempotencyKey", "==", idempotencyKey).limit(1)
       );
@@ -99,17 +108,18 @@ exports.handler = async (event) => {
         throw { code: "IDEMPOTENT", message: "Already processed" };
       }
 
-      // Load server copy
+      // ✅ Load old invoice copy
       const invoiceSnap = await txn.get(invoiceRef);
       const oldData = invoiceSnap.exists ? invoiceSnap.data() : {};
       const oldItems = oldData.items || [];
 
+      // ✅ Compute deltas
       const deltas = computeDeltas(oldItems, newItems, action);
 
-      // Record movements + update products
+      // ✅ For each product, record movement and update onHand
       for (const [pid, qtyDeltaRaw] of Object.entries(deltas)) {
         const qtyDelta = toNum(qtyDeltaRaw);
-        if (!qtyDelta || isNaN(qtyDelta)) continue; // skip invalid
+        if (!qtyDelta || isNaN(qtyDelta)) continue;
         const prodRef = db.collection("products").doc(pid);
 
         txn.set(
@@ -133,7 +143,7 @@ exports.handler = async (event) => {
         moved++;
       }
 
-      // Save server copy of invoice
+      // ✅ Save new invoice server copy
       const now = admin.firestore.FieldValue.serverTimestamp();
       if (action === "delete") {
         txn.set(invoiceRef, { ...oldData, status: "deleted", updatedAt: now }, { merge: true });
@@ -152,7 +162,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ ok: true, moved }),
     };
   } catch (e) {
-    // Allow idempotent duplicate to return ok:true without movement
+    // ✅ Handle idempotency gracefully
     if (e && e.code === "IDEMPOTENT") {
       return {
         statusCode: 200,
