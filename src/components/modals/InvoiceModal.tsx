@@ -68,7 +68,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       const refreshedItems = editingInvoice.items.map((item) => {
         const latestProduct = products.find(p => p.id === item.productId);
         const currentStock = initialLiveStockMap.get(item.productId) || 0;
-        initialLiveStockMap.set(item.productId, currentStock + item.quantity);
+        initialLiveStockMap.set(item.productId, currentStock + (item.quantity ?? 0)); // Ensure quantity is number
 
         return latestProduct
           ? {
@@ -152,7 +152,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     if (existingItemIndex > -1) {
       setInvoiceItems(prevItems => prevItems.map((item, index) =>
         index === existingItemIndex
-          ? { ...item, quantity: item.quantity + 1 }
+          ? { ...item, quantity: (item.quantity ?? 0) + 1 } // Ensure quantity is number
           : item
       ));
     } else {
@@ -160,7 +160,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         productId: product.id,
         name: product.name,
         sku: product.sku,
-        price: product.price,
+        price: product.price ?? 0, // Ensure price is number
         quantity: 1,
         purchasePrice: product.purchasePrice || 0,
         discount: 0
@@ -173,7 +173,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     setInvoiceItems(prevItems => {
       return prevItems.map(item => {
         if (item.productId === productId) {
-          const oldQuantity = item.quantity;
+          const oldQuantity = item.quantity ?? 0; // Ensure quantity is number
           const quantityDifference = newQuantity - oldQuantity;
 
           const currentLiveStock = liveStockMap.get(productId) || 0;
@@ -204,18 +204,20 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const updateInvoiceItemDiscount = (productId: string, discount: number) => {
     setInvoiceItems(invoiceItems.map(item =>
       item.productId === productId
-        ? { ...item, discount: Math.max(0, Math.min(100, discount)) }
+        ? { ...item, discount: Math.max(0, Math.min(100, discount ?? 0)) } // Ensure discount is number
         : item
     ));
   };
 
   const calculateInvoiceTotal = () => {
     const subtotal = invoiceItems.reduce((sum, item) => {
-      const itemTotal = item.price * item.quantity;
+      const itemPrice = item.price ?? 0; // Ensure price is a number
+      const itemQuantity = item.quantity ?? 0; // Ensure quantity is a number
+      const itemTotal = itemPrice * itemQuantity;
       const itemDiscount = itemTotal * ((item.discount || 0) / 100);
       return sum + (itemTotal - itemDiscount);
     }, 0);
-    const globalDiscountAmount = subtotal * (discount / 100);
+    const globalDiscountAmount = subtotal * ((discount ?? 0) / 100); // Ensure discount is number
     const total = subtotal - globalDiscountAmount;
     return { subtotal, discount: globalDiscountAmount, total };
   };
@@ -226,7 +228,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setLiveStockMap(prevMap => {
         const newMap = new Map(prevMap);
         const currentStock = newMap.get(productId) || 0;
-        newMap.set(productId, currentStock + itemToRemove.quantity);
+        newMap.set(productId, currentStock + (itemToRemove.quantity ?? 0)); // Ensure quantity is number
         return newMap;
       });
     }
@@ -245,7 +247,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         const newMap = new Map(prevMap);
         invoiceItems.forEach(item => {
           const currentStock = newMap.get(item.productId) || 0;
-          newMap.set(item.productId, currentStock + item.quantity);
+          newMap.set(item.productId, currentStock + (item.quantity ?? 0)); // Ensure quantity is number
         });
         return newMap;
       });
@@ -257,7 +259,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const validateInvoiceItems = (items: any[]) => {
     return items.every(item =>
       item.productId && typeof item.productId === 'string' &&
-      !isNaN(Number(item.quantity)) && Number(item.quantity) >= 0
+      !isNaN(Number(item.quantity)) && Number(item.quantity ?? 0) >= 0 // Ensure quantity is number
     );
   };
 
@@ -317,7 +319,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         const payload = {
           invoiceId: editingInvoice.id,
           action: "edit",
-          newItems: invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+          newItems: invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity ?? 0, sku: item.sku })), // Ensure quantity is number
           idempotencyKey: `${editingInvoice.id}:edit:${Date.now()}`,
           userId: currentUser.uid,
           reason: `Invoice ${editingInvoice.number || editingInvoice.id} edited.`
@@ -359,7 +361,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         const payload = {
           invoiceId: docRef.id,
           action: "create",
-          newItems: invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity, sku: item.sku })),
+          newItems: invoiceItems.map(item => ({ productId: item.productId, quantity: item.quantity ?? 0, sku: item.sku })), // Ensure quantity is number
           idempotencyKey: `${docRef.id}:create:${Date.now()}`,
           userId: currentUser.uid,
           reason: `Invoice ${invoiceData.number || docRef.id} created.`
@@ -465,7 +467,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                             <div>
                               <h4 className="font-bold">{product.name}</h4>
                               <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
-                              <p className="text-primary font-semibold">{product.price.toFixed(2)} ден.</p>
+                              <p className="text-primary font-semibold">{(product.price ?? 0).toFixed(2)} ден.</p> {/* Ensure price is number */}
                             </div>
                             <div className="text-right">
                               <p className="text-sm text-muted-foreground">Stock: {currentLiveStock}</p>
@@ -580,8 +582,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                   ) : (
                     <div className="space-y-3">
                       {invoiceItems.map(item => {
-                        const itemSubtotal = item.price * item.quantity;
-                        const itemDiscountAmount = itemSubtotal * ((item.discount || 0) / 100);
+                        const itemSubtotal = (item.price ?? 0) * (item.quantity ?? 0); // Ensure price and quantity are numbers
+                        const itemDiscountAmount = itemSubtotal * ((item.discount ?? 0) / 100); // Ensure discount is number
                         const itemTotal = itemSubtotal - itemDiscountAmount;
                         
                         return (
@@ -608,24 +610,24 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                   <Label className="text-xs">Quantity</Label>
                                   <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
                                     <Button
-                                      onClick={() => updateInvoiceItemQuantity(item.productId, item.quantity - 1)}
+                                      onClick={() => updateInvoiceItemQuantity(item.productId, (item.quantity ?? 0) - 1)} // Ensure quantity is number
                                       variant="outline"
                                       size="sm"
                                       className="h-8 w-8 p-0"
-                                      disabled={item.quantity <= 1 || isSaving}
+                                      disabled={(item.quantity ?? 0) <= 1 || isSaving} // Ensure quantity is number
                                     >
                                       -
                                     </Button>
                                     <Input
                                       type="number"
-                                      value={item.quantity}
+                                      value={item.quantity ?? 0} // Ensure quantity is number
                                       onChange={(e) => updateInvoiceItemQuantity(item.productId, parseInt(e.target.value) || 0)}
                                       className="w-full h-8 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                       placeholder="0"
                                       disabled={isSaving}
                                     />
                                     <Button
-                                      onClick={() => updateInvoiceItemQuantity(item.productId, item.quantity + 1)}
+                                      onClick={() => updateInvoiceItemQuantity(item.productId, (item.quantity ?? 0) + 1)} // Ensure quantity is number
                                       variant="outline"
                                       size="sm"
                                       className="h-8 w-8 p-0"
@@ -642,7 +644,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                     type="number"
                                     min="0"
                                     max="100"
-                                    value={item.discount || 0}
+                                    value={item.discount ?? 0} // Ensure discount is number
                                     onChange={(e) => updateInvoiceItemDiscount(item.productId, parseFloat(e.target.value) || 0)}
                                     className="h-8"
                                     placeholder="0"
@@ -656,7 +658,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                   <span className="text-muted-foreground">Price × Qty:</span>
                                   <span>{itemSubtotal.toFixed(2)} ден.</span>
                                 </div>
-                                {(item.discount || 0) > 0 && (
+                                {(item.discount ?? 0) > 0 && ( // Ensure discount is number
                                   <div className="flex justify-between text-success">
                                     <span>Discount ({item.discount}%):</span>
                                     <span>-{itemDiscountAmount.toFixed(2)} ден.</span>
@@ -685,7 +687,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                           type="number"
                           min="0"
                           max="100"
-                          value={discount}
+                          value={discount ?? 0} // Ensure discount is number
                           onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                           placeholder="0"
                           disabled={isSaving}
@@ -696,7 +698,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                             <span>Мегузбир:</span>
                             <span>{calculateInvoiceTotal().subtotal.toFixed(2)} ден.</span>
                           </div>
-                          {discount > 0 && (
+                          {(discount ?? 0) > 0 && ( // Ensure discount is number
                             <div className="flex justify-between text-success">
                               <span>Попуст ({discount}%):</span>
                               <span>-{calculateInvoiceTotal().discount.toFixed(2)} ден.</span>

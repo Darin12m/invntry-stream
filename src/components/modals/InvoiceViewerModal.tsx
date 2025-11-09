@@ -376,15 +376,15 @@ const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
                           padding: '8px',
                           textAlign: 'center',
                           fontSize: '12px',
-                          color: item.quantity < 0 ? '#dc2626' : 'inherit',
-                          fontWeight: item.quantity < 0 ? 'bold' : 'normal',
-                        }}>{item.quantity}</td>
+                          color: (item.quantity ?? 0) < 0 ? '#dc2626' : 'inherit', // Ensure quantity is number
+                          fontWeight: (item.quantity ?? 0) < 0 ? 'bold' : 'normal', // Ensure quantity is number
+                        }}>{item.quantity ?? 0}</td> {/* Ensure quantity is number */}
                         <td style={{
                           border: '1px solid #ddd',
                           padding: '8px',
                           textAlign: 'right',
                           fontSize: '12px',
-                        }}>{item.price.toFixed(2)} ден</td>
+                        }}>{(item.price ?? 0).toFixed(2)} ден</td> {/* Ensure price is number */}
                         <td style={{
                           border: '1px solid #ddd',
                           padding: '8px',
@@ -396,13 +396,13 @@ const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
                           padding: '8px',
                           textAlign: 'center',
                           fontSize: '12px',
-                        }}>{viewingInvoice.discountPercentage > 0 ? `${viewingInvoice.discountPercentage}%` : '5%'}</td>
+                        }}>{(viewingInvoice.discountPercentage ?? 0) > 0 ? `${viewingInvoice.discountPercentage}%` : '5%'}</td> {/* Ensure discountPercentage is number */}
                         <td style={{
                           border: '1px solid #ddd',
                           padding: '8px',
                           textAlign: 'right',
                           fontSize: '12px',
-                        }}>{(item.price * item.quantity).toFixed(2)} ден</td>
+                        }}>{((item.price ?? 0) * (item.quantity ?? 0)).toFixed(2)} ден</td> {/* Ensure price and quantity are numbers */}
                       </tr>
                     ))
                   ) : (
@@ -429,11 +429,11 @@ const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
                 marginBottom: '40px',
               }}>
                 <p style={{ margin: '5px 0' }}>
-                  Меѓузбир: <span style={{ marginLeft: '20px' }}>{viewingInvoice.subtotal.toFixed(2)} ден</span>
+                  Меѓузбир: <span style={{ marginLeft: '20px' }}>{(viewingInvoice.subtotal ?? 0).toFixed(2)} ден</span> {/* Ensure subtotal is number */}
                 </p>
-                {viewingInvoice.discountPercentage > 0 && (
+                {(viewingInvoice.discountPercentage ?? 0) > 0 && ( // Ensure discountPercentage is number
                   <p style={{ margin: '5px 0', color: '#dc2626' }}>
-                    Попуст: <span style={{ marginLeft: '20px' }}>-{viewingInvoice.discount.toFixed(2)} ден</span>
+                    Попуст: <span style={{ marginLeft: '20px' }}>-{(viewingInvoice.discount ?? 0).toFixed(2)} ден</span> {/* Ensure discount is number */}
                   </p>
                 )}
                 <p style={{ margin: '5px 0' }}>
@@ -447,7 +447,7 @@ const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
                   borderTop: '2px solid #ddd',
                   paddingTop: '10px',
                 }}>
-                  ВКУПНО: <span style={{ marginLeft: '20px' }}>{viewingInvoice.total.toFixed(2)} ден</span>
+                  ВКУПНО: <span style={{ marginLeft: '20px' }}>{(viewingInvoice.total ?? 0).toFixed(2)} ден</span> {/* Ensure total is number */}
                 </p>
               </div>
 
