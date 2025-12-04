@@ -4,7 +4,7 @@ import { Package, FileText, BarChart3, LogOut, Settings, Menu, X, User as UserIc
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; // Ensure Sheet components are imported
 import { AppContext } from '@/context/AppContext';
 import { useAuth } from '@/hooks/useAuth';
 import InventoryTab from '@/components/inventory/InventoryTab';
@@ -32,7 +32,8 @@ const AppLayout: React.FC = () => {
   const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'inventory' | 'invoices' | 'dashboard' | 'settings'>('inventory');
   const { metrics, dateFilter, setDateFilter, calculateDashboardMetrics } = useDashboardMetrics(products, invoices);
-  const { isIOS, screenCategory } = useDeviceType(); // Use the new hook
+  const { isIOS } = useDeviceType(); // Use the new hook
+  const [isSheetOpen, setIsSheetOpen] = useState(false); // State to control sheet visibility
 
   const renderTabContent = useCallback(() => {
     switch (activeTab) {
@@ -94,7 +95,7 @@ const AppLayout: React.FC = () => {
             </div>
 
             {/* Desktop Navigation */}
-            <div className="flex space-x-4 sm:space-x-8"> {/* Adjusted spacing for smaller screens */}
+            <div className="hidden md:flex space-x-4 sm:space-x-8"> {/* Hide on mobile, show on desktop */}
               {navItems.map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
@@ -109,6 +110,66 @@ const AppLayout: React.FC = () => {
                   {label}
                 </button>
               ))}
+            </div>
+
+            {/* Mobile Navigation (Sheet) */}
+            <div className="md:hidden flex items-center"> {/* Show on mobile, hide on desktop */}
+              <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Open menu</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[250px] sm:w-[300px] flex flex-col">
+                  <div className="flex items-center justify-between p-4 border-b">
+                    <div className="flex items-center">
+                      <div className="bg-gradient-primary p-1.5 rounded-md">
+                        <Package className="h-5 w-5 text-primary-foreground" />
+                      </div>
+                      <span className="ml-2 text-lg font-bold bg-gradient-primary bg-clip-text text-transparent">Menu</span>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => setIsSheetOpen(false)}>
+                      <X className="h-5 w-5" />
+                      <span className="sr-only">Close menu</span>
+                    </Button>
+                  </div>
+                  <div className="flex flex-col gap-2 p-4 flex-1">
+                    {navItems.map(({ key, label, icon: Icon }) => (
+                      <Button
+                        key={key}
+                        variant={activeTab === key ? 'default' : 'ghost'}
+                        className="justify-start w-full"
+                        onClick={() => {
+                          setActiveTab(key);
+                          setIsSheetOpen(false); // Close sheet on item click
+                        }}
+                      >
+                        <Icon className="w-4 h-4 mr-2" />
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="p-4 border-t">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" className="w-full justify-start">
+                          <Avatar className="h-6 w-6 mr-2">
+                            <AvatarFallback>{currentUser?.email?.[0]?.toUpperCase() || <UserIcon className="h-4 w-4" />}</AvatarFallback>
+                          </Avatar>
+                          {currentUser?.email}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-48 p-2">
+                        <Button variant="ghost" className="w-full justify-start" onClick={logout}>
+                          <LogOut className="h-4 w-4 mr-2" />
+                          Logout
+                        </Button>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
         </div>
