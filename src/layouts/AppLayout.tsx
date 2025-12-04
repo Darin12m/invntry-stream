@@ -4,7 +4,7 @@ import { Package, FileText, BarChart3, LogOut, Settings, Menu, X, User as UserIc
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; // Ensure Sheet components are imported
+// Removed Sheet, SheetContent, SheetTrigger imports as they are no longer needed
 import { AppContext } from '@/context/AppContext';
 import { useAuth } from '@/hooks/useAuth';
 import InventoryTab from '@/components/inventory/InventoryTab';
@@ -33,7 +33,7 @@ const AppLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'inventory' | 'invoices' | 'dashboard' | 'settings'>('inventory');
   const { metrics, dateFilter, setDateFilter, calculateDashboardMetrics } = useDashboardMetrics(products, invoices);
   const { isIOS } = useDeviceType(); // Use the new hook
-  const [isSheetOpen, setIsSheetOpen] = useState(false); // State to control sheet visibility
+  // Removed isSheetOpen state as it's no longer needed
 
   const renderTabContent = useCallback(() => {
     switch (activeTab) {
@@ -112,64 +112,30 @@ const AppLayout: React.FC = () => {
               ))}
             </div>
 
-            {/* Mobile Navigation (Sheet) */}
-            <div className="md:hidden flex items-center"> {/* Show on mobile, hide on desktop */}
-              <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Menu className="h-5 w-5" />
-                    <span className="sr-only">Open menu</span>
+            {/* User Profile/Logout - Always visible */}
+            <div className="flex items-center">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback>{currentUser?.email?.[0]?.toUpperCase() || <UserIcon className="h-4 w-4" />}</AvatarFallback>
+                    </Avatar>
                   </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-[250px] sm:w-[300px] flex flex-col">
-                  <div className="flex items-center justify-between p-4 border-b">
-                    <div className="flex items-center">
-                      <div className="bg-gradient-primary p-1.5 rounded-md">
-                        <Package className="h-5 w-5 text-primary-foreground" />
-                      </div>
-                      <span className="ml-2 text-lg font-bold bg-gradient-primary bg-clip-text text-transparent">Menu</span>
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => setIsSheetOpen(false)}>
-                      <X className="h-5 w-5" />
-                      <span className="sr-only">Close menu</span>
-                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-2">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{currentUser?.email}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {currentUser?.uid}
+                    </p>
                   </div>
-                  <div className="flex flex-col gap-2 p-4 flex-1">
-                    {navItems.map(({ key, label, icon: Icon }) => (
-                      <Button
-                        key={key}
-                        variant={activeTab === key ? 'default' : 'ghost'}
-                        className="justify-start w-full"
-                        onClick={() => {
-                          setActiveTab(key);
-                          setIsSheetOpen(false); // Close sheet on item click
-                        }}
-                      >
-                        <Icon className="w-4 h-4 mr-2" />
-                        {label}
-                      </Button>
-                    ))}
-                  </div>
-                  <div className="p-4 border-t">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="ghost" className="w-full justify-start">
-                          <Avatar className="h-6 w-6 mr-2">
-                            <AvatarFallback>{currentUser?.email?.[0]?.toUpperCase() || <UserIcon className="h-4 w-4" />}</AvatarFallback>
-                          </Avatar>
-                          {currentUser?.email}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-48 p-2">
-                        <Button variant="ghost" className="w-full justify-start" onClick={logout}>
-                          <LogOut className="h-4 w-4 mr-2" />
-                          Logout
-                        </Button>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </SheetContent>
-              </Sheet>
+                  <div className="my-2 h-px bg-border" />
+                  <Button variant="ghost" className="w-full justify-start" onClick={logout}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </Button>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </div>
