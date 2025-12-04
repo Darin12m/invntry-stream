@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback, useContext } from 'react';
-import { Search, Plus, Edit, Trash2, Trash, X, ChevronUp, ChevronDown, Package, CheckSquare, Square, History } from 'lucide-react';
+import React, { useState, useMemo, useCallback, useContext, useRef } from 'react';
+import { Search, Plus, Edit, Trash2, Trash, X, ChevronUp, ChevronDown, Package, CheckSquare, Square, History, Check } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,8 @@ import { useInvoices } from '@/hooks/useInvoices';
 import { useDebounce } from 'use-debounce';
 import { toast } from 'sonner'; // Import toast
 import { useDeviceType } from '@/hooks/useDeviceType'; // Import useDeviceType
+
+const LONG_PRESS_DURATION = 500; // milliseconds
 
 const InventoryTab: React.FC = React.memo(() => {
   const { currentUser, products, invoices } = useContext(AppContext);
@@ -32,6 +34,7 @@ const InventoryTab: React.FC = React.memo(() => {
     selectedProducts,
     toggleProductSelection,
     selectAllProducts: selectAllProductsHook,
+    setSelectedProducts // Added to clear selections
   } = useProducts();
   const { invoices: allInvoices } = useInvoices(); // Use allInvoices from useInvoices
   const { isIOS } = useDeviceType(); // Use the hook
@@ -45,6 +48,9 @@ const InventoryTab: React.FC = React.memo(() => {
   const [showSellHistoryModal, setShowSellHistoryModal] = useState(false);
   const [currentProductSellHistory, setCurrentProductSellHistory] = useState<any[]>([]);
   const [currentProductForSellHistory, setCurrentProductForSellHistory] = useState<string>('');
+
+  const [selectionMode, setSelectionMode] = useState(false);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
@@ -84,7 +90,9 @@ const InventoryTab: React.FC = React.memo(() => {
 
   const handleBulkDelete = useCallback(() => {
     bulkDeleteProducts(selectedProducts);
-  }, [bulkDeleteProducts, selectedProducts]);
+    setSelectionMode(false); // Exit selection mode after bulk delete
+    setSelectedProducts(new Set()); // Clear selections
+  }, [bulkDeleteProducts, selectedProducts, setSelectedProducts]);
 
   const handleSelectAll = useCallback(() => {
     selectAllProductsHook(filteredProducts.map(p => p.id));
@@ -105,6 +113,44 @@ const InventoryTab: React.FC = React.memo(() => {
     setCurrentProductForSellHistory(productName);
     setShowSellHistoryModal(true);
   }, [allInvoices]);
+
+  // Long-press / Tap selection logic
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handleInteractionStart = useCallback((productId: string) => {
+    clearLongPressTimer(); // Clear any previous timer
+    longPressTimer.current = setTimeout(() => {
+      setSelectionMode(true);
+      toggleProductSelection(productId);
+      longPressTimer.current = null; // Clear timer after it fires
+    }, LONG_PRESS_DURATION);
+  }, [clearLongPressTimer, toggleProductSelection]);
+
+  const handleInteractionEnd = useCallback((productId: string, isClick: boolean) => {
+    clearLongPressTimer();
+    if (selectionMode) {
+      if (isClick) { // Only toggle on click/tap if in selection mode
+        toggleProductSelection(productId);
+      }
+    } else {
+      if (isClick) { // Normal click action if not in selection mode and not a long press
+        const product = products.find(p => p.id === productId);
+        if (product) {
+          handleEditProduct(product);
+        }
+      }
+    }
+  }, [selectionMode, toggleProductSelection, handleEditProduct, products, clearLongPressTimer]);
+
+  const handleCancelSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedProducts(new Set());
+  }, [setSelectedProducts]);
 
   if (loadingProducts) {
     return (
@@ -131,25 +177,38 @@ const InventoryTab: React.FC = React.memo(() => {
           <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage your products and stock levels</p> {/* Adjusted font size */}
         </div>
         <div className="flex gap-2 sm:gap-3 flex-wrap justify-end"> {/* Adjusted spacing */}
-          {selectedProducts.size > 0 && (
+          {selectionMode ? (
+            <>
+              {selectedProducts.size > 0 && (
+                <Button
+                  onClick={handleBulkDelete}
+                  variant="destructive"
+                  className="shadow-elegant"
+                  size={isIOS ? "sm" : "default"} // Smaller button on iOS
+                >
+                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
+                  Delete Selected ({selectedProducts.size})
+                </Button>
+              )}
+              <Button
+                onClick={handleCancelSelectionMode}
+                variant="outline"
+                size={isIOS ? "sm" : "default"}
+              >
+                <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Done
+              </Button>
+            </>
+          ) : (
             <Button
-              onClick={handleBulkDelete}
-              variant="destructive"
-              className="shadow-elegant"
+              onClick={handleAddProduct}
+              className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
               size={isIOS ? "sm" : "default"} // Smaller button on iOS
             >
-              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
-              Delete Selected ({selectedProducts.size})
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
+              Add Product
             </Button>
           )}
-          <Button
-            onClick={handleAddProduct}
-            className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
-            size={isIOS ? "sm" : "default"} // Smaller button on iOS
-          >
-            <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
-            Add Product
-          </Button>
         </div>
       </div>
 
@@ -178,39 +237,37 @@ const InventoryTab: React.FC = React.memo(() => {
           </div>
         )}
 
-        <div className="flex gap-1 sm:gap-2 justify-end flex-wrap"> {/* Adjusted spacing */}
-          {products.length > 0 && (
-            <>
-              <Button
-                onClick={handleSelectAll}
-                variant="outline"
-                size={isIOS ? "sm" : "default"} // Smaller button on iOS
-                disabled={filteredProducts.length === 0}
-              >
-                {selectedProducts.size === filteredProducts.length && filteredProducts.length > 0 ? (
-                  <>
-                    <Square className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
-                    Deselect All
-                  </>
-                ) : (
-                  <>
-                    <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
-                    Select All
-                  </>
-                )}
-              </Button>
-              <Button
-                onClick={deleteAllProducts}
-                variant="destructive"
-                size={isIOS ? "sm" : "default"} // Smaller button on iOS
-                className="transition-all duration-200"
-              >
-                <Trash className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
-                Delete All
-              </Button>
-            </>
-          )}
-        </div>
+        {selectionMode && (
+          <div className="flex gap-1 sm:gap-2 justify-end flex-wrap"> {/* Adjusted spacing */}
+            <Button
+              onClick={handleSelectAll}
+              variant="outline"
+              size={isIOS ? "sm" : "default"} // Smaller button on iOS
+              disabled={filteredProducts.length === 0}
+            >
+              {selectedProducts.size === filteredProducts.length && filteredProducts.length > 0 ? (
+                <>
+                  <Square className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
+                  Deselect All
+                </>
+              ) : (
+                <>
+                  <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
+                  Select All
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={deleteAllProducts}
+              variant="destructive"
+              size={isIOS ? "sm" : "default"} // Smaller button on iOS
+              className="transition-all duration-200"
+            >
+              <Trash className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
+              Delete All
+            </Button>
+          </div>
+        )}
       </Card>
 
       {/* Desktop Table View - Hidden on mobile */}
@@ -219,13 +276,15 @@ const InventoryTab: React.FC = React.memo(() => {
           <table className="w-full min-w-[800px]"> {/* Added min-width for better table experience */}
             <thead>
               <tr className="border-b bg-muted/30">
-                <th className="text-left p-4 font-medium w-12">
-                  <Checkbox
-                    checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
-                    onCheckedChange={handleSelectAll}
-                    disabled={filteredProducts.length === 0}
-                  />
-                </th>
+                {selectionMode && (
+                  <th className="text-left p-4 font-medium w-12">
+                    <Checkbox
+                      checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
+                      onCheckedChange={handleSelectAll}
+                      disabled={filteredProducts.length === 0}
+                    />
+                  </th>
+                )}
                 <th className="text-left p-4 font-medium text-sm"> {/* Adjusted font size */}
                   <button
                     onClick={() => handleSort('name')}
@@ -303,14 +362,19 @@ const InventoryTab: React.FC = React.memo(() => {
                 return (
                   <tr 
                     key={product.id} 
-                    className={`border-b hover:bg-muted/50 transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}
+                    className={`border-b hover:bg-muted/50 transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'} ${selectedProducts.has(product.id) ? 'bg-primary/10' : ''}`}
+                    onMouseDown={() => handleInteractionStart(product.id)}
+                    onMouseUp={() => handleInteractionEnd(product.id, true)}
+                    onMouseLeave={clearLongPressTimer}
                   >
-                    <td className="p-4">
-                      <Checkbox
-                        checked={selectedProducts.has(product.id)}
-                        onCheckedChange={() => toggleProductSelection(product.id)}
-                      />
-                    </td>
+                    {selectionMode && (
+                      <td className="p-4">
+                        <Checkbox
+                          checked={selectedProducts.has(product.id)}
+                          onCheckedChange={() => toggleProductSelection(product.id)}
+                        />
+                      </td>
+                    )}
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="font-medium text-foreground text-sm">{product.name}</div> {/* Adjusted font size */}
@@ -342,6 +406,7 @@ const InventoryTab: React.FC = React.memo(() => {
                           onClick={() => handleEditProduct(product)}
                           variant="outline"
                           size="sm"
+                          disabled={selectionMode}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -349,6 +414,7 @@ const InventoryTab: React.FC = React.memo(() => {
                           onClick={() => handleViewSellHistory(product.id, product.name)}
                           variant="outline"
                           size="sm"
+                          disabled={selectionMode}
                         >
                           <History className="h-4 w-4" />
                         </Button>
@@ -356,6 +422,7 @@ const InventoryTab: React.FC = React.memo(() => {
                           onClick={() => deleteProduct(product.id)}
                           variant="destructive"
                           size="sm"
+                          disabled={selectionMode}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -376,13 +443,24 @@ const InventoryTab: React.FC = React.memo(() => {
           const displayOnHand = product.onHand ?? 0;
           const stockStatus = getStockStatus(displayOnHand);
           return (
-            <Card key={product.id} className="p-3 sm:p-4 hover:shadow-lg transition-all duration-300 animate-scale-in"> {/* Adjusted padding */}
+            <Card 
+              key={product.id} 
+              className={`p-3 sm:p-4 hover:shadow-lg transition-all duration-300 animate-scale-in ${selectedProducts.has(product.id) ? 'bg-primary/10' : ''}`}
+              onTouchStart={() => handleInteractionStart(product.id)}
+              onTouchEnd={() => handleInteractionEnd(product.id, true)}
+              onTouchCancel={clearLongPressTimer}
+              onMouseDown={() => handleInteractionStart(product.id)}
+              onMouseUp={() => handleInteractionEnd(product.id, true)}
+              onMouseLeave={clearLongPressTimer}
+            >
               <div className="flex items-start gap-2 sm:gap-3 mb-2 sm:mb-3"> {/* Adjusted spacing */}
-                <Checkbox
-                  checked={selectedProducts.has(product.id)}
-                  onCheckedChange={() => toggleProductSelection(product.id)}
-                  className="mt-0.5 sm:mt-1"
-                />
+                {selectionMode && (
+                  <Checkbox
+                    checked={selectedProducts.has(product.id)}
+                    onCheckedChange={() => toggleProductSelection(product.id)}
+                    className="mt-0.5 sm:mt-1"
+                  />
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2"> {/* Adjusted spacing */}
                     <h3 className="font-bold text-base sm:text-lg text-foreground">{product.name}</h3> {/* Adjusted font size */}
@@ -422,6 +500,7 @@ const InventoryTab: React.FC = React.memo(() => {
                   variant="outline"
                   size="sm"
                   className="flex-1"
+                  disabled={selectionMode}
                 >
                   <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
                   Edit
@@ -431,6 +510,7 @@ const InventoryTab: React.FC = React.memo(() => {
                   variant="outline"
                   size="sm"
                   className="flex-1"
+                  disabled={selectionMode}
                 >
                   <History className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
                   History
@@ -440,6 +520,7 @@ const InventoryTab: React.FC = React.memo(() => {
                   variant="destructive"
                   size="sm"
                   className="flex-1"
+                  disabled={selectionMode}
                 >
                   <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
                   Delete
@@ -464,7 +545,7 @@ const InventoryTab: React.FC = React.memo(() => {
                   ? `No products match "${debouncedSearchTerm}". Try adjusting your search.`
                   : "No products match the selected filters. Try different filter options."}
             </p>
-            {products.length === 0 && (
+            {products.length === 0 && !selectionMode && (
               <Button onClick={handleAddProduct} className="transition-all duration-200 hover:scale-105" size={isIOS ? "sm" : "default"}> {/* Smaller button on iOS */}
                 <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
                 Add Your First Product
