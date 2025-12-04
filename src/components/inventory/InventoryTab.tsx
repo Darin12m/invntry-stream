@@ -92,7 +92,7 @@ const InventoryTab: React.FC = React.memo(() => {
     bulkDeleteProducts(selectedProducts);
     setSelectionMode(false); // Exit selection mode after bulk delete
     setSelectedProducts(new Set()); // Clear selections
-  }, [bulkDeleteProducts, selectedProducts, setSelectedProducts]);
+  }, [bulkDeleteProducts, selectedProducts]); // Removed setSelectedProducts from dependencies
 
   const handleSelectAll = useCallback(() => {
     selectAllProductsHook(filteredProducts.map(p => p.id));
@@ -150,7 +150,7 @@ const InventoryTab: React.FC = React.memo(() => {
   const handleCancelSelectionMode = useCallback(() => {
     setSelectionMode(false);
     setSelectedProducts(new Set());
-  }, [setSelectedProducts]);
+  }, []); // Removed setSelectedProducts from dependencies
 
   if (loadingProducts) {
     return (
