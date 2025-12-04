@@ -4,7 +4,7 @@ import { Package, FileText, BarChart3, LogOut, Settings, Menu, X, User as UserIc
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-// Removed Sheet, SheetContent, SheetTrigger imports as they are no longer needed
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { AppContext } from '@/context/AppContext';
 import { useAuth } from '@/hooks/useAuth';
 import InventoryTab from '@/components/inventory/InventoryTab';
@@ -32,8 +32,7 @@ const AppLayout: React.FC = () => {
   const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'inventory' | 'invoices' | 'dashboard' | 'settings'>('inventory');
   const { metrics, dateFilter, setDateFilter, calculateDashboardMetrics } = useDashboardMetrics(products, invoices);
-  const { isIOS } = useDeviceType(); // Use the new hook
-  // Removed isSheetOpen state as it's no longer needed
+  const { isIOS, screenCategory } = useDeviceType(); // Use the new hook
 
   const renderTabContent = useCallback(() => {
     switch (activeTab) {
@@ -95,7 +94,7 @@ const AppLayout: React.FC = () => {
             </div>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex space-x-4 sm:space-x-8"> {/* Hide on mobile, show on desktop */}
+            <div className="flex space-x-4 sm:space-x-8"> {/* Adjusted spacing for smaller screens */}
               {navItems.map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
@@ -110,32 +109,6 @@ const AppLayout: React.FC = () => {
                   {label}
                 </button>
               ))}
-            </div>
-
-            {/* User Profile/Logout - Always visible */}
-            <div className="flex items-center">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback>{currentUser?.email?.[0]?.toUpperCase() || <UserIcon className="h-4 w-4" />}</AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-48 p-2">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{currentUser?.email}</p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {currentUser?.uid}
-                    </p>
-                  </div>
-                  <div className="my-2 h-px bg-border" />
-                  <Button variant="ghost" className="w-full justify-start" onClick={logout}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </Button>
-                </PopoverContent>
-              </Popover>
             </div>
           </div>
         </div>
