@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Products collection rules
+    match /products/{productId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow delete: if request.auth != null;
+      // Allow updates but protect onHand field from direct client modification
+      allow update: if request.auth != null && 
+        (!("onHand" in request.resource.data) || request.resource.data.onHand == resource.data.onHand);
+    }
+
+    // Invoices collection rules
+    match /invoices/{invoiceId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Settings collection rules
+    match /settings/{settingId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Stock Movements collection rules
+    match /stock_movements/{movementId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if false;
+    }
+
+    // Invoices Server Copies collection rules
+    match /invoices_server_copies/{invoiceId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if false;
+    }
+
+    // Activity Logs collection rules
+    match /activityLogs/{logId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if false;
+    }
+  }
+}

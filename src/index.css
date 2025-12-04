@@ -1,0 +1,363 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 240 20% 99%;
+    --foreground: 240 10% 3.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+
+    --primary: 262 83% 58%;
+    --primary-foreground: 210 40% 98%;
+    --primary-glow: 262 83% 68%;
+
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 220.9 39.3% 11%;
+
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 220.9 39.3% 11%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 355 7% 97%;
+
+    --warning: 48 98% 58%;
+    --warning-foreground: 26 83% 14%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262 83% 58%;
+
+    --radius: 0.75rem;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-surface: linear-gradient(180deg, hsl(var(--background)), hsl(220 14.3% 97%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(220 14.3% 98%));
+
+    /* Shadows */
+    --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.1);
+    --shadow-glow: 0 0 40px hsl(var(--primary-glow) / 0.15);
+    --shadow-card: 0 4px 20px -4px hsl(220 13% 69% / 0.15);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* iOS Safe Area Insets - Updated by JS */
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+
+    /* Responsive Spacing Scale */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
+
+    /* Responsive Font Scale */
+    --font-xs: 0.75rem;
+    --font-sm: 0.875rem;
+    --font-base: 1rem;
+    --font-lg: 1.125rem;
+    --font-xl: 1.25rem;
+    --font-2xl: 1.5rem;
+    --font-3xl: 1.875rem;
+
+    /* Touch Target Sizes */
+    --touch-target-min: 44px;
+    --touch-target-comfortable: 48px;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    /* iOS viewport fix */
+    height: -webkit-fill-available;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+    /* iOS-native scrolling */
+    -webkit-overflow-scrolling: touch;
+    /* iOS safe area support */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    /* Use modern viewport units with fallback */
+    min-height: 100vh;
+    min-height: 100dvh;
+    min-height: calc(var(--vh, 1vh) * 100);
+    /* Prevent overscroll bounce */
+    overscroll-behavior-y: none;
+  }
+
+  /* Prevent iOS input zooming - minimum 16px font */
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="search"],
+  input[type="url"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  /* iOS touch target minimum sizes */
+  button,
+  [role="button"],
+  a,
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: var(--touch-target-min);
+    min-width: var(--touch-target-min);
+  }
+
+  /* Prevent text size adjustment on orientation change */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+}
+
+/* iOS-specific responsive scaling */
+@media screen and (max-width: 375px) {
+  :root {
+    --spacing-xs: 0.1875rem;
+    --spacing-sm: 0.375rem;
+    --spacing-md: 0.75rem;
+    --spacing-lg: 1.125rem;
+    --spacing-xl: 1.5rem;
+    --spacing-2xl: 2.25rem;
+    --font-xs: 0.6875rem;
+    --font-sm: 0.8125rem;
+    --font-base: 0.9375rem;
+    --font-lg: 1.0625rem;
+    --font-xl: 1.1875rem;
+    --font-2xl: 1.375rem;
+    --font-3xl: 1.75rem;
+  }
+}
+
+@media screen and (min-width: 376px) and (max-width: 414px) {
+  :root {
+    --spacing-xs: 0.21875rem;
+    --spacing-sm: 0.4375rem;
+    --spacing-md: 0.875rem;
+    --spacing-lg: 1.3125rem;
+    --spacing-xl: 1.75rem;
+    --spacing-2xl: 2.625rem;
+  }
+}
+
+@media screen and (min-width: 768px) and (max-width: 1024px) {
+  :root {
+    --spacing-md: 1.125rem;
+    --spacing-lg: 1.75rem;
+    --spacing-xl: 2.25rem;
+    --spacing-2xl: 3.375rem;
+    --font-lg: 1.1875rem;
+    --font-xl: 1.375rem;
+    --font-2xl: 1.625rem;
+    --font-3xl: 2rem;
+    --touch-target-min: 48px;
+    --touch-target-comfortable: 52px;
+  }
+}
+
+@layer utilities {
+  /* Page transitions */
+  .page-transition {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Smooth transitions for interactive elements */
+  button, a, input, select {
+    @apply transition-all duration-200 ease-in-out;
+  }
+  
+  /* Hover effects */
+  button:hover:not(:disabled), a:hover {
+    @apply transform scale-[1.02];
+  }
+  
+  button:active:not(:disabled), a:active {
+    @apply transform scale-[0.98];
+  }
+
+  /* Skeleton loader animation */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* iOS Safe Area Utilities */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+  .safe-x {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  .safe-y {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-all {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Margin variants for safe areas */
+  .mt-safe {
+    margin-top: env(safe-area-inset-top);
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+  .ml-safe {
+    margin-left: env(safe-area-inset-left);
+  }
+  .mr-safe {
+    margin-right: env(safe-area-inset-right);
+  }
+
+  /* iOS viewport height utilities */
+  .h-screen-ios {
+    height: 100vh;
+    height: 100dvh;
+    height: calc(var(--vh, 1vh) * 100);
+  }
+  .min-h-screen-ios {
+    min-height: 100vh;
+    min-height: 100dvh;
+    min-height: calc(var(--vh, 1vh) * 100);
+  }
+  .max-h-screen-ios {
+    max-height: 100vh;
+    max-height: 100dvh;
+    max-height: calc(var(--vh, 1vh) * 100);
+  }
+
+  /* Touch-friendly tap targets */
+  .tap-target {
+    min-height: var(--touch-target-min);
+    min-width: var(--touch-target-min);
+  }
+  .tap-target-comfortable {
+    min-height: var(--touch-target-comfortable);
+    min-width: var(--touch-target-comfortable);
+  }
+
+  /* Responsive container with safe areas */
+  .container-safe {
+    @apply px-4 sm:px-6 lg:px-8;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  /* No-bounce scrolling for iOS */
+  .no-bounce {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+}

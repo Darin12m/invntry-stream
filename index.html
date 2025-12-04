@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>InventoryPro - Inventory Management System</title>
+    <meta name="description" content="Professional inventory management system with invoicing capabilities" />
+    <meta name="author" content="Lovable" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <meta property="og:title" content="7edf4df3-92ae-48ac-8515-73e3b1d7cf8e" />
+    <meta property="og:description" content="Lovable Generated Project" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@lovable_dev" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <!-- iOS-specific meta tags -->
+    <meta name="apple-mobile-web-app-title" content="InventoryPro" />
+    <link rel="apple-touch-icon" href="/favicon.ico" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Fix for 100vh bug on iOS - using dvh with fallback
+      function setVhProperty() {
+        let vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+        
+        // Also set safe area inset values as CSS variables for JS access
+        const styles = getComputedStyle(document.documentElement);
+        document.documentElement.style.setProperty('--sat', styles.getPropertyValue('env(safe-area-inset-top)') || '0px');
+        document.documentElement.style.setProperty('--sab', styles.getPropertyValue('env(safe-area-inset-bottom)') || '0px');
+        document.documentElement.style.setProperty('--sal', styles.getPropertyValue('env(safe-area-inset-left)') || '0px');
+        document.documentElement.style.setProperty('--sar', styles.getPropertyValue('env(safe-area-inset-right)') || '0px');
+      }
+      
+      // Debounce resize events for better performance
+      let resizeTimeout;
+      function debouncedSetVh() {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(setVhProperty, 100);
+      }
+      
+      window.addEventListener('resize', debouncedSetVh);
+      window.addEventListener('orientationchange', function() {
+        // Delay for orientation change to complete
+        setTimeout(setVhProperty, 150);
+      });
+      setVhProperty(); // Initial call
+    </script>
+  </body>
+</html>
