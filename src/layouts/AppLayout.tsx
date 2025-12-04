@@ -85,18 +85,19 @@ const AppLayout: React.FC = () => {
         style={isIOS ? { paddingTop: 'env(safe-area-inset-top)' } : {}} // Apply safe area padding for iOS
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center flex-shrink-0"> {/* Added flex-shrink-0 to logo/title */}
+          {/* Main flex container: flex-col on mobile, flex-row on md and up */}
+          <div className="flex flex-col md:flex-row justify-between md:items-center py-3"> {/* Added py-3 for vertical padding */}
+            {/* Logo/Title - appears first, with bottom margin on mobile */}
+            <div className="flex items-center flex-shrink-0 mb-3 md:mb-0"> {/* Added mb-3 for spacing on mobile */}
               <div className="bg-gradient-primary p-2 rounded-lg">
                 <Package className="h-6 w-6 text-primary-foreground" />
               </div>
               <span className="ml-3 text-lg sm:text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">WeParty Inventory</span>
             </div>
 
-            {/* Navigation items container */}
-            {/* On mobile, this will be scrollable. On desktop, it will be a normal flex container. */}
+            {/* Navigation items container - appears second */}
             <div className="flex-1 min-w-0 overflow-x-auto whitespace-nowrap scrolling-touch hide-scrollbar md:flex-none md:overflow-visible md:whitespace-normal">
-              <div className="inline-flex space-x-4 sm:space-x-8"> {/* Use inline-flex to allow overflow within whitespace-nowrap */}
+              <div className="inline-flex space-x-4 sm:space-x-8">
                 {navItems.map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
