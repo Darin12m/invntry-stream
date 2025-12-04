@@ -86,29 +86,32 @@ const AppLayout: React.FC = () => {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+            <div className="flex items-center flex-shrink-0"> {/* Added flex-shrink-0 to logo/title */}
               <div className="bg-gradient-primary p-2 rounded-lg">
                 <Package className="h-6 w-6 text-primary-foreground" />
               </div>
               <span className="ml-3 text-lg sm:text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">WeParty Inventory</span>
             </div>
 
-            {/* Desktop Navigation */}
-            <div className="flex space-x-4 sm:space-x-8"> {/* Adjusted spacing for smaller screens */}
-              {navItems.map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveTab(key)}
-                  className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-all duration-300 ${
-                    activeTab === key
-                      ? 'text-primary border-b-2 border-primary shadow-glow'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <Icon className="w-4 h-4 mr-2" />
-                  {label}
-                </button>
-              ))}
+            {/* Navigation items container */}
+            {/* On mobile, this will be scrollable. On desktop, it will be a normal flex container. */}
+            <div className="flex-1 min-w-0 overflow-x-auto whitespace-nowrap scrolling-touch hide-scrollbar md:flex-none md:overflow-visible md:whitespace-normal">
+              <div className="inline-flex space-x-4 sm:space-x-8"> {/* Use inline-flex to allow overflow within whitespace-nowrap */}
+                {navItems.map(({ key, label, icon: Icon }) => (
+                  <button
+                    key={key}
+                    onClick={() => setActiveTab(key)}
+                    className={`flex-shrink-0 inline-flex items-center px-1 pt-1 text-sm font-medium transition-all duration-300 ${ // Added flex-shrink-0
+                      activeTab === key
+                        ? 'text-primary border-b-2 border-primary shadow-glow'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 mr-2" />
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

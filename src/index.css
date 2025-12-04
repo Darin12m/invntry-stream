@@ -360,4 +360,19 @@ All colors MUST be HSL.
     overscroll-behavior: none;
     -webkit-overflow-scrolling: touch;
   }
+
+  /* Custom utility for smooth touch scrolling on iOS */
+  .scrolling-touch {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Custom utility to hide scrollbars */
+  .hide-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
 }
