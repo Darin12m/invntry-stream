@@ -200,10 +200,10 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                       <td className="p-2 sm:p-4 font-medium text-xs sm:text-sm">{invoice.number}</td> {/* Adjusted padding and font size */}
                       <td className="p-2 sm:p-4 text-muted-foreground text-xs sm:text-sm">{new Date(invoice.date).toLocaleDateString()}</td> {/* Adjusted padding and font size */}
                       <td className="p-2 sm:p-4 text-xs sm:text-sm">{invoice.customer.name}</td> {/* Adjusted padding and font size */}
-                      <td className="p-2 sm:p-4 text-right font-medium text-blue-600 text-xs sm:text-sm">{invoice.total.toFixed(2)} ден.</td> {/* Adjusted padding and font size */}
-                      <td className="p-2 sm:p-4 text-right font-medium text-red-600 text-xs sm:text-sm">{invoiceCosts.toFixed(2)} ден.</td> {/* Adjusted padding and font size */}
+                      <td className="p-2 sm:p-4 text-right font-medium text-blue-600 text-xs sm:text-sm">{invoice.total.toFixed(2)} {currency}</td> {/* Adjusted padding and font size */}
+                      <td className="p-2 sm:p-4 text-right font-medium text-red-600 text-xs sm:text-sm">{invoiceCosts.toFixed(2)} {currency}</td> {/* Adjusted padding and font size */}
                       <td className={`p-2 sm:p-4 text-right font-medium text-xs sm:text-sm ${invoiceProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}> {/* Adjusted padding and font size */}
-                        {invoiceProfit.toFixed(2)} ден.
+                        {invoiceProfit.toFixed(2)} {currency}
                       </td>
                       <td className="p-2 sm:p-4 text-center"> {/* Adjusted padding */}
                         <Button
