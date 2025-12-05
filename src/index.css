@@ -397,7 +397,7 @@ All colors MUST be HSL.
   .top-icons {
     display: flex;
     align-items: center;
-    gap: 8px !important; /* Smaller gap */
+    gap: 4px !important; /* Smaller gap */
   }
 
   .top-icons svg,
