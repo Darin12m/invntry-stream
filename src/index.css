@@ -104,7 +104,7 @@ All colors MUST be HSL.
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 0 0% 100%;
+    --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
     --primary: 210 40% 98%;
@@ -397,7 +397,7 @@ All colors MUST be HSL.
   .top-icons {
     display: flex;
     align-items: center;
-    gap: 2px !important; /* Smaller gap */
+    gap: 1px !important; /* Smaller gap */
   }
 
   .top-icons svg,
