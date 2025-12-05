@@ -393,20 +393,6 @@ All colors MUST be HSL.
     display: none; /* Chrome, Safari, Opera */
   }
 
-  /* Fix: Top bar icons styling */
-  .top-icons {
-    display: flex;
-    align-items: center;
-    gap: 1px !important; /* Smaller gap */
-  }
-
-  .top-icons svg,
-  .top-icons img,
-  .top-icons button {
-    width: 35px !important; /* Increased icon size */
-    height: 35px !important; /* Increased icon size */
-  }
-
   /* Fix: Product table horizontal scroll wrapper */
   .table-scroll-wrapper {
     overflow-x: auto !important;

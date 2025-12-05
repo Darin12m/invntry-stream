@@ -91,7 +91,7 @@ const AppLayout: React.FC = () => {
             </div>
 
             {/* Navigation icons - compact on mobile, with labels on desktop */}
-            <div className="flex items-center gap-2 top-icons"> {/* Changed gap and added top-icons class */}
+            <div className="flex items-center gap-px sm:gap-4"> {/* Responsive gap: 1px on mobile, 16px on sm and up */}
               {navItems.map(({ key, icon: Icon }) => (
                 <button
                   key={key}
@@ -103,7 +103,7 @@ const AppLayout: React.FC = () => {
                   }`}
                   aria-label={key}
                 >
-                  <Icon className={`h-6 w-6 sm:h-6 sm:w-6 ${!isMobile ? 'sm:mr-2' : ''}`} /> {/* Increased icon size */}
+                  <Icon className={`h-[35px] w-[35px] sm:h-7 sm:w-7 ${!isMobile ? 'sm:mr-2' : ''}`} /> {/* Responsive icon size: 35px on mobile, 28px on sm and up */}
                   {!isMobile && (
                     <span className="hidden sm:inline text-sm font-medium capitalize">{key}</span>
                   )}
