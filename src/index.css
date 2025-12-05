@@ -403,8 +403,8 @@ All colors MUST be HSL.
   .top-icons svg,
   .top-icons img,
   .top-icons button {
-    width: 26px !important;
-    height: 26px !important;
+    width: 30px !important; /* Increased icon size */
+    height: 30px !important; /* Increased icon size */
   }
 
   /* Fix: Product table horizontal scroll wrapper */
