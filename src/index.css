@@ -145,13 +145,16 @@ All colors MUST be HSL.
   html {
     /* iOS viewport fix */
     height: -webkit-fill-available;
-    overflow-x: hidden;
-    max-width: 100%;
+    /* Fix: Disable horizontal scrolling globally */
+    overflow-x: hidden !important;
+    max-width: 100% !important;
   }
 
   html, body {
-    overflow-x: hidden;
-    max-width: 100%;
+    /* Fix: Disable horizontal scrolling globally */
+    overflow-x: hidden !important;
+    max-width: 100% !important;
+    position: relative; /* Added for stability */
   }
 
   body {
@@ -202,7 +205,7 @@ All colors MUST be HSL.
 
   /* Prevent any element from causing horizontal overflow */
   #root {
-    overflow-x: hidden;
+    overflow-x: hidden !important; /* Fix: Disable horizontal scrolling globally */
     max-width: 100%;
     width: 100%;
   }
@@ -388,5 +391,31 @@ All colors MUST be HSL.
 
   .hide-scrollbar::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Opera */
+  }
+
+  /* Fix: Top bar icons styling */
+  .top-icons {
+    display: flex;
+    align-items: center;
+    gap: 8px !important; /* Smaller gap */
+  }
+
+  .top-icons svg,
+  .top-icons img,
+  .top-icons button {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  /* Fix: Product table horizontal scroll wrapper */
+  .table-scroll-wrapper {
+    overflow-x: auto !important;
+    overflow-y: visible;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-scroll-wrapper table {
+    min-width: 750px; /* Adjust depending on your columns */
   }
 }
