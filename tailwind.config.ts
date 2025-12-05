@@ -13,32 +13,18 @@ export default {
       },
     },
     extend: {
-      // iOS Device Breakpoints
-      screens: {
-        'xs': '375px',      // iPhone SE
-        'sm': '390px',      // iPhone 12/13/14/15
-        'md': '428px',      // iPhone Pro Max
-        'lg': '768px',      // iPad
-        'xl': '1024px',     // iPad Pro / Desktop
-        '2xl': '1400px',    // Large desktop
-        // Device-specific breakpoints
-        'iphone-se': '375px',
-        'iphone': '390px',
-        'iphone-plus': '414px',
-        'iphone-max': '430px',
-        'ipad': '768px',
-        'ipad-pro': '1024px',
-      },
+      // Removed custom iOS device breakpoints. Relying on standard Tailwind breakpoints (sm, md, lg)
+      // and fluid typography for dynamic responsiveness.
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
       spacing: {
-        // Safe area spacing
+        // Safe area spacing - these are now handled directly in CSS or via utility classes
         'safe-top': 'env(safe-area-inset-top)',
         'safe-bottom': 'env(safe-area-inset-bottom)',
         'safe-left': 'env(safe-area-inset-left)',
         'safe-right': 'env(safe-area-inset-right)',
-        // iOS touch target sizes
+        // iOS touch target sizes - these are now handled directly in CSS or via utility classes
         'touch': '44px',
         'touch-lg': '48px',
         'touch-xl': '52px',
@@ -46,14 +32,14 @@ export default {
       minHeight: {
         'touch': '44px',
         'touch-lg': '48px',
-        'screen-ios': ['100vh', '100dvh'],
+        'screen-ios': ['100vh', '100dvh'], // Kept for iOS vh fix, but not tied to JS detection
       },
       minWidth: {
         'touch': '44px',
         'touch-lg': '48px',
       },
       height: {
-        'screen-ios': ['100vh', '100dvh'],
+        'screen-ios': ['100vh', '100dvh'], // Kept for iOS vh fix, but not tied to JS detection
       },
       colors: {
         border: "hsl(var(--border))",

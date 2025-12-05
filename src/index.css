@@ -69,32 +69,28 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
-    /* iOS Safe Area Insets - Updated by JS */
+    /* iOS Safe Area Insets - Updated by JS in index.html */
     --sat: env(safe-area-inset-top, 0px);
     --sab: env(safe-area-inset-bottom, 0px);
     --sal: env(safe-area-inset-left, 0px);
     --sar: env(safe-area-inset-right, 0px);
 
-    /* Responsive Spacing Scale */
-    --spacing-xs: 0.25rem;
-    --spacing-sm: 0.5rem;
-    --spacing-md: 1rem;
-    --spacing-lg: 1.5rem;
-    --spacing-xl: 2rem;
-    --spacing-2xl: 3rem;
+    /* Fluid Typography with clamp() */
+    /* Base font size: 14px on small screens, 16px on large */
+    --font-size-base: clamp(0.875rem, 0.8rem + 0.4vw, 1rem); /* 14px to 16px */
+    --font-size-sm: clamp(0.75rem, 0.7rem + 0.2vw, 0.875rem); /* 12px to 14px */
+    --font-size-lg: clamp(1rem, 0.9rem + 0.5vw, 1.125rem); /* 16px to 18px */
+    --font-size-xl: clamp(1.125rem, 1rem + 0.6vw, 1.25rem); /* 18px to 20px */
+    --font-size-2xl: clamp(1.25rem, 1.1rem + 0.7vw, 1.5rem); /* 20px to 24px */
+    --font-size-3xl: clamp(1.5rem, 1.3rem + 1vw, 1.875rem); /* 24px to 30px */
+    --font-size-4xl: clamp(1.875rem, 1.6rem + 1.5vw, 2.25rem); /* 30px to 36px */
 
-    /* Responsive Font Scale */
-    --font-xs: 0.75rem;
-    --font-sm: 0.875rem;
-    --font-base: 1rem;
-    --font-lg: 1.125rem;
-    --font-xl: 1.25rem;
-    --font-2xl: 1.5rem;
-    --font-3xl: 1.875rem;
+    /* Fluid Spacing (example, can be extended) */
+    --spacing-fluid-sm: clamp(0.5rem, 0.4rem + 0.2vw, 0.75rem); /* 8px to 12px */
+    --spacing-fluid-md: clamp(1rem, 0.8rem + 0.5vw, 1.5rem); /* 16px to 24px */
 
-    /* Touch Target Sizes */
-    --touch-target-min: 44px;
-    --touch-target-comfortable: 48px;
+    /* Fluid Icon Size */
+    --icon-size-fluid: clamp(1.25rem, 1.1rem + 0.7vw, 1.75rem); /* 20px to 28px */
   }
 
   .dark {
@@ -162,7 +158,7 @@ All colors MUST be HSL.
     font-feature-settings: 'rlig' 1, 'calt' 1;
     /* iOS-native scrolling */
     -webkit-overflow-scrolling: touch;
-    /* iOS safe area support */
+    /* iOS safe area support - applied globally */
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
@@ -211,50 +207,8 @@ All colors MUST be HSL.
   }
 }
 
-/* iOS-specific responsive scaling */
-@media screen and (max-width: 375px) {
-  :root {
-    --spacing-xs: 0.1875rem;
-    --spacing-sm: 0.375rem;
-    --spacing-md: 0.75rem;
-    --spacing-lg: 1.125rem;
-    --spacing-xl: 1.5rem;
-    --spacing-2xl: 2.25rem;
-    --font-xs: 0.6875rem;
-    --font-sm: 0.8125rem;
-    --font-base: 0.9375rem;
-    --font-lg: 1.0625rem;
-    --font-xl: 1.1875rem;
-    --font-2xl: 1.375rem;
-    --font-3xl: 1.75rem;
-  }
-}
-
-@media screen and (min-width: 376px) and (max-width: 414px) {
-  :root {
-    --spacing-xs: 0.21875rem;
-    --spacing-sm: 0.4375rem;
-    --spacing-md: 0.875rem;
-    --spacing-lg: 1.3125rem;
-    --spacing-xl: 1.75rem;
-    --spacing-2xl: 2.625rem;
-  }
-}
-
-@media screen and (min-width: 768px) and (max-width: 1024px) {
-  :root {
-    --spacing-md: 1.125rem;
-    --spacing-lg: 1.75rem;
-    --spacing-xl: 2.25rem;
-    --spacing-2xl: 3.375rem;
-    --font-lg: 1.1875rem;
-    --font-xl: 1.375rem;
-    --font-2xl: 1.625rem;
-    --font-3xl: 2rem;
-    --touch-target-min: 48px;
-    --touch-target-comfortable: 52px;
-  }
-}
+/* Removed iOS-specific responsive scaling media queries.
+   Fluid typography and spacing are now handled by clamp() in :root. */
 
 @layer utilities {
   /* Page transitions */
@@ -296,7 +250,8 @@ All colors MUST be HSL.
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
-  /* iOS Safe Area Utilities */
+  /* iOS Safe Area Utilities - now mostly handled by global body padding */
+  /* These can still be used for specific elements if needed, but global is preferred */
   .safe-top {
     padding-top: env(safe-area-inset-top);
   }
@@ -403,5 +358,31 @@ All colors MUST be HSL.
 
   .table-scroll-wrapper table {
     min-width: 750px; /* Adjust depending on your columns */
+  }
+
+  /* Fluid typography utility classes */
+  .text-fluid-base { font-size: var(--font-size-base); }
+  .text-fluid-sm { font-size: var(--font-size-sm); }
+  .text-fluid-lg { font-size: var(--font-size-lg); }
+  .text-fluid-xl { font-size: var(--font-size-xl); }
+  .text-fluid-2xl { font-size: var(--font-size-2xl); }
+  .text-fluid-3xl { font-size: var(--font-size-3xl); }
+  .text-fluid-4xl { font-size: var(--font-size-4xl); }
+
+  /* Fluid spacing utility classes */
+  .p-fluid-sm { padding: var(--spacing-fluid-sm); }
+  .px-fluid-sm { padding-left: var(--spacing-fluid-sm); padding-right: var(--spacing-fluid-sm); }
+  .py-fluid-sm { padding-top: var(--spacing-fluid-sm); padding-bottom: var(--spacing-fluid-sm); }
+  .gap-fluid-sm { gap: var(--spacing-fluid-sm); }
+
+  .p-fluid-md { padding: var(--spacing-fluid-md); }
+  .px-fluid-md { padding-left: var(--spacing-fluid-md); padding-right: var(--spacing-fluid-md); }
+  .py-fluid-md { padding-top: var(--spacing-fluid-md); padding-bottom: var(--spacing-fluid-md); }
+  .gap-fluid-md { gap: var(--spacing-fluid-md); }
+
+  /* Fluid icon size utility */
+  .icon-fluid {
+    width: var(--icon-size-fluid);
+    height: var(--icon-size-fluid);
   }
 }
