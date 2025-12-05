@@ -248,7 +248,7 @@ const InventoryTab: React.FC = React.memo(() => {
       </div>
 
       {/* Desktop Table View - Hidden on mobile */}
-      <Card className="shadow-card hidden md:block overflow-hidden border border-border/50">
+      <Card className="shadow-card hidden lg:block overflow-hidden border border-border/50">
         <div className="table-scroll-wrapper"> {/* Added wrapper for horizontal scrolling */}
           <table className="w-full table-fixed">
             <thead>
@@ -427,7 +427,7 @@ const InventoryTab: React.FC = React.memo(() => {
       </Card>
 
       {/* Mobile Card View - Hidden on desktop */}
-      <div className="space-y-3 md:hidden w-full max-w-full overflow-hidden">
+      <div className="space-y-3 lg:hidden w-full max-w-full overflow-hidden">
         {sortedProducts.map(product => {
           const displayQuantity = product.quantity ?? 0;
           const displayOnHand = product.onHand ?? 0;
