@@ -136,14 +136,10 @@ const InventoryTab: React.FC = React.memo(() => {
         toggleProductSelection(productId);
       }
     } else {
-      if (isClick) { // Normal click action if not in selection mode and not a long press
-        const product = products.find(p => p.id === productId);
-        if (product) {
-          handleEditProduct(product);
-        }
-      }
+      // A simple tap/click when not in selection mode will now do nothing on the card itself.
+      // The edit modal will only open via the explicit 'Edit' button.
     }
-  }, [selectionMode, toggleProductSelection, handleEditProduct, products, clearLongPressTimer]);
+  }, [selectionMode, toggleProductSelection, clearLongPressTimer]);
 
   const handleCancelSelectionMode = useCallback(() => {
     setSelectionMode(false);
@@ -448,7 +444,7 @@ const InventoryTab: React.FC = React.memo(() => {
                       : 'border-muted-foreground/30'
                   }`}
                   onClick={(e) => {
-                    e.stopPropagation();
+                    e.stopPropagation(); // Prevent the card's onTouchEnd from firing if checkbox is clicked
                     toggleProductSelection(product.id);
                   }}
                 >
