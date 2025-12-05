@@ -167,6 +167,10 @@ export const useProducts = () => {
     });
   }, []);
 
+  const clearSelectedProducts = useCallback(() => {
+    setSelectedProducts(new Set());
+  }, []);
+
   return {
     products,
     loadingProducts,
@@ -183,5 +187,6 @@ export const useProducts = () => {
     selectedProducts,
     toggleProductSelection,
     selectAllProducts,
+    clearSelectedProducts,
   };
 };

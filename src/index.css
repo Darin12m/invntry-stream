@@ -177,12 +177,8 @@ All colors MUST be HSL.
     font-size: 16px !important;
   }
 
-  /* iOS touch target minimum sizes */
-  button,
-  [role="button"],
-  a,
-  input[type="checkbox"],
-  input[type="radio"] {
+  /* iOS touch target minimum sizes - only for tap-target class */
+  .tap-target-ios {
     min-height: var(--touch-target-min);
     min-width: var(--touch-target-min);
   }

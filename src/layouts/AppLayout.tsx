@@ -1,18 +1,13 @@
 import React, { useContext, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Package, FileText, BarChart3, LogOut, Settings, Menu, X, User as UserIcon } from 'lucide-react';
+import { Package, FileText, BarChart3, Settings } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { AppContext } from '@/context/AppContext';
-import { useAuth } from '@/hooks/useAuth';
 import InventoryTab from '@/components/inventory/InventoryTab';
 import InvoicesTab from '@/components/invoices/InvoicesTab';
 import DashboardTab from '@/components/dashboard/DashboardTab';
 import SettingsPage from '@/pages/SettingsPage';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
-import { useDeviceType } from '@/hooks/useDeviceType'; // Import the new hook
+import { useDeviceType } from '@/hooks/useDeviceType';
 
 interface NavItem {
   key: 'inventory' | 'invoices' | 'dashboard' | 'settings';
@@ -28,11 +23,10 @@ const navItems: NavItem[] = [
 ];
 
 const AppLayout: React.FC = () => {
-  const { currentUser, products, invoices, activityLogs, settings, loading, error } = useContext(AppContext);
-  const { logout } = useAuth();
+  const { products, invoices, loading, error } = useContext(AppContext);
   const [activeTab, setActiveTab] = useState<'inventory' | 'invoices' | 'dashboard' | 'settings'>('inventory');
   const { metrics, dateFilter, setDateFilter, calculateDashboardMetrics } = useDashboardMetrics(products, invoices);
-  const { isIOS, screenCategory } = useDeviceType(); // Use the new hook
+  const { isIOS, isMobile } = useDeviceType();
 
   const renderTabContent = useCallback(() => {
     switch (activeTab) {
@@ -81,45 +75,50 @@ const AppLayout: React.FC = () => {
     <div className="min-h-screen bg-gradient-surface">
       {/* Navigation */}
       <nav 
-        className="bg-card/80 backdrop-blur-sm shadow-elegant border-b sticky top-0 z-40"
-        style={isIOS ? { paddingTop: 'env(safe-area-inset-top)' } : {}} // Apply safe area padding for iOS
+        className="bg-card/95 backdrop-blur-md shadow-sm border-b border-border/50 sticky top-0 z-40"
+        style={isIOS ? { paddingTop: 'env(safe-area-inset-top)' } : {}}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Main flex container: flex-col on mobile, flex-row on md and up */}
-          <div className="flex flex-col md:flex-row justify-between md:items-center py-3"> {/* Added py-3 for vertical padding */}
-            {/* Logo/Title - appears first, with bottom margin on mobile */}
-            <div className="flex items-center flex-shrink-0 mb-3 md:mb-0"> {/* Added mb-3 for spacing on mobile */}
-              <div className="bg-gradient-primary p-2 rounded-lg">
-                <Package className="h-6 w-6 text-primary-foreground" />
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14 sm:h-16">
+            {/* Logo/Title */}
+            <div className="flex items-center flex-shrink-0">
+              <div className="bg-gradient-primary p-2 rounded-xl shadow-sm">
+                <Package className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
               </div>
-              <span className="ml-3 text-lg sm:text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">WeParty Inventory</span>
+              <span className="ml-2.5 sm:ml-3 text-base sm:text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                WeParty Inventory
+              </span>
             </div>
 
-            {/* Navigation items container - appears second */}
-            <div className="flex-1 min-w-0 overflow-x-auto whitespace-nowrap scrolling-touch hide-scrollbar md:flex-none md:overflow-visible md:whitespace-normal">
-              <div className="inline-flex space-x-4 sm:space-x-8">
-                {navItems.map(({ key, label, icon: Icon }) => (
-                  <button
-                    key={key}
-                    onClick={() => setActiveTab(key)}
-                    className={`flex-shrink-0 inline-flex items-center px-1 pt-1 text-sm font-medium transition-all duration-300 ${ // Added flex-shrink-0
-                      activeTab === key
-                        ? 'text-primary border-b-2 border-primary shadow-glow'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 mr-2" />
-                    {label}
-                  </button>
-                ))}
-              </div>
+            {/* Navigation icons - compact on mobile, with labels on desktop */}
+            <div className="flex items-center gap-1 sm:gap-2">
+              {navItems.map(({ key, icon: Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`relative flex items-center justify-center p-2.5 sm:px-3 sm:py-2 rounded-xl transition-all duration-200 ${
+                    activeTab === key
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+                  aria-label={key}
+                >
+                  <Icon className={`h-5 w-5 sm:h-4 sm:w-4 ${!isMobile ? 'sm:mr-2' : ''}`} />
+                  {!isMobile && (
+                    <span className="hidden sm:inline text-sm font-medium capitalize">{key}</span>
+                  )}
+                  {activeTab === key && (
+                    <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full sm:hidden" />
+                  )}
+                </button>
+              ))}
             </div>
           </div>
         </div>
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-4 px-2 sm:py-8 sm:px-4 lg:px-8"> {/* Adjusted padding for responsiveness */}
+      <main className="max-w-7xl mx-auto py-4 px-3 sm:py-6 sm:px-4 lg:px-8">
         {renderTabContent()}
       </main>
     </div>
