@@ -103,7 +103,7 @@ const AppLayout: React.FC = () => {
                   }`}
                   aria-label={key}
                 >
-                  <Icon className={`h-[35px] w-[35px] lg:h-7 lg:w-7 ${!isMobile ? 'lg:mr-2' : ''}`} /> {/* Responsive icon size: 35px on mobile, 28px on lg and up */}
+                  <Icon className={`h-[20px] w-[20px] lg:h-7 lg:w-7 ${!isMobile ? 'lg:mr-2' : ''}`} /> {/* Responsive icon size: 20px on mobile, 28px on lg and up */}
                   {!isMobile && (
                     <span className="hidden lg:inline text-sm font-medium capitalize">{key}</span>
                   )}
