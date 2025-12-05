@@ -139,11 +139,19 @@ All colors MUST be HSL.
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
   }
 
   html {
     /* iOS viewport fix */
     height: -webkit-fill-available;
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  html, body {
+    overflow-x: hidden;
+    max-width: 100%;
   }
 
   body {
@@ -162,6 +170,9 @@ All colors MUST be HSL.
     min-height: calc(var(--vh, 1vh) * 100);
     /* Prevent overscroll bounce */
     overscroll-behavior-y: none;
+    /* Lock to screen width */
+    width: 100%;
+    position: relative;
   }
 
   /* Prevent iOS input zooming - minimum 16px font */
@@ -187,6 +198,13 @@ All colors MUST be HSL.
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+  }
+
+  /* Prevent any element from causing horizontal overflow */
+  #root {
+    overflow-x: hidden;
+    max-width: 100%;
+    width: 100%;
   }
 }
 
