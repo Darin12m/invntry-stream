@@ -91,7 +91,7 @@ const AppLayout: React.FC = () => {
             </div>
 
             {/* Navigation icons - compact on mobile, with labels on desktop */}
-            <div className="flex items-center gap-px sm:gap-4"> {/* Responsive gap: 1px on mobile, 16px on sm and up */}
+            <div className="flex items-center gap-px lg:gap-4"> {/* Responsive gap: 1px on mobile, 16px on lg and up */}
               {navItems.map(({ key, icon: Icon }) => (
                 <button
                   key={key}
@@ -103,9 +103,9 @@ const AppLayout: React.FC = () => {
                   }`}
                   aria-label={key}
                 >
-                  <Icon className={`h-[35px] w-[35px] sm:h-7 sm:w-7 ${!isMobile ? 'sm:mr-2' : ''}`} /> {/* Responsive icon size: 35px on mobile, 28px on sm and up */}
+                  <Icon className={`h-[35px] w-[35px] lg:h-7 lg:w-7 ${!isMobile ? 'lg:mr-2' : ''}`} /> {/* Responsive icon size: 35px on mobile, 28px on lg and up */}
                   {!isMobile && (
-                    <span className="hidden sm:inline text-sm font-medium capitalize">{key}</span>
+                    <span className="hidden lg:inline text-sm font-medium capitalize">{key}</span>
                   )}
                   {activeTab === key && (
                     <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full sm:hidden" />
