@@ -1,10 +1,9 @@
 import React, { useState, useMemo, useCallback, useContext, useRef } from 'react';
-import { Search, Plus, Edit, Trash2, Trash, X, ChevronUp, ChevronDown, Package, CheckSquare, Square, History, Check } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Trash, ChevronUp, ChevronDown, Package, CheckSquare, History, Check } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Product } from '@/types';
 import { useProducts } from '@/hooks/useProducts';
 import { getStockStatus } from '@/utils/helpers';
@@ -13,10 +12,9 @@ import SellHistoryModal from '@/components/modals/SellHistoryModal';
 import { AppContext } from '@/context/AppContext';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useDebounce } from 'use-debounce';
-import { toast } from 'sonner'; // Import toast
-import { useDeviceType } from '@/hooks/useDeviceType'; // Import useDeviceType
+import { useDeviceType } from '@/hooks/useDeviceType';
 
-const LONG_PRESS_DURATION = 500; // milliseconds
+const LONG_PRESS_DURATION = 500;
 
 const InventoryTab: React.FC = React.memo(() => {
   const { currentUser, products, invoices } = useContext(AppContext);
@@ -169,14 +167,14 @@ const InventoryTab: React.FC = React.memo(() => {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 animate-fade-in"> {/* Adjusted spacing */}
+    <div className="space-y-4 sm:space-y-6 animate-fade-in w-full max-w-full overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4"> {/* Adjusted spacing */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Inventory Management</h2> {/* Adjusted font size */}
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage your products and stock levels</p> {/* Adjusted font size */}
+          <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Inventory Management</h2>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage your products and stock levels</p>
         </div>
-        <div className="flex gap-2 sm:gap-3 flex-wrap justify-end"> {/* Adjusted spacing */}
+        <div className="flex gap-2 sm:gap-3 flex-wrap justify-end">
           {selectionMode ? (
             <>
               {selectedProducts.size > 0 && (
@@ -184,18 +182,18 @@ const InventoryTab: React.FC = React.memo(() => {
                   onClick={handleBulkDelete}
                   variant="destructive"
                   className="shadow-elegant"
-                  size={isIOS ? "sm" : "default"} // Smaller button on iOS
+                  size="sm"
                 >
-                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
+                  <Trash2 className="h-4 w-4 mr-2" />
                   Delete Selected ({selectedProducts.size})
                 </Button>
               )}
               <Button
                 onClick={handleCancelSelectionMode}
                 variant="outline"
-                size={isIOS ? "sm" : "default"}
+                size="sm"
               >
-                <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <Check className="h-4 w-4 mr-2" />
                 Done
               </Button>
             </>
@@ -203,225 +201,217 @@ const InventoryTab: React.FC = React.memo(() => {
             <Button
               onClick={handleAddProduct}
               className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
-              size={isIOS ? "sm" : "default"} // Smaller button on iOS
+              size="sm"
             >
-              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
+              <Plus className="h-4 w-4 mr-2" />
               Add Product
             </Button>
           )}
         </div>
       </div>
 
-      {/* Search Bar and Bulk Actions */}
-      <Card className="p-3 sm:p-4 shadow-card space-y-3 sm:space-y-4"> {/* Adjusted padding and spacing */}
+      {/* Search Bar */}
+      <Card className="p-4 sm:p-5 shadow-card">
         <div className="relative w-full">
-          <Search className="absolute left-2 sm:left-3 top-2.5 sm:top-3 h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" /> {/* Adjusted icon size and position */}
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search products by name, SKU, or category..."
             value={localSearchInput}
             onChange={(e) => setLocalSearchInput(e.target.value)}
-            className="pl-8 sm:pl-10 transition-all duration-200 focus:ring-2 focus:ring-primary text-sm sm:text-base" /* Adjusted padding and font size */
+            className="pl-10 h-11 transition-all duration-200 focus:ring-2 focus:ring-primary text-sm"
           />
         </div>
-        {localSearchInput && (
-          <div className="text-xs sm:text-sm text-muted-foreground flex items-center flex-wrap gap-1 sm:gap-2"> {/* Adjusted font size and spacing */}
-            Showing {filteredProducts.length} of {products.length} products matching "{localSearchInput}"
-            <Button
-              onClick={() => setLocalSearchInput('')}
-              variant="ghost"
-              size="sm"
-              className="h-auto px-1 sm:px-2 py-0.5 sm:py-1 text-xs" /* Adjusted padding and font size */
-            >
-              <X className="h-2.5 w-2.5 sm:h-3 w-3 mr-0.5 sm:mr-1" /> Clear Search {/* Adjusted icon size */}
-            </Button>
-          </div>
-        )}
-
-        {selectionMode && (
-          <div className="flex gap-1 sm:gap-2 justify-end flex-wrap"> {/* Adjusted spacing */}
-            <Button
-              onClick={handleSelectAll}
-              variant="outline"
-              size={isIOS ? "sm" : "default"} // Smaller button on iOS
-              disabled={filteredProducts.length === 0}
-            >
-              {selectedProducts.size === filteredProducts.length && filteredProducts.length > 0 ? (
-                <>
-                  <Square className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
-                  Deselect All
-                </>
-              ) : (
-                <>
-                  <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
-                  Select All
-                </>
-              )}
-            </Button>
-            <Button
-              onClick={deleteAllProducts}
-              variant="destructive"
-              size={isIOS ? "sm" : "default"} // Smaller button on iOS
-              className="transition-all duration-200"
-            >
-              <Trash className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
-              Delete All
-            </Button>
-          </div>
-        )}
       </Card>
 
+      {/* Bulk Actions Row */}
+      <div className="flex items-center justify-end gap-3">
+        <Button
+          onClick={handleSelectAll}
+          variant="outline"
+          size="sm"
+          className="h-9 px-4"
+          disabled={filteredProducts.length === 0}
+        >
+          <CheckSquare className="h-4 w-4 mr-2" />
+          Select All
+        </Button>
+        <Button
+          onClick={deleteAllProducts}
+          variant="destructive"
+          size="sm"
+          className="h-9 px-4"
+          disabled={filteredProducts.length === 0}
+        >
+          <Trash className="h-4 w-4 mr-2" />
+          Delete All
+        </Button>
+      </div>
+
       {/* Desktop Table View - Hidden on mobile */}
-      <Card className="shadow-card hidden md:block overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px]"> {/* Added min-width for better table experience */}
+      <Card className="shadow-card hidden md:block overflow-hidden border border-border/50">
+        <div className="w-full overflow-hidden">
+          <table className="w-full table-fixed">
             <thead>
-              <tr className="border-b bg-muted/30">
-                {selectionMode && (
-                  <th className="text-left p-4 font-medium w-12">
-                    <Checkbox
-                      checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
-                      onCheckedChange={handleSelectAll}
-                      disabled={filteredProducts.length === 0}
-                    />
-                  </th>
-                )}
-                <th className="text-left p-4 font-medium text-sm"> {/* Adjusted font size */}
+              <tr className="border-b border-border/50">
+                <th className="w-12 p-4 text-left">
+                  <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center cursor-pointer hover:border-primary transition-colors"
+                       onClick={handleSelectAll}>
+                    {selectedProducts.size === filteredProducts.length && filteredProducts.length > 0 && (
+                      <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+                    )}
+                  </div>
+                </th>
+                <th className="text-left p-4 font-medium text-sm text-foreground w-[28%]">
                   <button
                     onClick={() => handleSort('name')}
-                    className="flex items-center gap-2 hover:text-primary transition-colors"
+                    className="flex items-center gap-1 hover:text-primary transition-colors"
                   >
                     Name
                     {sortColumn === 'name' && (
-                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
                     )}
                   </button>
                 </th>
-                <th className="text-center p-4 font-medium text-sm"> {/* Adjusted font size */}
+                <th className="text-center p-4 font-medium text-sm text-foreground w-[12%]">
                   <button
                     onClick={() => handleSort('sku')}
-                    className="flex items-center gap-2 hover:text-primary transition-colors mx-auto"
+                    className="flex items-center gap-1 hover:text-primary transition-colors mx-auto"
                   >
                     SKU
                     {sortColumn === 'sku' && (
-                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
                     )}
                   </button>
                 </th>
-                <th className="text-center p-4 font-medium text-sm"> {/* Adjusted font size */}
+                <th className="text-center p-4 font-medium text-sm text-foreground w-[15%]">
                   <button
                     onClick={() => handleSort('category')}
-                    className="flex items-center gap-2 hover:text-primary transition-colors mx-auto"
+                    className="flex items-center gap-1 hover:text-primary transition-colors mx-auto"
                   >
                     Category
                     {sortColumn === 'category' && (
-                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
                     )}
                   </button>
                 </th>
-                <th className="text-right p-4 font-medium text-sm"> {/* Adjusted font size */}
+                <th className="text-center p-4 font-medium text-sm text-foreground w-[10%]">
                   <button
                     onClick={() => handleSort('quantity')}
-                    className="flex items-center gap-2 hover:text-primary transition-colors ml-auto"
+                    className="flex items-center gap-1 hover:text-primary transition-colors mx-auto"
                   >
                     Quantity
                     {sortColumn === 'quantity' && (
-                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
                     )}
                   </button>
                 </th>
-                <th className="text-right p-4 font-medium text-sm"> {/* Adjusted font size */}
+                <th className="text-center p-4 font-medium text-sm text-foreground w-[12%]">
                   <button
                     onClick={() => handleSort('onHand')}
-                    className="flex items-center gap-2 hover:text-primary transition-colors ml-auto"
+                    className="flex items-center gap-1 hover:text-primary transition-colors mx-auto"
                   >
                     On Hand
                     {sortColumn === 'onHand' && (
-                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
                     )}
                   </button>
                 </th>
-                <th className="text-right p-4 font-medium text-sm"> {/* Adjusted font size */}
+                <th className="text-center p-4 font-medium text-sm text-foreground w-[10%]">
                   <button
                     onClick={() => handleSort('price')}
-                    className="flex items-center gap-2 hover:text-primary transition-colors ml-auto"
+                    className="flex items-center gap-1 hover:text-primary transition-colors mx-auto"
                   >
                     Price
                     {sortColumn === 'price' && (
-                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
                     )}
                   </button>
                 </th>
-                <th className="text-right p-4 font-medium text-sm">Actions</th> {/* Adjusted font size */}
+                <th className="text-center p-4 font-medium text-sm text-foreground w-[13%]">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {sortedProducts.map((product, index) => {
+              {sortedProducts.map((product) => {
                 const displayQuantity = product.quantity ?? 0;
                 const displayOnHand = product.onHand ?? 0;
                 const stockStatus = getStockStatus(displayOnHand);
                 return (
                   <tr 
                     key={product.id} 
-                    className={`border-b hover:bg-muted/50 transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'} ${selectedProducts.has(product.id) ? 'bg-primary/10' : ''}`}
-                    onMouseDown={() => handleInteractionStart(product.id)}
-                    onMouseUp={() => handleInteractionEnd(product.id, true)}
-                    onMouseLeave={clearLongPressTimer}
+                    className={`border-b border-border/30 hover:bg-muted/30 transition-colors ${selectedProducts.has(product.id) ? 'bg-primary/5' : ''}`}
                   >
-                    {selectionMode && (
-                      <td className="p-4">
-                        <Checkbox
-                          checked={selectedProducts.has(product.id)}
-                          onCheckedChange={() => toggleProductSelection(product.id)}
-                        />
-                      </td>
-                    )}
                     <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="font-medium text-foreground text-sm">{product.name}</div> {/* Adjusted font size */}
+                      <div 
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors ${
+                          selectedProducts.has(product.id) 
+                            ? 'border-primary bg-primary' 
+                            : 'border-muted-foreground/30 hover:border-primary'
+                        }`}
+                        onClick={() => toggleProductSelection(product.id)}
+                      >
+                        {selectedProducts.has(product.id) && (
+                          <Check className="h-3 w-3 text-primary-foreground" />
+                        )}
                       </div>
                     </td>
-                    <td className="p-4 text-center">
-                      <span className="text-muted-foreground text-xs">{product.sku}</span> {/* Adjusted font size */}
+                    <td className="p-4">
+                      <span className="font-medium text-foreground text-sm truncate block">{product.name}</span>
                     </td>
                     <td className="p-4 text-center">
-                      <span className="text-muted-foreground text-xs">{product.category}</span> {/* Adjusted font size */}
+                      <span className="text-muted-foreground text-sm">{product.sku}</span>
                     </td>
-                    <td className="p-4 text-right">
-                      <span className="font-medium text-sm">{displayQuantity}</span> {/* Adjusted font size */}
+                    <td className="p-4 text-center">
+                      <span className="text-muted-foreground text-sm truncate block">{product.category}</span>
                     </td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <span className="font-medium text-sm">{displayOnHand}</span> {/* Adjusted font size */}
-                        <Badge variant={stockStatus.variant} className="text-xs">
+                    <td className="p-4 text-center">
+                      <span className="font-medium text-sm">{displayQuantity}</span>
+                    </td>
+                    <td className="p-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="font-medium text-sm">{displayOnHand}</span>
+                        <Badge 
+                          variant={stockStatus.variant} 
+                          className={`text-xs px-2 py-0.5 rounded-full ${
+                            stockStatus.label === 'Low' 
+                              ? 'bg-warning/20 text-warning-foreground border-warning' 
+                              : stockStatus.label === 'Out of Stock'
+                              ? 'bg-destructive text-destructive-foreground'
+                              : ''
+                          }`}
+                        >
                           {stockStatus.label}
                         </Badge>
                       </div>
                     </td>
-                    <td className="p-4 text-right">
-                      <span className="font-medium text-primary text-sm">{product.price.toFixed(2)} ден.</span> {/* Adjusted font size */}
+                    <td className="p-4 text-center">
+                      <span className="font-medium text-primary text-sm">{product.price.toFixed(2)}</span>
+                      <span className="text-primary text-sm ml-1">ден.</span>
                     </td>
                     <td className="p-4">
-                      <div className="flex gap-2 justify-end">
+                      <div className="flex gap-1.5 justify-center">
                         <Button
                           onClick={() => handleEditProduct(product)}
                           variant="outline"
-                          size="sm"
+                          size="icon"
+                          className="h-9 w-9 rounded-lg border-border/50"
                           disabled={selectionMode}
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit className="h-4 w-4 text-muted-foreground" />
                         </Button>
                         <Button
                           onClick={() => handleViewSellHistory(product.id, product.name)}
                           variant="outline"
-                          size="sm"
+                          size="icon"
+                          className="h-9 w-9 rounded-lg border-border/50"
                           disabled={selectionMode}
                         >
-                          <History className="h-4 w-4" />
+                          <History className="h-4 w-4 text-muted-foreground" />
                         </Button>
                         <Button
                           onClick={() => deleteProduct(product.id)}
                           variant="destructive"
-                          size="sm"
+                          size="icon"
+                          className="h-9 w-9 rounded-lg"
                           disabled={selectionMode}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -437,7 +427,7 @@ const InventoryTab: React.FC = React.memo(() => {
       </Card>
 
       {/* Mobile Card View - Hidden on desktop */}
-      <div className="space-y-3 sm:space-y-4 md:hidden"> {/* Adjusted spacing */}
+      <div className="space-y-3 md:hidden w-full max-w-full overflow-hidden">
         {sortedProducts.map(product => {
           const displayQuantity = product.quantity ?? 0;
           const displayOnHand = product.onHand ?? 0;
@@ -445,34 +435,37 @@ const InventoryTab: React.FC = React.memo(() => {
           return (
             <Card 
               key={product.id} 
-              className={`p-3 sm:p-4 hover:shadow-lg transition-all duration-300 animate-scale-in ${selectedProducts.has(product.id) ? 'bg-primary/10' : ''}`}
+              className={`p-4 hover:shadow-lg transition-all duration-300 w-full max-w-full overflow-hidden ${selectedProducts.has(product.id) ? 'bg-primary/5' : ''}`}
               onTouchStart={() => handleInteractionStart(product.id)}
               onTouchEnd={() => handleInteractionEnd(product.id, true)}
               onTouchCancel={clearLongPressTimer}
-              onMouseDown={() => handleInteractionStart(product.id)}
-              onMouseUp={() => handleInteractionEnd(product.id, true)}
-              onMouseLeave={clearLongPressTimer}
             >
-              <div className="flex items-start gap-2 sm:gap-3 mb-2 sm:mb-3"> {/* Adjusted spacing */}
-                {selectionMode && (
-                  <Checkbox
-                    checked={selectedProducts.has(product.id)}
-                    onCheckedChange={() => toggleProductSelection(product.id)}
-                    className="mt-0.5 sm:mt-1"
-                  />
-                )}
+              <div className="flex items-start gap-3 mb-3">
+                <div 
+                  className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center cursor-pointer transition-colors ${
+                    selectedProducts.has(product.id) 
+                      ? 'border-primary bg-primary' 
+                      : 'border-muted-foreground/30'
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleProductSelection(product.id);
+                  }}
+                >
+                  {selectedProducts.has(product.id) && (
+                    <Check className="h-3 w-3 text-primary-foreground" />
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2"> {/* Adjusted spacing */}
-                    <h3 className="font-bold text-base sm:text-lg text-foreground">{product.name}</h3> {/* Adjusted font size */}
-                  </div>
-                  <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm"> {/* Adjusted spacing and font size */}
+                  <h3 className="font-semibold text-base text-foreground truncate">{product.name}</h3>
+                  <div className="space-y-2 text-sm mt-2">
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">SKU:</span>
-                      <span className="font-medium">{product.sku}</span>
+                      <span className="font-medium truncate ml-2">{product.sku}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Category:</span>
-                      <span className="font-medium">{product.category}</span>
+                      <span className="font-medium truncate ml-2">{product.category}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Quantity:</span>
@@ -480,9 +473,18 @@ const InventoryTab: React.FC = React.memo(() => {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">On Hand:</span>
-                      <div className="flex items-center gap-1 sm:gap-2"> {/* Adjusted spacing */}
+                      <div className="flex items-center gap-2">
                         <span className="font-medium">{displayOnHand}</span>
-                        <Badge variant={stockStatus.variant} className="text-xs">
+                        <Badge 
+                          variant={stockStatus.variant} 
+                          className={`text-xs px-2 py-0.5 rounded-full ${
+                            stockStatus.label === 'Low' 
+                              ? 'bg-warning/20 text-warning-foreground border-warning' 
+                              : stockStatus.label === 'Out of Stock'
+                              ? 'bg-destructive text-destructive-foreground'
+                              : ''
+                          }`}
+                        >
                           {stockStatus.label}
                         </Badge>
                       </div>
@@ -494,35 +496,32 @@ const InventoryTab: React.FC = React.memo(() => {
                   </div>
                 </div>
               </div>
-              <div className="flex gap-1 sm:gap-2 pt-2 sm:pt-3 border-t"> {/* Adjusted spacing and padding */}
+              <div className="flex gap-2 pt-3 border-t border-border/30">
                 <Button
                   onClick={() => handleEditProduct(product)}
                   variant="outline"
                   size="sm"
-                  className="flex-1"
-                  disabled={selectionMode}
+                  className="flex-1 h-9"
                 >
-                  <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
+                  <Edit className="h-4 w-4 mr-1.5" />
                   Edit
                 </Button>
                 <Button
                   onClick={() => handleViewSellHistory(product.id, product.name)}
                   variant="outline"
                   size="sm"
-                  className="flex-1"
-                  disabled={selectionMode}
+                  className="flex-1 h-9"
                 >
-                  <History className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
+                  <History className="h-4 w-4 mr-1.5" />
                   History
                 </Button>
                 <Button
                   onClick={() => deleteProduct(product.id)}
                   variant="destructive"
                   size="sm"
-                  className="flex-1"
-                  disabled={selectionMode}
+                  className="flex-1 h-9"
                 >
-                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
+                  <Trash2 className="h-4 w-4 mr-1.5" />
                   Delete
                 </Button>
               </div>

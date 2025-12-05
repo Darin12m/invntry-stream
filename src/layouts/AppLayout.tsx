@@ -72,10 +72,10 @@ const AppLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-surface">
+    <div className="min-h-screen bg-gradient-surface overflow-x-hidden max-w-full w-full">
       {/* Navigation */}
       <nav 
-        className="bg-card/95 backdrop-blur-md shadow-sm border-b border-border/50 sticky top-0 z-40"
+        className="bg-card/95 backdrop-blur-md shadow-sm border-b border-border/50 sticky top-0 z-40 w-full max-w-full overflow-hidden"
         style={isIOS ? { paddingTop: 'env(safe-area-inset-top)' } : {}}
       >
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
@@ -118,7 +118,7 @@ const AppLayout: React.FC = () => {
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-4 px-3 sm:py-6 sm:px-4 lg:px-8">
+      <main className="max-w-7xl mx-auto py-4 px-3 sm:py-6 sm:px-4 lg:px-8 w-full overflow-x-hidden">
         {renderTabContent()}
       </main>
     </div>
