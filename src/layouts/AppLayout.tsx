@@ -90,20 +90,20 @@ const AppLayout: React.FC = () => {
               </span>
             </div>
 
-            {/* Navigation icons - compact on mobile, with labels on desktop */}
-            <div className="flex items-center gap-px lg:gap-4"> {/* Responsive gap: 1px on mobile, 16px on lg and up */}
+            {/* Navigation icons - larger icons, tighter spacing on mobile */}
+            <div className="flex items-center gap-0.5 sm:gap-1 lg:gap-3">
               {navItems.map(({ key, icon: Icon }) => (
                 <button
                   key={key}
                   onClick={() => setActiveTab(key)}
-                  className={`relative flex items-center justify-center p-2.5 sm:px-3 sm:py-2 rounded-xl transition-all duration-200 ${
+                  className={`relative flex items-center justify-center p-2 sm:px-3 sm:py-2 rounded-xl transition-all duration-200 ${
                     activeTab === key
                       ? 'bg-primary/10 text-primary'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                   }`}
                   aria-label={key}
                 >
-                  <Icon className={`h-[20px] w-[20px] lg:h-7 lg:w-7 ${!isMobile ? 'lg:mr-2' : ''}`} /> {/* Responsive icon size: 20px on mobile, 28px on lg and up */}
+                  <Icon className={`h-6 w-6 sm:h-6 sm:w-6 lg:h-7 lg:w-7 ${!isMobile ? 'lg:mr-2' : ''}`} />
                   {!isMobile && (
                     <span className="hidden lg:inline text-sm font-medium capitalize">{key}</span>
                   )}

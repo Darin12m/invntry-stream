@@ -1,39 +1,109 @@
-import { useState, useEffect, useCallback, useContext } from 'react';
+import { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { Invoice, Product, SortDirection } from '@/types';
 import { invoiceService } from '@/services/firestore/invoiceService';
 import { toast } from 'sonner';
 import { AppContext } from '@/context/AppContext';
 import { activityLogService } from '@/services/firestore/activityLogService';
-import { db } from '@/firebase/config'; // Import db
-import { doc, writeBatch } from 'firebase/firestore'; // Import doc and writeBatch
+import { db } from '@/firebase/config';
+import { doc, writeBatch, collection, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
 
 export const useInvoices = () => {
-  const { invoices, setInvoices, products, currentUser, setLoading, setError } = useContext(AppContext);
+  const { invoices, setInvoices, products, currentUser, setError } = useContext(AppContext);
   const [loadingInvoices, setLoadingInvoices] = useState(true);
   const [errorInvoices, setErrorInvoices] = useState<string | null>(null);
   const [invoiceSortBy, setInvoiceSortBy] = useState<'number' | 'date' | 'customer' | 'total' | 'invoiceType'>('number');
   const [invoiceSortDirection, setInvoiceSortDirection] = useState<SortDirection>('asc');
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
 
-  const fetchInvoices = useCallback(async () => {
+  // Track if we've received the first snapshot
+  const hasInitialSnapshot = useRef(false);
+
+  // Real-time listener for invoices
+  useEffect(() => {
+    if (!currentUser) {
+      setLoadingInvoices(false);
+      return;
+    }
+
     setLoadingInvoices(true);
     setErrorInvoices(null);
-    try {
-      const invoicesList = await invoiceService.list();
-      setInvoices(invoicesList);
-    } catch (error: any) {
-      console.error('Error loading invoices:', error);
-      setErrorInvoices('Failed to load invoices');
-      setError('Failed to load invoices');
-      toast.error('Failed to load invoices');
-    } finally {
-      setLoadingInvoices(false);
-    }
-  }, [setInvoices, setError]);
+    hasInitialSnapshot.current = false;
 
-  useEffect(() => {
-    fetchInvoices();
-  }, [fetchInvoices]);
+    const invoicesRef = collection(db, 'invoices');
+    const q = query(invoicesRef, orderBy('date', 'desc'));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const invoicesList: Invoice[] = snapshot.docs.map(doc => {
+          const data = doc.data();
+          
+          // Handle Firestore Timestamp conversion safely
+          let dateStr = '';
+          if (data.date) {
+            if (data.date instanceof Timestamp) {
+              dateStr = data.date.toDate().toISOString().split('T')[0];
+            } else if (typeof data.date === 'string') {
+              dateStr = data.date;
+            }
+          }
+
+          return {
+            id: doc.id,
+            number: data.number || '',
+            date: dateStr,
+            customer: {
+              name: data.customer?.name || data.buyerName || '',
+              email: data.customer?.email || data.buyerEmail || '',
+              address: data.customer?.address || data.buyerAddress || '',
+              phone: data.customer?.phone || '',
+            },
+            items: (data.items || []).map((item: any) => ({
+              productId: item.productId || '',
+              name: item.name || '',
+              sku: item.sku || '',
+              price: item.price ?? 0,
+              quantity: item.quantity ?? 0,
+              purchasePrice: item.purchasePrice ?? 0,
+              discount: item.discount ?? 0,
+            })),
+            subtotal: data.subtotal ?? 0,
+            discount: data.discount ?? 0,
+            discountPercentage: data.discountPercentage ?? 0,
+            total: data.total ?? 0,
+            status: data.status || 'pending',
+            invoiceType: data.invoiceType || 'sale',
+            itemsIds: data.itemsIds || [],
+            deletedAt: data.deletedAt || null,
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt,
+            buyerName: data.buyerName,
+            buyerEmail: data.buyerEmail,
+            buyerAddress: data.buyerAddress,
+          } as Invoice;
+        });
+        
+        setInvoices(invoicesList);
+        
+        if (!hasInitialSnapshot.current) {
+          hasInitialSnapshot.current = true;
+          setLoadingInvoices(false);
+        }
+      },
+      (error) => {
+        console.error('Error in invoices real-time listener:', error);
+        setErrorInvoices('Failed to load invoices');
+        setError('Failed to load invoices');
+        toast.error('Failed to load invoices');
+        setLoadingInvoices(false);
+      }
+    );
+
+    // Cleanup listener on unmount
+    return () => {
+      unsubscribe();
+    };
+  }, [currentUser, setInvoices, setError]);
 
   const createInvoice = useCallback(async (invoice: Omit<Invoice, 'id'>) => {
     try {
@@ -41,14 +111,14 @@ export const useInvoices = () => {
       const userId = currentUser?.uid || null;
       await invoiceService.create(invoice, userEmail, userId);
       toast.success('Invoice created successfully!');
-      await fetchInvoices();
+      // No need to fetch - real-time listener will update
     } catch (error: any) {
       console.error('Error creating invoice:', error);
       toast.error(`Failed to create invoice: ${error.message}`);
       setError(`Failed to create invoice: ${error.message}`);
       throw error;
     }
-  }, [currentUser, fetchInvoices, setError]);
+  }, [currentUser, setError]);
 
   const updateInvoice = useCallback(async (id: string, invoice: Partial<Invoice>) => {
     try {
@@ -56,14 +126,14 @@ export const useInvoices = () => {
       const userId = currentUser?.uid || null;
       await invoiceService.update(id, invoice, userEmail, userId);
       toast.success('Invoice updated successfully!');
-      await fetchInvoices();
+      // No need to fetch - real-time listener will update
     } catch (error: any) {
       console.error('Error updating invoice:', error);
       toast.error(`Failed to update invoice: ${error.message}`);
       setError(`Failed to update invoice: ${error.message}`);
       throw error;
     }
-  }, [currentUser, fetchInvoices, setError]);
+  }, [currentUser, setError]);
 
   const softDeleteInvoice = useCallback(async (invoiceId: string) => {
     const invoiceToDelete = invoices.find(inv => inv.id === invoiceId);
@@ -82,15 +152,14 @@ export const useInvoices = () => {
         const userId = currentUser?.uid || null;
         await invoiceService.softDelete(invoiceToDelete, products, userEmail, userId);
         toast.success("Invoice moved to trash and stock reverted.");
-        await fetchInvoices();
-        // No need to fetch products here, as the context will handle it if product updates are observed.
+        // No need to fetch - real-time listener will update
       } catch (error: any) {
         console.error('Error soft deleting invoice:', error);
         toast.error(`Failed to move invoice to trash: ${error.message}`);
         setError(`Failed to move invoice to trash: ${error.message}`);
       }
     }
-  }, [invoices, products, currentUser, fetchInvoices, setError]);
+  }, [invoices, products, currentUser, setError]);
 
   const bulkSoftDeleteInvoices = useCallback(async (invoiceIds: Set<string>) => {
     if (invoiceIds.size === 0) {
@@ -102,7 +171,7 @@ export const useInvoices = () => {
       try {
         const userEmail = currentUser?.email || 'Unknown User';
         const userId = currentUser?.uid || null;
-        const batch = writeBatch(db); // Corrected: use writeBatch
+        const batch = writeBatch(db);
         let successCount = 0;
 
         for (const invoiceId of Array.from(invoiceIds)) {
@@ -118,39 +187,39 @@ export const useInvoices = () => {
 
           // Revert stock changes based on invoice type
           for (const item of invoiceToDelete.items) {
-            const productRef = doc(db, 'products', item.productId); // Corrected: import doc
+            const productRef = doc(db, 'products', item.productId);
             const product = products.find(p => p.id === item.productId);
+            
+            // Gracefully handle missing products
             if (!product) {
-              throw new Error(`Product ${item.name} (ID: ${item.productId}) not found. Cannot revert stock for bulk delete.`);
+              console.warn(`Product ${item.name} (ID: ${item.productId}) not found. Skipping stock revert.`);
+              continue;
             }
 
-            let newOnHand = product.onHand;
+            let newOnHand = product.onHand ?? 0;
             if (invoiceToDelete.invoiceType === 'sale' || invoiceToDelete.invoiceType === 'gifted-damaged') {
-              newOnHand += item.quantity;
+              newOnHand += item.quantity ?? 0;
             } else if (invoiceToDelete.invoiceType === 'return') {
-              newOnHand -= item.quantity;
+              newOnHand -= item.quantity ?? 0;
             }
 
-            if (newOnHand < 0 && (invoiceToDelete.invoiceType === 'sale' || invoiceToDelete.invoiceType === 'gifted-damaged')) {
-              throw new Error(`Cannot bulk delete invoice ${invoiceToDelete.number}: Reverting stock would cause negative stock for product "${item.name}".`);
-            }
             batch.update(productRef, { onHand: newOnHand });
           }
-          batch.update(doc(db, 'invoices', invoiceId), { deletedAt: new Date() }); // Use new Date() for consistency // Corrected: import doc
+          batch.update(doc(db, 'invoices', invoiceId), { deletedAt: new Date() });
           successCount++;
         }
         await batch.commit();
         setSelectedInvoices(new Set());
         toast.success(`${successCount} invoices moved to trash and stock reverted.`);
         await activityLogService.logAction(`Bulk invoices moved to trash by ${userEmail}`, userId, userEmail);
-        await fetchInvoices();
+        // No need to fetch - real-time listener will update
       } catch (error: any) {
         console.error('Error bulk soft deleting invoices:', error);
         toast.error(`Failed to move invoices to trash: ${error.message}`);
         setError(`Failed to move invoices to trash: ${error.message}`);
       }
     }
-  }, [invoices, products, currentUser, fetchInvoices, setError]);
+  }, [invoices, products, currentUser, setError]);
 
   const deleteAllInvoices = useCallback(async () => {
     if (invoices.length === 0) {
@@ -162,7 +231,7 @@ export const useInvoices = () => {
       try {
         const userEmail = currentUser?.email || 'Unknown User';
         const userId = currentUser?.uid || null;
-        const batch = writeBatch(db); // Corrected: use writeBatch
+        const batch = writeBatch(db);
         let successCount = 0;
 
         for (const invoice of invoices) {
@@ -172,39 +241,39 @@ export const useInvoices = () => {
           }
           // Revert stock changes based on invoice type
           for (const item of invoice.items) {
-            const productRef = doc(db, 'products', item.productId); // Corrected: import doc
+            const productRef = doc(db, 'products', item.productId);
             const product = products.find(p => p.id === item.productId);
+            
+            // Gracefully handle missing products
             if (!product) {
-              throw new Error(`Product ${item.name} (ID: ${item.productId}) not found. Cannot revert stock for delete all.`);
+              console.warn(`Product ${item.name} (ID: ${item.productId}) not found. Skipping stock revert.`);
+              continue;
             }
 
-            let newOnHand = product.onHand;
+            let newOnHand = product.onHand ?? 0;
             if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'gifted-damaged') {
-              newOnHand += item.quantity;
+              newOnHand += item.quantity ?? 0;
             } else if (invoice.invoiceType === 'return') {
-              newOnHand -= item.quantity;
+              newOnHand -= item.quantity ?? 0;
             }
 
-            if (newOnHand < 0 && (invoice.invoiceType === 'sale' || invoice.invoiceType === 'gifted-damaged')) {
-              throw new Error(`Cannot delete all invoices: Reverting stock would cause negative stock for product "${item.name}" from invoice ${invoice.number}.`);
-            }
             batch.update(productRef, { onHand: newOnHand });
           }
-          batch.update(doc(db, 'invoices', invoice.id), { deletedAt: new Date() }); // Use new Date() for consistency // Corrected: import doc
+          batch.update(doc(db, 'invoices', invoice.id), { deletedAt: new Date() });
           successCount++;
         }
         await batch.commit();
         setSelectedInvoices(new Set());
         toast.success(`${successCount} invoices moved to trash and stock reverted.`);
         await activityLogService.logAction(`All invoices moved to trash by ${userEmail}`, userId, userEmail);
-        await fetchInvoices();
+        // No need to fetch - real-time listener will update
       } catch (error: any) {
         console.error('Error soft deleting all invoices:', error);
         toast.error(`Failed to move all invoices to trash: ${error.message}`);
         setError(`Failed to move all invoices to trash: ${error.message}`);
       }
     }
-  }, [invoices, products, currentUser, fetchInvoices, setError]);
+  }, [invoices, products, currentUser, setError]);
 
   const restoreInvoice = useCallback(async (invoiceId: string) => {
     const invoiceToRestore = invoices.find(inv => inv.id === invoiceId);
@@ -223,14 +292,14 @@ export const useInvoices = () => {
         const userId = currentUser?.uid || null;
         await invoiceService.restore(invoiceToRestore, products, userEmail, userId);
         toast.success("Invoice restored successfully and stock updated.");
-        await fetchInvoices();
+        // No need to fetch - real-time listener will update
       } catch (error: any) {
         console.error('Error restoring invoice:', error);
         toast.error(`Failed to restore invoice: ${error.message}`);
         setError(`Failed to restore invoice: ${error.message}`);
       }
     }
-  }, [invoices, products, currentUser, fetchInvoices, setError]);
+  }, [invoices, products, currentUser, setError]);
 
   const permanentDeleteInvoice = useCallback(async (invoiceId: string) => {
     const invoiceToDelete = invoices.find(inv => inv.id === invoiceId);
@@ -249,14 +318,14 @@ export const useInvoices = () => {
         const userId = currentUser?.uid || null;
         await invoiceService.permanentDelete(invoiceToDelete, products, userEmail, userId);
         toast.success("Invoice permanently deleted and stock reverted.");
-        await fetchInvoices();
+        // No need to fetch - real-time listener will update
       } catch (error: any) {
         console.error('Error permanently deleting invoice or restoring stock:', error);
         toast.error(`Failed to permanently delete invoice: ${error.message}`);
         setError(`Failed to permanently delete invoice: ${error.message}`);
       }
     }
-  }, [invoices, products, currentUser, fetchInvoices, setError]);
+  }, [invoices, products, currentUser, setError]);
 
   const handleInvoiceSort = useCallback((column: typeof invoiceSortBy) => {
     if (invoiceSortBy === column) {
@@ -289,16 +358,21 @@ export const useInvoices = () => {
     });
   }, []);
 
-  // Define handleViewInvoice here to be returned by the hook
   const handleViewInvoice = useCallback((invoice: Invoice) => {
-    // This function is passed down to components that need to view an invoice
-    // It's defined here to be part of the useInvoices hook's public API
-    // and can be used by components like DashboardTab or InvoicesTab
-    // For now, it just logs, but in a real app, it would trigger a modal or navigation.
     console.log('Viewing invoice:', invoice.number);
-    // In a real scenario, you'd likely have a state setter here to open a viewer modal
-    // e.g., setShowInvoiceViewer(true); setViewingInvoice(invoice);
   }, []);
+
+  // Manual refresh function (still available if needed)
+  const fetchInvoices = useCallback(async () => {
+    try {
+      const invoicesList = await invoiceService.list();
+      setInvoices(invoicesList);
+    } catch (error: any) {
+      console.error('Error loading invoices:', error);
+      setErrorInvoices('Failed to load invoices');
+      toast.error('Failed to load invoices');
+    }
+  }, [setInvoices]);
 
   return {
     invoices,
@@ -312,7 +386,7 @@ export const useInvoices = () => {
     deleteAllInvoices,
     restoreInvoice,
     permanentDeleteInvoice,
-    handleViewInvoice, // Export handleViewInvoice
+    handleViewInvoice,
     invoiceSortBy,
     invoiceSortDirection,
     handleInvoiceSort,

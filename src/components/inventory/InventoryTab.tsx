@@ -245,8 +245,8 @@ const InventoryTab: React.FC = React.memo(() => {
 
       {/* Desktop Table View - Hidden on mobile */}
       <Card className="shadow-card hidden lg:block overflow-hidden border border-border/50">
-        <div className="table-scroll-wrapper"> {/* Added wrapper for horizontal scrolling */}
-          <table className="w-full table-fixed">
+        <div className="overflow-x-auto w-full"> {/* Horizontal scroll for product fields */}
+          <table className="w-full min-w-[800px]">
             <thead>
               <tr className="border-b border-border/50">
                 <th className="w-12 p-4 text-left">
