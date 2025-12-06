@@ -179,53 +179,99 @@ const SettingsPage: React.FC = () => {
     reader.readAsText(file);
   };
 
+  // Handle permanent delete all trashed invoices
+  const handlePermanentDeleteAllTrashed = async () => {
+    if (deletedInvoices.length === 0) {
+      toast.error("No invoices in trash to delete.");
+      return;
+    }
+
+    if (window.confirm(`⚠️ WARNING: This will permanently delete ALL ${deletedInvoices.length} invoices in trash. This action cannot be undone. Are you absolutely sure?`)) {
+      try {
+        const batch = writeBatch(db);
+        
+        for (const invoice of deletedInvoices) {
+          // Revert stock for each invoice (already trashed, so stock was already reverted on soft delete)
+          // For permanent delete, we just remove the document
+          batch.delete(doc(db, 'invoices', invoice.id));
+        }
+        
+        await batch.commit();
+        toast.success(`${deletedInvoices.length} invoices permanently deleted.`);
+        await activityLogService.logAction(
+          `All trashed invoices (${deletedInvoices.length}) permanently deleted by ${currentUser?.email}`,
+          currentUser?.uid || null,
+          currentUser?.email || 'Unknown User'
+        );
+      } catch (error: any) {
+        console.error('Error permanently deleting all trashed invoices:', error);
+        toast.error(`Failed to delete all trashed invoices: ${error.message}`);
+      }
+    }
+  };
+
   // Render functions for each section's content
   const renderDeletedInvoices = () => (
-    <Card className="p-4 sm:p-6 shadow-card space-y-4 sm:space-y-6 animate-fade-in"> {/* Adjusted padding and spacing */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 gap-2"> {/* Adjusted spacing */}
-        <h3 className="text-lg sm:text-xl font-bold flex items-center gap-1 sm:gap-2"><FileX className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" /> Deleted Invoices</h3> {/* Adjusted font size and icon size */}
-        <Button onClick={() => setActiveSection(null)} variant="outline" size={isIOS ? "sm" : "default"}>Back to Overview</Button> {/* Smaller button on iOS */}
+    <Card className="p-4 sm:p-6 shadow-card space-y-4 sm:space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 gap-2">
+        <h3 className="text-lg sm:text-xl font-bold flex items-center gap-1 sm:gap-2"><FileX className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" /> Deleted Invoices</h3>
+        <Button onClick={() => setActiveSection(null)} variant="outline" size={isIOS ? "sm" : "default"}>Back to Overview</Button>
       </div>
-      <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4"> {/* Adjusted font size and spacing */}
+      <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
         View and restore invoices that have been moved to trash, or permanently delete them.
       </p>
       {deletedInvoices.length === 0 ? (
-        <div className="text-center py-6 sm:py-8 text-muted-foreground"> {/* Adjusted padding */}
-          <FileX className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3" /> {/* Adjusted icon size */}
-          <p className="text-sm sm:text-base">No invoices in trash.</p> {/* Adjusted font size */}
+        <div className="text-center py-6 sm:py-8 text-muted-foreground">
+          <FileX className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3" />
+          <p className="text-sm sm:text-base">No invoices in trash.</p>
         </div>
       ) : (
-        <div className="space-y-2 sm:space-y-3"> {/* Adjusted spacing */}
-          {deletedInvoices.map(invoice => (
-            <Card key={invoice.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border rounded-md bg-background"> {/* Adjusted padding */}
-              <div className="flex-1 min-w-0 mb-1 sm:mb-0"> {/* Adjusted spacing */}
-                <p className="font-medium text-sm sm:text-base truncate">Invoice #{invoice.number} - {invoice.customer.name}</p> {/* Adjusted font size */}
-                <p className="text-xs text-muted-foreground">
-                  Deleted: {invoice.deletedAt instanceof Date ? invoice.deletedAt.toLocaleDateString() : 'N/A'} | Total: {invoice.total.toFixed(2)} {settings.currency}
-                </p>
-              </div>
-              <div className="flex gap-1 sm:gap-2 flex-wrap justify-end"> {/* Adjusted spacing */}
-                <Button
-                  onClick={() => restoreInvoice(invoice.id)}
-                  variant="outline"
-                  size="sm"
-                  className="flex-shrink-0"
-                >
-                  <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
-                  Restore
-                </Button>
-                <Button
-                  onClick={() => permanentDeleteInvoice(invoice.id)}
-                  variant="destructive"
-                  size="sm"
-                  className="flex-shrink-0"
-                >
-                  <Trash className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
-                  Delete Permanently
-                </Button>
-              </div>
-            </Card>
-          ))}
+        <div className="space-y-3 sm:space-y-4">
+          {/* Delete All Button */}
+          <div className="flex justify-end">
+            <Button
+              onClick={handlePermanentDeleteAllTrashed}
+              variant="destructive"
+              size="sm"
+              className="shadow-sm"
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              Delete All ({deletedInvoices.length})
+            </Button>
+          </div>
+          
+          <div className="space-y-2 sm:space-y-3">
+            {deletedInvoices.map(invoice => (
+              <Card key={invoice.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border rounded-md bg-background">
+                <div className="flex-1 min-w-0 mb-1 sm:mb-0">
+                  <p className="font-medium text-sm sm:text-base truncate">Invoice #{invoice.number} - {invoice.customer.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Deleted: {invoice.deletedAt instanceof Date ? invoice.deletedAt.toLocaleDateString() : 'N/A'} | Total: {invoice.total.toFixed(2)} {settings.currency}
+                  </p>
+                </div>
+                <div className="flex gap-1 sm:gap-2 flex-wrap justify-end">
+                  <Button
+                    onClick={() => restoreInvoice(invoice.id)}
+                    variant="outline"
+                    size="sm"
+                    className="flex-shrink-0"
+                  >
+                    <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Restore
+                  </Button>
+                  <Button
+                    onClick={() => permanentDeleteInvoice(invoice.id)}
+                    variant="destructive"
+                    size="sm"
+                    className="flex-shrink-0"
+                  >
+                    <Trash className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Delete Permanently
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
     </Card>
