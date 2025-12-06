@@ -339,74 +339,84 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     handleCloseInvoiceModal,
   ]);
 
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (showInvoiceModal) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [showInvoiceModal]);
+
   if (!showInvoiceModal || !currentInvoice) return null;
 
   const { subtotal, discount: calculatedDiscountAmount, total } = calculateInvoiceTotals(invoiceItems, discount);
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 overflow-y-auto">
-      <div className="min-h-full flex items-center justify-center p-2 sm:p-4">
-        <Card className="w-full max-w-7xl max-h-[95vh] sm:h-5/6 flex flex-col animate-scale-in shadow-glow">
+    <div className="modal-overlay">
+      <div className="min-h-full flex items-center justify-center p-0 sm:p-4">
+        <Card className="modal-panel-lg w-full flex flex-col animate-scale-in shadow-glow">
           
-          {/* Header */}
-          <div className="flex justify-between items-center p-4 sm:p-6 border-b"> {/* Adjusted padding */}
-            <h2 className="text-xl sm:text-2xl font-bold">{editingInvoice ? 'Edit Invoice' : 'Create New Invoice'}</h2> {/* Adjusted font size */}
-            <Button onClick={handleCloseInvoiceModal} variant="ghost" size="sm"> {/* Smaller button */}
-              <X className="h-5 w-5 sm:h-6 w-6" /> {/* Adjusted icon size */}
+          {/* Header - Fixed at top */}
+          <div className="flex justify-between items-center p-3 sm:p-6 border-b sticky top-0 bg-card z-10">
+            <h2 className="text-lg sm:text-2xl font-bold truncate">{editingInvoice ? 'Edit Invoice' : 'Create New Invoice'}</h2>
+            <Button onClick={handleCloseInvoiceModal} variant="ghost" size="sm" className="flex-shrink-0">
+              <X className="h-5 w-5" />
             </Button>
           </div>
           
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
+            <div className="flex-1 flex flex-col sm:flex-row overflow-hidden modal-content">
               
-              {/* LEFT SIDE - Products */}
-              <div className="w-full sm:w-1/2 border-r bg-muted/30 flex flex-col max-h-64 sm:max-h-none">
+              {/* LEFT SIDE - Products (Hidden on mobile, show as collapsible) */}
+              <div className="w-full sm:w-1/2 border-b sm:border-b-0 sm:border-r bg-muted/30 flex flex-col max-h-[40vh] sm:max-h-none">
                 
                 {/* Search Section */}
-                <div className="p-3 sm:p-4 bg-primary/5 border-b"> {/* Adjusted padding */}
-                  <h3 className="font-bold text-base sm:text-lg mb-2 sm:mb-3 text-primary">Search Products</h3> {/* Adjusted font size and spacing */}
+                <div className="p-3 sm:p-4 bg-primary/5 border-b">
+                  <h3 className="font-bold text-sm sm:text-lg mb-2 text-primary">Search Products</h3>
                   <div className="relative">
-                    <Search className="absolute left-2 sm:left-3 top-2.5 sm:top-3 h-3 w-3 sm:h-4 w-4 text-muted-foreground" /> {/* Adjusted icon size and position */}
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search products..."
                       value={invoiceProductSearch}
                       onChange={(e) => setInvoiceProductSearch(e.target.value)}
-                      className="pl-8 sm:pl-10 text-sm sm:text-base"
-                    /> {/* Adjusted padding and font size */}
+                      className="pl-9 text-base"
+                    />
                   </div>
                   {invoiceProductSearch && (
-                    <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-muted-foreground"> {/* Adjusted spacing and font size */}
+                    <p className="mt-1.5 text-xs text-muted-foreground">
                       Found {filteredInvoiceProducts.length} products
                     </p>
                   )}
                 </div>
                 
-                {/* Products List */}
-                <div className="flex-1 overflow-y-auto p-3 sm:p-4"> {/* Adjusted padding */}
-                  <div className="space-y-2 sm:space-y-3"> {/* Adjusted spacing */}
-                    {filteredInvoiceProducts.map(product => {
-                      return (
-                        <Card
-                          key={product.id}
-                          onClick={() => addItemToInvoice(product)}
-                          className={`p-3 sm:p-4 cursor-pointer hover:shadow-elegant transition-all duration-300 hover:border-primary/50`} /* Adjusted padding */
-                        >
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <h4 className="font-bold text-sm sm:text-base">{product.name}</h4> {/* Adjusted font size */}
-                              <p className="text-xs text-muted-foreground">SKU: {product.sku}</p> {/* Adjusted font size */}
-                              <p className="text-primary font-semibold text-sm sm:text-base">{product.price.toFixed(2)} ден.</p> {/* Adjusted font size */}
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xs text-muted-foreground">Stock: {product.onHand}</p> {/* Adjusted font size */}
-                              <div className={`rounded-full p-1.5 sm:p-2 mt-1.5 sm:mt-2 bg-primary text-primary-foreground`}> {/* Adjusted padding and spacing */}
-                                <Plus className="h-3 w-3 sm:h-4 w-4" /> {/* Adjusted icon size */}
-                              </div>
+                {/* Products List - Scrollable */}
+                <div className="flex-1 overflow-y-auto p-2 sm:p-4 modal-search-results">
+                  <div className="space-y-2">
+                    {filteredInvoiceProducts.map(product => (
+                      <Card
+                        key={product.id}
+                        onClick={() => addItemToInvoice(product)}
+                        className="p-3 cursor-pointer hover:shadow-elegant transition-all duration-300 hover:border-primary/50 active:scale-[0.98]"
+                      >
+                        <div className="flex justify-between items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-sm truncate">{product.name}</h4>
+                            <p className="text-xs text-muted-foreground truncate">SKU: {product.sku}</p>
+                            <p className="text-primary font-semibold text-sm">{product.price.toFixed(2)} ден.</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-xs text-muted-foreground">Stock: {product.onHand}</p>
+                            <div className="rounded-full p-1.5 mt-1 bg-primary text-primary-foreground inline-flex">
+                              <Plus className="h-3 w-3" />
                             </div>
                           </div>
-                        </Card>
-                      );
-                    })}
+                        </div>
+                      </Card>
+                    ))}
                   </div>
                 </div>
                 
@@ -641,12 +651,12 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
               
             </div>
             
-            {/* Footer Buttons */}
-            <div className="p-4 sm:p-6 border-t flex justify-end gap-2 sm:gap-3"> {/* Adjusted padding and spacing */}
+            {/* Footer Buttons - Sticky at bottom */}
+            <div className="modal-footer flex justify-end gap-2">
               <Button
                 onClick={handleCloseInvoiceModal}
                 variant="outline"
-                size={isIOS ? "sm" : "default"} // Smaller button on iOS
+                size="sm"
               >
                 Cancel
               </Button>
@@ -654,9 +664,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 onClick={handleSaveInvoice}
                 disabled={invoiceItems.length === 0 || !customerInfo.name.trim()}
                 className="bg-success"
-                size={isIOS ? "sm" : "default"} // Smaller button on iOS
+                size="sm"
               >
-                <Save className="h-3 w-3 sm:h-4 w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
+                <Save className="h-4 w-4 mr-1" />
                 Save Invoice
               </Button>
             </div>

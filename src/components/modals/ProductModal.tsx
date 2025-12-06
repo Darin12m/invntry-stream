@@ -115,27 +115,41 @@ const ProductModal: React.FC<ProductModalProps> = ({
     }
   };
 
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (showProductModal) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [showProductModal]);
+
   if (!showProductModal) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4"> {/* Adjusted padding */}
-      <Card className="w-full max-w-md max-h-[95vh] flex flex-col animate-scale-in shadow-glow">
-        {/* Header */}
-        <div className="p-4 pb-3 sm:p-6 sm:pb-4 flex justify-between items-center border-b"> {/* Adjusted padding */}
-          <h3 className="text-lg sm:text-xl font-semibold"> {/* Adjusted font size */}
-            {editingProduct ? 'Edit Product' : 'Add New Product'}
-          </h3>
-          <Button
-            onClick={handleCloseProductModal}
-            variant="ghost"
-            size="sm"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+    <div className="modal-overlay">
+      <div className="min-h-full flex items-center justify-center p-0 sm:p-4">
+        <Card className="modal-panel w-full flex flex-col animate-scale-in shadow-glow">
+          {/* Header - Fixed at top */}
+          <div className="p-3 sm:p-6 flex justify-between items-center border-b sticky top-0 bg-card z-10">
+            <h3 className="text-lg sm:text-xl font-semibold truncate">
+              {editingProduct ? 'Edit Product' : 'Add New Product'}
+            </h3>
+            <Button
+              onClick={handleCloseProductModal}
+              variant="ghost"
+              size="sm"
+              className="flex-shrink-0"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3 sm:space-y-4"> {/* Adjusted padding and spacing */}
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3 modal-content">
           <div>
             <Label htmlFor="name" className="text-sm sm:text-base">Product Name *</Label> {/* Adjusted font size */}
             <Input
@@ -271,25 +285,26 @@ const ProductModal: React.FC<ProductModalProps> = ({
           </div>
         </div>
 
-        {/* Footer Buttons */}
-        <div className="p-4 pt-3 sm:p-6 sm:pt-4 border-t flex justify-end gap-2 sm:gap-3"> {/* Adjusted padding and spacing */}
-          <Button
-            onClick={handleCloseProductModal}
-            variant="outline"
-            size={isIOS ? "sm" : "default"} // Smaller button on iOS
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSaveProduct}
-            className="bg-gradient-primary shadow-elegant"
-            size={isIOS ? "sm" : "default"} // Smaller button on iOS
-          >
-            <Save className="h-3 w-3 sm:h-4 w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
-            {editingProduct ? 'Update' : 'Add'} Product
-          </Button>
-        </div>
-      </Card>
+          {/* Footer Buttons - Sticky at bottom */}
+          <div className="modal-footer flex justify-end gap-2">
+            <Button
+              onClick={handleCloseProductModal}
+              variant="outline"
+              size="sm"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveProduct}
+              className="bg-gradient-primary shadow-elegant"
+              size="sm"
+            >
+              <Save className="h-4 w-4 mr-1" />
+              {editingProduct ? 'Update' : 'Add'} Product
+            </Button>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 };
