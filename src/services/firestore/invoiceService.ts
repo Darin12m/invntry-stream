@@ -1,5 +1,5 @@
 import { db } from '@/firebase/config';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, getDoc, writeBatch, serverTimestamp, FieldValue, runTransaction, setDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, getDoc, writeBatch, serverTimestamp, FieldValue, runTransaction, limit, setDoc } from 'firebase/firestore';
 import { Invoice, Product } from '@/types';
 import { activityLogService } from '@/services/firestore/activityLogService';
 import { debugLog } from '@/utils/debugLog'; // Import debugLog
@@ -66,7 +66,13 @@ export const invoiceService = {
         counterYear = currentYear;
       }
     } else {
-      debugLog("invoiceService._getInvoiceNumberPreview: Counter document does not exist. Initializing for preview.");
+      // If counter document doesn't exist, we can't reliably determine the *true* next number
+      // without querying all invoices, which is too heavy for a preview.
+      // So, we'll default to 001/YY for the preview.
+      // The actual initialization logic will run in the 'create' transaction.
+      debugLog("invoiceService._getInvoiceNumberPreview: Counter document does not exist. Defaulting preview to 001/YY.");
+      nextNumber = 1; // Default to 1 for preview
+      counterYear = currentYear;
     }
     return formatInvoiceNumber(nextNumber, counterYear);
   },
@@ -95,7 +101,31 @@ export const invoiceService = {
           storedYear = data.year;
           debugLog("invoiceService.create: Fetched existing counter:", { currentNumber, storedYear });
         } else {
-          debugLog("invoiceService.create: Invoice counter document does not exist. Will create it.");
+          debugLog("invoiceService.create: Invoice counter document does not exist. Attempting to initialize from existing invoices.");
+          
+          // Query existing invoices to determine initial counter state
+          const latestInvoiceQuery = query(invoicesColRef, orderBy('createdAt', 'desc'), limit(1));
+          const latestInvoiceSnapshot = await transaction.get(latestInvoiceQuery); // Use transaction.get for this query
+          debugLog("invoiceService.create: Latest invoice snapshot for initialization:", latestInvoiceSnapshot);
+
+          if (!latestInvoiceSnapshot.empty) {
+            const lastInvoiceDoc = latestInvoiceSnapshot.docs[0];
+            const lastInvoiceNumber = lastInvoiceDoc.data().number; // e.g., "006/25"
+            
+            const parts = lastInvoiceNumber.split('/');
+            const parsedNumber = parseInt(parts[0], 10);
+            const parsedYearSuffix = parseInt(parts[1], 10);
+            const parsedFullYear = 2000 + parsedYearSuffix; // Assuming 20xx years
+
+            currentNumber = parsedNumber;
+            storedYear = parsedFullYear; // Store full 4-digit year
+            debugLog("invoiceService.create: Initialized counter from last invoice:", { lastInvoiceNumber, currentNumber, storedYear });
+          } else {
+            // No invoices exist at all, start from 0
+            currentNumber = 0;
+            storedYear = currentYear; // Use current year for the counter
+            debugLog("invoiceService.create: No invoices found. Initializing counter to 0 for current year.");
+          }
         }
 
         let nextNumber: number;
