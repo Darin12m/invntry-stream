@@ -285,18 +285,20 @@ const ImportProductsModal: React.FC<ImportProductsModalProps> = ({
                         value={columnMappings[field]}
                         onValueChange={(value) => handleMappingChange(field, value)}
                       >
-                        <SelectTrigger id={`map-${field}`} className="w-full text-foreground"> {/* Added text-foreground here */}
+                        <SelectTrigger id={`map-${field}`} className="w-full text-foreground text-sm">
                           <SelectValue placeholder={`Select column for ${FIELD_LABELS[field]}`} />
                         </SelectTrigger>
                         <SelectContent>
                           {excelHeaders.length > 0 ? (
                             excelHeaders.map(header => (
-                              <SelectItem key={header} value={header}>
+                              <SelectItem key={header} value={header} className="text-foreground text-sm">
                                 {header}
                               </SelectItem>
                             ))
                           ) : (
-                            <SelectItem value="" disabled>No headers found</SelectItem>
+                            <SelectItem value="" disabled className="text-muted-foreground text-sm">
+                              No headers found
+                            </SelectItem>
                           )}
                         </SelectContent>
                       </Select>
