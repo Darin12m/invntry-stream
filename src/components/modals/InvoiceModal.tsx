@@ -18,6 +18,7 @@ import { invoiceService } from '@/services/firestore/invoiceService';
 import {
   getInvoiceNumberingType,
   parseInvoiceNumber,
+  generateNextSuggestedNumber,
   regularInvoiceNumberRegex,
   cashInvoiceNumberRegex
 } from '@/utils/invoiceNumbering'; // Import new utilities
@@ -45,15 +46,44 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [customerInfo, setCustomerInfo] = useState({ name: '', email: '', address: '', phone: '' });
   const [invoiceProductSearch, setInvoiceProductSearch] = useState('');
   const [discount, setDiscount] = useState(0);
-  const [invoiceType, setInvoiceType] = useState<'sale' | 'return' | 'gifted-damaged' | 'cash' | 'online-sale'>('sale');
+  const [invoiceType, setInvoiceType] = useState<'sale' | 'return' | 'gifted-damaged' | 'cash'>('sale');
   
   const [manualInvoiceNumber, setManualInvoiceNumber] = useState('');
   const [invoiceNumberError, setInvoiceNumberError] = useState<string | null>(null);
   const [isDuplicateInvoiceNumber, setIsDuplicateInvoiceNumber] = useState(false);
 
+  // Helper to generate a suggested number based on current type and year
+  const getSuggestedInvoiceNumber = useCallback(async (type: Invoice['invoiceType']) => {
+    const currentYearShort = String(new Date().getFullYear()).slice(-2);
+    const numberingType = getInvoiceNumberingType(type);
+    const latestNumber = await invoiceService._getLatestInvoiceNumber(numberingType, currentYearShort);
+    
+    let suggestedNumber = '';
+    if (latestNumber) {
+      const parsed = parseInvoiceNumber(latestNumber);
+      if (parsed.isValid && parsed.prefix === (numberingType === 'cash' ? 'CASH ' : '')) {
+        if (parsed.year === currentYearShort) {
+          suggestedNumber = generateNextSuggestedNumber(latestNumber, currentYearShort, numberingType);
+        } else {
+          // New year, reset sequence
+          suggestedNumber = generateNextSuggestedNumber('', currentYearShort, numberingType);
+        }
+      } else {
+        // Latest number found but invalid format or wrong type, start fresh for this type/year
+        suggestedNumber = generateNextSuggestedNumber('', currentYearShort, numberingType);
+      }
+    } else {
+      // No previous invoices of this type/year, start from 001
+      suggestedNumber = generateNextSuggestedNumber('', currentYearShort, numberingType);
+    }
+    return suggestedNumber;
+  }, []);
+
   useEffect(() => {
     const initializeInvoiceData = async () => {
       if (!editingInvoice) { // Only for new invoices
+        const suggestedNum = await getSuggestedInvoiceNumber('sale'); // Get suggested number for default 'sale' type
+        
         setCurrentInvoice({
           id: Date.now().toString(), // Temporary ID
           number: '', // Will be set by manualInvoiceNumber
@@ -73,15 +103,13 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           buyerEmail: '',
           buyerAddress: '',
         });
+        setManualInvoiceNumber(suggestedNum);
+        setInvoiceNumberError(null);
+        setIsDuplicateInvoiceNumber(false);
         setInvoiceItems([]);
         setCustomerInfo({ name: '', email: '', address: '', phone: '' });
         setDiscount(0);
         setInvoiceType('sale'); // Ensure initial type is 'sale'
-
-        // For new invoices, the number field is empty by default
-        setManualInvoiceNumber('');
-        setInvoiceNumberError(null);
-        setIsDuplicateInvoiceNumber(false);
 
       } else {
         // For existing invoices, populate with existing data
@@ -96,7 +124,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           discountPercentage: editingInvoice.discountPercentage,
           total: editingInvoice.total,
           status: editingInvoice.status,
-          invoiceType: editingInvoice.invoiceType as 'sale' | 'return' | 'gifted-damaged' | 'cash' | 'online-sale' || 'sale',
+          invoiceType: editingInvoice.invoiceType as 'sale' | 'return' | 'gifted-damaged' | 'cash' || 'sale',
           itemsIds: editingInvoice.itemsIds || [],
           createdAt: editingInvoice.createdAt,
           buyerName: editingInvoice.buyerName || '',
@@ -129,7 +157,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           phone: editingInvoice.customer.phone || '' 
         });
         setDiscount(editingInvoice.discountPercentage || 0);
-        setInvoiceType(editingInvoice.invoiceType as 'sale' | 'return' | 'gifted-damaged' | 'cash' | 'online-sale' || 'sale');
+        setInvoiceType(editingInvoice.invoiceType as 'sale' | 'return' | 'gifted-damaged' | 'cash' || 'sale');
       }
       setInvoiceProductSearch('');
     };
@@ -137,7 +165,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     if (showInvoiceModal) {
       initializeInvoiceData();
     }
-  }, [editingInvoice, showInvoiceModal, products]);
+  }, [editingInvoice, showInvoiceModal, products, getSuggestedInvoiceNumber]);
 
   const handleCloseInvoiceModal = useCallback(() => {
     setShowInvoiceModal(false);
@@ -161,13 +189,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
 
     const numberingType = getInvoiceNumberingType(currentInvoiceType);
-    let isValidFormat = false;
-
-    if (numberingType === 'cash') {
-      isValidFormat = cashInvoiceNumberRegex.test(number);
-    } else { // 'regular' or 'online-sale'
-      isValidFormat = regularInvoiceNumberRegex.test(number);
-    }
+    const isValidFormat = numberingType === 'cash'
+      ? cashInvoiceNumberRegex.test(number)
+      : regularInvoiceNumberRegex.test(number);
 
     if (!isValidFormat) {
       setInvoiceNumberError(numberingType === 'cash'
@@ -177,7 +201,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       return false;
     }
 
-    // Check for duplicates in Firestore, scoped by invoiceType and year
+    // Check for duplicates in Firestore
     const invoicesColRef = collection(db, 'invoices');
     const currentYearShort = String(new Date().getFullYear()).slice(-2); // Get current year for uniqueness scope
 
@@ -223,10 +247,11 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
   const handleInvoiceTypeChange = useCallback(async (newType: Invoice['invoiceType']) => {
     setInvoiceType(newType);
-    // No auto-suggestion for manual numbering, just clear the field for new input
-    setManualInvoiceNumber('');
-    setInvoiceNumberError(null);
-    setIsDuplicateInvoiceNumber(false);
+    // Re-suggest number based on new type
+    const suggestedNum = await getSuggestedInvoiceNumber(newType);
+    setManualInvoiceNumber(suggestedNum);
+    // Re-validate the new suggested number
+    await validateManualInvoiceNumber(suggestedNum, newType);
 
     // Auto-convert quantities when switching to/from return
     if (newType === 'return') {
@@ -240,7 +265,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         quantity: Math.abs(item.quantity)
       })));
     }
-  }, [invoiceType]);
+  }, [invoiceType, getSuggestedInvoiceNumber, validateManualInvoiceNumber]);
 
 
   const filteredInvoiceProducts = useMemo(() => products.filter(product =>
@@ -282,9 +307,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
               toast.error("Return invoice items must have negative quantity (restores stock).");
               return item;
             }
-          } else if (invoiceType === 'sale' || invoiceType === 'cash' || invoiceType === 'gifted-damaged' || invoiceType === 'online-sale') {
+          } else if (invoiceType === 'sale' || invoiceType === 'cash' || invoiceType === 'gifted-damaged') {
             if (newQuantity < 0) {
-              toast.error("Sale/Cash/Gifted/Online Sale invoice items cannot have negative quantity.");
+              toast.error("Sale/Cash/Gifted invoice items cannot have negative quantity.");
               return item;
             }
           }
@@ -357,7 +382,33 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       return;
     }
 
-    // Removed auto-update logic for manual numbering
+    // --- Auto-update invoice number if sequence has changed ---
+    const currentYearShort = String(new Date().getFullYear()).slice(-2);
+    const numberingType = getInvoiceNumberingType(invoiceType);
+    const latestNumberFromDb = await invoiceService._getLatestInvoiceNumber(numberingType, currentYearShort);
+    const suggestedNextNumber = generateNextSuggestedNumber(latestNumberFromDb, currentYearShort, numberingType);
+
+    if (!editingInvoice && manualInvoiceNumber !== suggestedNextNumber) {
+      const parsedManual = parseInvoiceNumber(manualInvoiceNumber);
+      const parsedSuggested = parseInvoiceNumber(suggestedNextNumber);
+
+      // Only auto-update if the user's number is not a valid higher sequential number
+      if (parsedManual.isValid && parsedSuggested.isValid &&
+          parsedManual.year === parsedSuggested.year &&
+          parsedManual.prefix === parsedSuggested.prefix &&
+          parsedManual.sequential < parsedSuggested.sequential) {
+        
+        setManualInvoiceNumber(suggestedNextNumber);
+        toast.info(`Invoice number updated to maintain sequence: ${suggestedNextNumber}`);
+        // Re-run validation with the new number
+        const reValidated = await validateManualInvoiceNumber(suggestedNextNumber, invoiceType);
+        if (!reValidated) {
+          toast.error("Auto-updated invoice number is invalid. Please review.");
+          return;
+        }
+      }
+    }
+    // --- End auto-update logic ---
 
     const { subtotal, discount: calculatedDiscountAmount, total } = calculateInvoiceTotals(invoiceItems, discount);
     
@@ -441,7 +492,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
             const quantityToRevert = item.quantity ?? 0;
             let change = 0;
 
-            if (previousInvoice.invoiceType === 'sale' || previousInvoice.invoiceType === 'cash' || previousInvoice.invoiceType === 'gifted-damaged' || previousInvoice.invoiceType === 'online-sale') {
+            if (previousInvoice.invoiceType === 'sale' || previousInvoice.invoiceType === 'cash' || previousInvoice.invoiceType === 'gifted-damaged') {
               change = quantityToRevert;
             } else if (previousInvoice.invoiceType === 'return') {
               change = quantityToRevert;
@@ -456,7 +507,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         const quantityToApply = item.quantity ?? 0;
         let change = 0;
 
-        if (invoicePayloadBase.invoiceType === 'sale' || invoicePayloadBase.invoiceType === 'cash' || invoicePayloadBase.invoiceType === 'gifted-damaged' || invoicePayloadBase.invoiceType === 'online-sale') {
+        if (invoicePayloadBase.invoiceType === 'sale' || invoicePayloadBase.invoiceType === 'cash' || invoicePayloadBase.invoiceType === 'gifted-damaged') {
           change = -quantityToApply;
         } else if (invoicePayloadBase.invoiceType === 'return') {
           change = -quantityToApply;
@@ -475,7 +526,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
         const newOnHand = initialOnHand + netChange;
 
-        if (newOnHand < 0 && (invoicePayloadBase.invoiceType === 'sale' || invoicePayloadBase.invoiceType === 'cash' || invoicePayloadBase.invoiceType === 'gifted-damaged' || invoicePayloadBase.invoiceType === 'online-sale')) {
+        if (newOnHand < 0 && (invoicePayloadBase.invoiceType === 'sale' || invoicePayloadBase.invoiceType === 'cash' || invoicePayloadBase.invoiceType === 'gifted-damaged')) {
           throw new Error(`Cannot save invoice: Product "${product.name}" would go into negative stock (${newOnHand}). Current: ${initialOnHand}, Net Change: ${netChange}`);
         }
         
@@ -513,6 +564,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     validateManualInvoiceNumber,
     invoiceNumberError,
     isDuplicateInvoiceNumber,
+    getSuggestedInvoiceNumber,
   ]);
 
   useEffect(() => {
@@ -635,12 +687,11 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                   <select
                     id="invoiceType"
                     value={invoiceType}
-                    onChange={(e) => handleInvoiceTypeChange(e.target.value as 'sale' | 'return' | 'gifted-damaged' | 'cash' | 'online-sale')}
+                    onChange={(e) => handleInvoiceTypeChange(e.target.value as 'sale' | 'return' | 'gifted-damaged' | 'cash')}
                     className="w-full p-2 border border-border rounded-md bg-background text-sm sm:text-base"
                   >
                     <option value="sale">Sale (Regular Invoice)</option>
                     <option value="cash">Cash (Cash Invoice)</option>
-                    <option value="online-sale">Online Sale</option>
                     <option value="return">Return (Regular Invoice)</option>
                     <option value="gifted-damaged">Gifted/Damaged (Regular Invoice)</option>
                   </select>
@@ -649,9 +700,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       ? 'Return invoices restore stock (auto-negative quantity).'
                       : invoiceType === 'cash'
                         ? 'Cash invoices decrease stock (same as sale).'
-                        : invoiceType === 'online-sale'
-                          ? 'Online Sale invoices decrease stock (same as sale).'
-                          : 'Sales/Cash/Online Sale decrease stock, Returns increase stock, Gifted/Damaged decreases stock.'}
+                        : 'Sales/Cash decrease stock, Returns increase stock, Gifted/Damaged decreases stock.'}
                   </p>
                 </div>
 
@@ -742,7 +791,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                       variant="outline"
                                       size="sm"
                                       className="h-7 w-7 sm:h-8 w-8 p-0"
-                                      disabled={item.quantity <= 1 && (invoiceType === 'sale' || invoiceType === 'cash' || invoiceType === 'online-sale')}
+                                      disabled={item.quantity <= 1 && (invoiceType === 'sale' || invoiceType === 'cash' || invoiceType === 'gifted-damaged')}
                                     >
                                       -
                                     </Button>
