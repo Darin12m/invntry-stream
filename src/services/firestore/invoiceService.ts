@@ -199,14 +199,14 @@ export const invoiceService = {
       // Reversing logic - for return invoices qty is negative, so:
       // sale/cash/gifted/online-sale: we subtracted positive qty, so add it back
       // return: we subtracted negative qty (added stock), so subtract to revert
-      if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged' || invoice.invoiceType === 'online-sale') {
-        newOnHand += item.quantity; // Add back stock for sales/cash/gifted/online-sale
+      if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged') {
+        newOnHand += item.quantity; // Add back stock for sales/cash/gifted
       } else if (invoice.invoiceType === 'return') {
         // Return qty is negative, so adding negative = subtracting
         newOnHand += item.quantity; // This subtracts because qty is negative
       }
 
-      if (newOnHand < 0 && (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged' || invoice.invoiceType === 'online-sale')) {
+      if (newOnHand < 0 && (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged')) {
         throw new Error(`Cannot delete invoice ${invoice.number}: Reverting stock would cause negative stock for product "${item.name}". Current: ${product.onHand}, Change: +${item.quantity}, New: ${newOnHand}`);
       }
       batch.update(productRef, { onHand: newOnHand });
@@ -234,15 +234,15 @@ export const invoiceService = {
 
       let newOnHand = product.onHand;
       // Apply original effect (same as creating the invoice)
-      // For sale/cash/gifted/online-sale: subtract qty (qty is positive)
+      // For sale/cash/gifted: subtract qty (qty is positive)
       // For return: subtract qty (qty is negative, so it adds stock)
-      if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged' || invoice.invoiceType === 'online-sale') {
-        newOnHand -= item.quantity; // Subtract stock for sales/cash/gifted/online-sale
+      if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged') {
+        newOnHand -= item.quantity; // Subtract stock for sales/cash/gifted
       } else if (invoice.invoiceType === 'return') {
         newOnHand -= item.quantity; // qty is negative, so this adds stock
       }
 
-      if (newOnHand < 0 && (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged' || invoice.invoiceType === 'online-sale')) {
+      if (newOnHand < 0 && (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged')) {
         throw new Error(`Cannot restore invoice ${invoice.number}: Insufficient stock for product "${item.name}". Current: ${product.onHand}, Change: -${item.quantity}, New: ${newOnHand}`);
       }
       batch.update(productRef, { onHand: newOnHand });
@@ -271,13 +271,13 @@ export const invoiceService = {
 
       let newOnHand = product.onHand;
       // Revert stock - same as soft delete logic
-      if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged' || invoice.invoiceType === 'online-sale') {
+      if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged') {
         newOnHand += item.quantity;
       } else if (invoice.invoiceType === 'return') {
         newOnHand += item.quantity; // qty is negative, so this subtracts
       }
 
-      if (newOnHand < 0 && (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged' || invoice.invoiceType === 'online-sale')) {
+      if (newOnHand < 0 && (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged')) {
         throw new Error(`Cannot permanently delete invoice ${invoice.number}: Reverting stock would cause negative stock for product "${item.name}".`);
       }
       batch.update(productRef, { onHand: newOnHand });
