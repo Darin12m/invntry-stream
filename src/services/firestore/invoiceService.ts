@@ -1,5 +1,5 @@
 import { db } from '@/firebase/config';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, getDoc, writeBatch, serverTimestamp, FieldValue, setDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, getDoc, writeBatch, serverTimestamp, FieldValue, setDoc, limit } from 'firebase/firestore';
 import { Invoice, Product } from '@/types';
 import { activityLogService } from '@/services/firestore/activityLogService';
 import { debugLog } from '@/utils/debugLog'; // Import debugLog
@@ -38,6 +38,22 @@ export const invoiceService = {
       updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt,
       deletedAt: data.deletedAt?.toDate ? data.deletedAt.toDate() : data.deletedAt,
     } as Invoice;
+  },
+
+  // New helper to get the latest invoice number for pre-filling UI
+  _getLatestInvoiceNumber: async (): Promise<string> => {
+    debugLog("invoiceService._getLatestInvoiceNumber: Querying for latest invoice number.");
+    const invoicesColRef = collection(db, 'invoices');
+    const q = query(invoicesColRef, orderBy('createdAt', 'desc'), limit(1));
+    const latestInvoiceSnapshot = await getDocs(q);
+
+    if (!latestInvoiceSnapshot.empty) {
+      const lastInvoiceData = latestInvoiceSnapshot.docs[0].data();
+      debugLog("invoiceService._getLatestInvoiceNumber: Found last invoice number:", lastInvoiceData.number);
+      return lastInvoiceData.number;
+    }
+    debugLog("invoiceService._getLatestInvoiceNumber: No previous invoices found. Returning empty string.");
+    return ''; // Return empty if no invoices exist
   },
 
   create: async (invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>, userEmail: string = 'Unknown User', userId: string | null = null): Promise<{ invoiceId: string; invoiceNumber: string }> => {

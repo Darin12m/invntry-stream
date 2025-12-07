@@ -54,10 +54,11 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     const initializeInvoiceData = async () => {
       if (!editingInvoice) { // Only for new invoices
         debugLog("InvoiceModal: Initializing new invoice.");
+        const latestInvoiceNumber = await invoiceService._getLatestInvoiceNumber();
         
         setCurrentInvoice({
           id: Date.now().toString(), // Temporary ID
-          number: '', // Start with empty for manual entry
+          number: '', // Will be set by manualInvoiceNumber
           date: new Date().toISOString().split('T')[0],
           customer: { name: '', email: '', address: '', phone: '' },
           items: [],
@@ -74,7 +75,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           buyerEmail: '',
           buyerAddress: '',
         });
-        setManualInvoiceNumber(''); // Clear manual input
+        setManualInvoiceNumber(latestInvoiceNumber); // Pre-fill with the last invoice number
         setInvoiceNumberError(null);
         setIsDuplicateInvoiceNumber(false);
         setInvoiceItems([]);
