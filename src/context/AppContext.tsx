@@ -1,7 +1,6 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import { User as FirebaseAuthUser } from 'firebase/auth';
 import { Product, Invoice, AppSettings, ActivityLog } from '@/types';
-// Removed direct imports of useProducts, useInvoices, useSettings, useActivityLogs to break circular dependency
 import { toast } from 'sonner';
 import { db } from '@/firebase/config';
 import { collection, writeBatch, doc } from 'firebase/firestore';
@@ -43,12 +42,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasMigratedProducts = useRef(false); // Ref to track if migration has run
 
   // Global data fetching for initial load or refresh
   const fetchAppData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
+      // Run product data migration once per session
+      if (!hasMigratedProducts.current && currentUser) {
+        await productService.migrateProductData(currentUser.email || 'System', currentUser.uid);
+        hasMigratedProducts.current = true;
+      }
+
       const [
         productsList,
         invoicesList,
@@ -80,7 +86,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } finally {
       setLoading(false);
     }
-  }, [setProducts, setInvoices, setActivityLogs, setSettings, setError]);
+  }, [setProducts, setInvoices, setActivityLogs, setSettings, setError, currentUser]);
 
   // Only fetch data when user is authenticated
   useEffect(() => {
@@ -94,6 +100,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setProducts([]);
       setInvoices([]);
       setActivityLogs([]);
+      hasMigratedProducts.current = false; // Reset migration flag on logout
     }
   }, [currentUser, fetchAppData]);
 

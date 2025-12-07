@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react'; // Import useMemo
+import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,21 +6,20 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Search, Plus, Trash, X, Save } from 'lucide-react';
 import { db } from '@/firebase/config';
-import { doc, writeBatch, collection } from 'firebase/firestore'; // Import collection and writeBatch
+import { doc, writeBatch, collection } from 'firebase/firestore';
 import { Product, Invoice, InvoiceItem } from '@/types';
 import { toast } from "sonner";
 import { AppContext } from '@/context/AppContext';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useProducts } from '@/hooks/useProducts';
 import { calculateInvoiceTotals } from '@/utils/invoiceCalculations';
-import { useDeviceType } from '@/hooks/useDeviceType'; // Import useDeviceType
+import { useDeviceType } from '@/hooks/useDeviceType';
 
 interface InvoiceModalProps {
   showInvoiceModal: boolean;
   setShowInvoiceModal: (show: boolean) => void;
   editingInvoice: Invoice | null;
   setEditingInvoice: (invoice: Invoice | null) => void;
-  // Removed products, invoices, fetchInvoices, fetchProducts, createInvoice, updateInvoice props
 }
 
 const InvoiceModal: React.FC<InvoiceModalProps> = ({
@@ -32,7 +31,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const { currentUser, products, invoices: allInvoices } = useContext(AppContext);
   const { createInvoice, updateInvoice } = useInvoices();
   const { fetchProducts } = useProducts(); // To refresh product list after stock changes
-  const { isIOS } = useDeviceType(); // Use the hook
+  const { isIOS } = useDeviceType();
 
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
@@ -69,7 +68,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
               ...item,
               name: latestProduct.name,
               sku: latestProduct.sku,
-              price: latestProduct.price,
+              // Use item's price if it exists, otherwise fallback to latest product price
+              price: item.price ?? latestProduct.price, 
               purchasePrice: latestProduct.purchasePrice || 0,
             }
           : { ...item };
@@ -114,7 +114,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setInvoiceType('sale');
     }
     setInvoiceProductSearch('');
-  }, [editingInvoice, products, allInvoices]); // Depend on allInvoices from context
+  }, [editingInvoice, products, allInvoices]);
 
   const handleCloseInvoiceModal = useCallback(() => {
     setShowInvoiceModal(false);
@@ -149,7 +149,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         productId: product.id,
         name: product.name,
         sku: product.sku,
-        price: product.price,
+        price: product.price, // Default to product's sale price
         quantity: initialQuantity,
         purchasePrice: product.purchasePrice || 0,
         discount: 0
@@ -184,6 +184,14 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       });
     });
   }, [invoiceType]);
+
+  const updateInvoiceItemPrice = useCallback((productId: string, newPrice: number) => {
+    setInvoiceItems(prevItems => prevItems.map(item =>
+      item.productId === productId
+        ? { ...item, price: Math.max(0, newPrice) } // Ensure price is non-negative
+        : item
+    ));
+  }, []);
 
   const updateInvoiceItemDiscount = useCallback((productId: string, discount: number) => {
     setInvoiceItems(prevItems => prevItems.map(item =>
@@ -227,7 +235,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       productId: item.productId,
       name: item.name,
       sku: item.sku,
-      price: parseFloat(item.price.toFixed(2)),
+      price: parseFloat(item.price.toFixed(2)), // Use the potentially overridden price
       quantity: item.quantity,
       purchasePrice: parseFloat(item.purchasePrice?.toFixed(2) || '0'),
       discount: parseFloat(item.discount?.toFixed(2) || '0'),
@@ -253,7 +261,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     };
 
     try {
-      const batch = writeBatch(db); // Corrected: use writeBatch
+      const batch = writeBatch(db);
       
       // If editing an existing invoice, first revert its previous stock changes
       if (editingInvoice) {
@@ -446,9 +454,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 <div className="w-full sm:w-1/2 p-4 sm:p-6 overflow-y-auto">
                 
                 {/* Invoice Number and Date */}
-                <div className="mb-4 sm:mb-6 grid grid-cols-2 gap-3 sm:gap-4"> {/* Adjusted spacing */}
+                <div className="mb-4 sm:mb-6 grid grid-cols-2 gap-3 sm:gap-4">
                   <div>
-                    <Label className="text-sm sm:text-base">Invoice Number</Label> {/* Adjusted font size */}
+                    <Label className="text-sm sm:text-base">Invoice Number</Label>
                     <Input
                       value={currentInvoice.number}
                       onChange={(e) => setCurrentInvoice({ ...currentInvoice, number: e.target.value })}
@@ -456,7 +464,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                     />
                   </div>
                   <div>
-                    <Label htmlFor="invoiceDate" className="text-sm sm:text-base">Invoice Date *</Label> {/* Adjusted font size */}
+                    <Label htmlFor="invoiceDate" className="text-sm sm:text-base">Invoice Date *</Label>
                     <Input
                       id="invoiceDate"
                       type="date"
@@ -507,9 +515,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 </div>
 
                   {/* Customer Information */}
-                <div className="mb-4 sm:mb-6"> {/* Adjusted spacing */}
-                  <h3 className="font-bold text-base sm:text-lg mb-2 sm:mb-3">Customer Information</h3> {/* Adjusted font size and spacing */}
-                  <div className="space-y-2 sm:space-y-3"> {/* Adjusted spacing */}
+                <div className="mb-4 sm:mb-6">
+                  <h3 className="font-bold text-base sm:text-lg mb-2 sm:mb-3">Customer Information</h3>
+                  <div className="space-y-2 sm:space-y-3">
                     <Input
                       placeholder="Customer Name *"
                       value={customerInfo.name}
@@ -541,58 +549,58 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 </div>
 
                 {/* Invoice Items */}
-                <div className="mb-4 sm:mb-6"> {/* Adjusted spacing */}
-                  <div className="flex justify-between items-center mb-2 sm:mb-3"> {/* Adjusted spacing */}
-                    <h3 className="font-bold text-base sm:text-lg">Invoice Items</h3> {/* Adjusted font size */}
+                <div className="mb-4 sm:mb-6">
+                  <div className="flex justify-between items-center mb-2 sm:mb-3">
+                    <h3 className="font-bold text-base sm:text-lg">Invoice Items</h3>
                     {invoiceItems.length > 0 && (
                       <Button
                         onClick={clearAllInvoiceItems}
                         variant="outline"
-                        size={isIOS ? "sm" : "default"} // Smaller button on iOS
+                        size={isIOS ? "sm" : "default"}
                       >
-                        <Trash className="h-3 w-3 sm:h-4 w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
+                        <Trash className="h-3 w-3 sm:h-4 w-4 mr-1 sm:mr-2" />
                         Clear All
                       </Button>
                     )}
                   </div>
                   {invoiceItems.length === 0 ? (
-                    <Card className="p-6 sm:p-8 text-center"> {/* Adjusted padding */}
-                      <p className="text-muted-foreground text-sm sm:text-base">Click products on the left to add them here</p> {/* Adjusted font size */}
+                    <Card className="p-6 sm:p-8 text-center">
+                      <p className="text-muted-foreground text-sm sm:text-base">Click products on the left to add them here</p>
                     </Card>
                   ) : (
-                    <div className="space-y-2 sm:space-y-3"> {/* Adjusted spacing */}
+                    <div className="space-y-2 sm:space-y-3">
                       {invoiceItems.map(item => {
                         const itemSubtotal = item.price * item.quantity;
                         const itemDiscountAmount = itemSubtotal * ((item.discount || 0) / 100);
                         const itemTotal = itemSubtotal - itemDiscountAmount;
                         
                         return (
-                          <Card key={item.productId} className="p-3 sm:p-4"> {/* Adjusted padding */}
+                          <Card key={item.productId} className="p-3 sm:p-4">
                             <div className="space-y-2">
                               <div className="flex justify-between items-start gap-2">
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="font-medium text-sm sm:text-base truncate">{item.name}</h4> {/* Adjusted font size */}
-                                  <p className="text-xs text-muted-foreground truncate">{item.sku}</p> {/* Adjusted font size */}
+                                  <h4 className="font-medium text-sm sm:text-base truncate">{item.name}</h4>
+                                  <p className="text-xs text-muted-foreground truncate">SKU: {item.sku}</p>
                                 </div>
                                 <Button
                                   onClick={() => removeInvoiceItem(item.productId)}
                                   variant="destructive"
                                   size="sm"
-                                  className="h-7 w-7 sm:h-8 w-8 p-0 flex-shrink-0" // Adjusted size
+                                  className="h-7 w-7 sm:h-8 w-8 p-0 flex-shrink-0"
                                 >
-                                  <X className="h-3 w-3 sm:h-4 w-4" /> {/* Adjusted icon size */}
+                                  <X className="h-3 w-3 sm:h-4 w-4" />
                                 </Button>
                               </div>
                               
-                              <div className="grid grid-cols-2 gap-2">
+                              <div className="grid grid-cols-3 gap-2"> {/* Changed to 3 columns for price */}
                                 <div>
                                   <Label className="text-xs">Quantity</Label>
-                                  <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5 sm:p-1"> {/* Adjusted padding */}
+                                  <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5 sm:p-1">
                                     <Button
                                       onClick={() => updateInvoiceItemQuantity(item.productId, item.quantity - 1)}
                                       variant="outline"
                                       size="sm"
-                                      className="h-7 w-7 sm:h-8 w-8 p-0" // Adjusted size
+                                      className="h-7 w-7 sm:h-8 w-8 p-0"
                                       disabled={item.quantity <= 1 && invoiceType === 'sale'}
                                     >
                                       -
@@ -601,20 +609,32 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                       type="number"
                                       value={item.quantity}
                                       onChange={(e) => updateInvoiceItemQuantity(item.productId, parseInt(e.target.value) || 0)}
-                                      className="w-full h-7 sm:h-8 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-sm sm:text-base" // Adjusted height and font size
+                                      className="w-full h-7 sm:h-8 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-sm sm:text-base"
                                       placeholder="0"
                                     />
                                     <Button
                                       onClick={() => updateInvoiceItemQuantity(item.productId, item.quantity + 1)}
                                       variant="outline"
                                       size="sm"
-                                      className="h-7 w-7 sm:h-8 w-8 p-0" // Adjusted size
+                                      className="h-7 w-7 sm:h-8 w-8 p-0"
                                     >
                                       +
                                     </Button>
                                   </div>
                                 </div>
                                 
+                                <div> {/* New Price Input */}
+                                  <Label className="text-xs">Price</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={item.price}
+                                    onChange={(e) => updateInvoiceItemPrice(item.productId, parseFloat(e.target.value) || 0)}
+                                    className="h-7 sm:h-8 text-sm sm:text-base"
+                                    placeholder="0.00"
+                                  />
+                                </div>
+
                                 <div>
                                   <Label className="text-xs">Discount (%)</Label>
                                   <Input
@@ -623,13 +643,13 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                     max="100"
                                     value={item.discount || 0}
                                     onChange={(e) => updateInvoiceItemDiscount(item.productId, parseFloat(e.target.value) || 0)}
-                                    className="h-7 sm:h-8 text-sm sm:text-base" // Adjusted height and font size
+                                    className="h-7 sm:h-8 text-sm sm:text-base"
                                     placeholder="0"
                                   />
                                 </div>
                               </div>
                               
-                              <div className="text-right text-xs sm:text-sm space-y-1 pt-2 border-t"> {/* Adjusted font size and spacing */}
+                              <div className="text-right text-xs sm:text-sm space-y-1 pt-2 border-t">
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">Price × Qty:</span>
                                   <span>{itemSubtotal.toFixed(2)} ден.</span>
@@ -655,9 +675,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
                   {/* Discount and Totals */}
                   {invoiceItems.length > 0 && (
-                    <Card className="p-3 sm:p-4 space-y-3 sm:space-y-4"> {/* Adjusted padding and spacing */}
+                    <Card className="p-3 sm:p-4 space-y-3 sm:space-y-4">
                       <div>
-                        <Label htmlFor="discount" className="text-sm sm:text-base">Попуст (%)</Label> {/* Adjusted font size */}
+                        <Label htmlFor="discount" className="text-sm sm:text-base">Попуст (%)</Label>
                         <Input
                           id="discount"
                           type="number"
@@ -669,7 +689,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                           className="text-sm sm:text-base"
                         />
                       </div>
-                      <div className="space-y-1.5 sm:space-y-2 text-right text-sm sm:text-base"> {/* Adjusted spacing and font size */}
+                      <div className="space-y-1.5 sm:space-y-2 text-right text-sm sm:text-base">
                           <div className="flex justify-between">
                             <span>Мегузбир:</span>
                             <span>{subtotal.toFixed(2)} ден.</span>
@@ -680,7 +700,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                               <span>-{calculatedDiscountAmount.toFixed(2)} ден.</span>
                             </div>
                           )}
-                          <div className="flex justify-between font-bold text-base sm:text-lg border-t pt-2"> {/* Adjusted font size and padding */}
+                          <div className="flex justify-between font-bold text-base sm:text-lg border-t pt-2">
                             <span>ВКУПНО:</span>
                             <span className="text-primary">{total.toFixed(2)} ден.</span>
                           </div>
