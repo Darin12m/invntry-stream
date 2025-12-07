@@ -326,12 +326,28 @@ const ImportProductsModal: React.FC<ImportProductsModalProps> = ({
                     <h5 className="font-semibold text-destructive flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4" /> {productsWithErrors.length} Products with Errors
                     </h5>
-                    <ul className="list-disc list-inside text-sm text-destructive-foreground">
-                      {productsWithErrors.slice(0, 5).map((p, i) => (
-                        <li key={i}>Row {p.originalRow} (SKU: {p.sku || 'N/A'}): {p.errors.join(', ')}</li>
-                      ))}
-                      {productsWithErrors.length > 5 && <li>...and {productsWithErrors.length - 5} more.</li>}
-                    </ul>
+                    <div className="overflow-x-auto max-h-60"> {/* Added max-h-60 for scrollability */}
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="p-2 text-left">Row</th>
+                            <th className="p-2 text-left">SKU</th>
+                            <th className="p-2 text-left">Name</th>
+                            <th className="p-2 text-left">Errors</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {productsWithErrors.map((p, i) => (
+                            <tr key={i} className="border-b last:border-b-0">
+                              <td className="p-2">{p.originalRow}</td>
+                              <td className="p-2">{p.sku || 'N/A'}</td>
+                              <td className="p-2">{p.name || 'N/A'}</td>
+                              <td className="p-2 text-destructive-foreground">{p.errors.join(', ')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </Card>
                 )}
 
