@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,8 @@ import {
   parseInvoiceNumber,
   generateNextSuggestedNumber,
   regularInvoiceNumberRegex,
-  cashInvoiceNumberRegex
+  cashInvoiceNumberRegex,
+  cashInvoiceNumberExtendedRegex
 } from '@/utils/invoiceNumbering'; // Import new utilities
 
 interface InvoiceModalProps {
@@ -52,10 +53,13 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [invoiceNumberError, setInvoiceNumberError] = useState<string | null>(null);
   const [isDuplicateInvoiceNumber, setIsDuplicateInvoiceNumber] = useState(false);
 
+  const cashLockedPrefixRef = useRef<string>(''); // To store the auto-generated CASH prefix
+
   // Helper to generate a suggested number based on current type and year
   const getSuggestedInvoiceNumber = useCallback(async (type: Invoice['invoiceType']) => {
     const currentYearShort = String(new Date().getFullYear()).slice(-2);
     const numberingType = getInvoiceNumberingType(type);
+    
     const latestNumber = await invoiceService._getLatestInvoiceNumber(numberingType, currentYearShort);
     
     let suggestedNumber = '';
@@ -88,6 +92,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         // Get suggested number for the default 'sale' type
         const suggestedNum = await getSuggestedInvoiceNumber('sale');
         setManualInvoiceNumber(suggestedNum);
+        cashLockedPrefixRef.current = ''; // Clear locked prefix for non-cash
         
         setCurrentInvoice({
           id: Date.now().toString(), // Temporary ID
@@ -138,6 +143,18 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         setInvoiceNumberError(null);
         setIsDuplicateInvoiceNumber(false);
 
+        // Set locked prefix if editing a CASH invoice
+        if (editingInvoice.invoiceType === 'cash') {
+          const parsed = parseInvoiceNumber(editingInvoice.number);
+          if (parsed.isValid && parsed.prefix === 'CASH ') {
+            cashLockedPrefixRef.current = `${parsed.prefix}${String(parsed.sequential).padStart(3, '0')}/${parsed.year}`;
+          } else {
+            cashLockedPrefixRef.current = ''; // Fallback if existing CASH number is malformed
+          }
+        } else {
+          cashLockedPrefixRef.current = '';
+        }
+
         const refreshedItems = editingInvoice.items.map((item) => {
           const latestProduct = products.find(p => p.id === item.productId);
           return latestProduct
@@ -181,6 +198,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     setManualInvoiceNumber(''); // Reset manual input
     setInvoiceNumberError(null);
     setIsDuplicateInvoiceNumber(false);
+    cashLockedPrefixRef.current = ''; // Clear locked prefix
   }, [setShowInvoiceModal, setEditingInvoice]);
 
   const validateManualInvoiceNumber = useCallback(async (number: string, currentInvoiceType: Invoice['invoiceType']) => {
@@ -191,22 +209,25 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
 
     const numberingType = getInvoiceNumberingType(currentInvoiceType);
-    let isValidFormat = true; // Assume valid for freeform
+    let isValidFormat = true;
 
     if (numberingType === 'cash') {
-      isValidFormat = cashInvoiceNumberRegex.test(number);
+      // For CASH, validate against the extended regex
+      isValidFormat = cashInvoiceNumberExtendedRegex.test(number);
+      if (!isValidFormat) {
+        setInvoiceNumberError("Format must be CASH ###/YY or CASH ###/YY-#### or CASH ###/YY ####");
+        setIsDuplicateInvoiceNumber(false);
+        return false;
+      }
     } else if (numberingType === 'regular') { // 'sale', 'return', 'gifted-damaged'
       isValidFormat = regularInvoiceNumberRegex.test(number);
+      if (!isValidFormat) {
+        setInvoiceNumberError("Format must be ###/YY (e.g., 001/25)");
+        setIsDuplicateInvoiceNumber(false);
+        return false;
+      }
     }
-    // For 'freeform' (online-sale), isValidFormat remains true
-
-    if (!isValidFormat) {
-      setInvoiceNumberError(numberingType === 'cash'
-        ? "Format must be CASH ###/YY (e.g., CASH 001/25)"
-        : "Format must be ###/YY (e.g., 001/25)");
-      setIsDuplicateInvoiceNumber(false);
-      return false;
-    }
+    // No format validation for 'online-sale' (if it were enabled)
 
     // Check for duplicates in Firestore, scoped by invoiceType and year
     const invoicesColRef = collection(db, 'invoices');
@@ -227,7 +248,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       } else {
         // Check if the duplicate is of the same numbering type and year
         const duplicateInvoice = querySnapshot.docs[0].data() as Invoice;
-        const duplicateYearShort = duplicateInvoice.number.split('/').pop(); // Extract year from number
+        const duplicateYearShort = parseInvoiceNumber(duplicateInvoice.number).year;
         
         // For 'freeform' (online-sale), we check uniqueness by exact type and year
         // For 'regular'/'cash', we check by numbering type and year
@@ -252,16 +273,64 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
   const handleManualInvoiceNumberChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setManualInvoiceNumber(value);
-    // Validate immediately, but also before saving
-    await validateManualInvoiceNumber(value, invoiceType);
-  }, [validateManualInvoiceNumber, invoiceType]);
+    
+    if (invoiceType === 'cash') {
+      const lockedPrefix = cashLockedPrefixRef.current;
+      if (!lockedPrefix) {
+        // This should ideally not happen if initialized correctly, but as a fallback
+        setManualInvoiceNumber(value);
+        setInvoiceNumberError("CASH invoice prefix not set. Please re-select invoice type.");
+        return;
+      }
+
+      if (!value.startsWith(lockedPrefix)) {
+        // User tried to edit the locked prefix
+        setManualInvoiceNumber(lockedPrefix); // Revert to locked prefix
+        setInvoiceNumberError("Cannot edit the auto-generated CASH invoice prefix.");
+        setIsDuplicateInvoiceNumber(false);
+        return;
+      }
+
+      const suffixPart = value.substring(lockedPrefix.length);
+      const suffixRegex = /^([- ]?[0-9]{0,4})?$/; // Optional space/dash, then 0-4 digits
+
+      if (!suffixRegex.test(suffixPart)) {
+        // Invalid suffix character or too many digits
+        const lastValidSuffix = manualInvoiceNumber.substring(lockedPrefix.length);
+        setManualInvoiceNumber(lockedPrefix + lastValidSuffix); // Revert to last valid suffix
+        setInvoiceNumberError("Suffix must be a space or dash followed by up to 4 digits.");
+        setIsDuplicateInvoiceNumber(false);
+        return;
+      }
+
+      // If it's valid so far, update the state and then run full validation
+      setManualInvoiceNumber(value);
+      await validateManualInvoiceNumber(value, invoiceType);
+
+    } else {
+      // For other invoice types, allow full editing and validate
+      setManualInvoiceNumber(value);
+      await validateManualInvoiceNumber(value, invoiceType);
+    }
+  }, [validateManualInvoiceNumber, invoiceType, manualInvoiceNumber]);
 
   const handleInvoiceTypeChange = useCallback(async (newType: Invoice['invoiceType']) => {
     setInvoiceType(newType);
-    // For other types, re-suggest number based on new type
     const suggestedNum = await getSuggestedInvoiceNumber(newType);
     setManualInvoiceNumber(suggestedNum);
+    
+    // Set/clear locked prefix based on new type
+    if (newType === 'cash') {
+      const parsed = parseInvoiceNumber(suggestedNum);
+      if (parsed.isValid && parsed.prefix === 'CASH ') {
+        cashLockedPrefixRef.current = `${parsed.prefix}${String(parsed.sequential).padStart(3, '0')}/${parsed.year}`;
+      } else {
+        cashLockedPrefixRef.current = suggestedNum; // Fallback if suggested is not perfect
+      }
+    } else {
+      cashLockedPrefixRef.current = '';
+    }
+
     // Re-validate the new suggested number
     await validateManualInvoiceNumber(suggestedNum, newType);
 
@@ -411,7 +480,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
             parsedManual.prefix === parsedSuggested.prefix &&
             parsedManual.sequential < parsedSuggested.sequential) {
           
-          setManualInvoiceNumber(suggestedNext.number);
+          setManualInvoiceNumber(suggestedNextNumber);
           toast.info(`Invoice number updated to maintain sequence: ${suggestedNextNumber}`);
           // Re-run validation with the new number
           const reValidated = await validateManualInvoiceNumber(suggestedNextNumber, invoiceType);
@@ -676,7 +745,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       id="invoiceNumber"
                       value={manualInvoiceNumber}
                       onChange={handleManualInvoiceNumberChange}
-                      placeholder="e.g., 001/25 or CASH 001/25"
+                      placeholder={invoiceType === 'cash' ? "CASH 001/25 1234" : "e.g., 001/25"}
                       className={`text-sm sm:text-base ${invoiceNumberError ? 'border-destructive' : ''}`}
                     />
                     {invoiceNumberError && (

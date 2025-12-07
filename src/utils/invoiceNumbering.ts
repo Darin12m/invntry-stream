@@ -5,6 +5,9 @@ import { Invoice } from '@/types';
 // Cash: CASH ###/YY (e.g., CASH 001/25)
 export const regularInvoiceNumberRegex = /^[0-9]{3}\/[0-9]{2}$/;
 export const cashInvoiceNumberRegex = /^CASH [0-9]{3}\/[0-9]{2}$/;
+// New regex for extended cash invoice numbers: CASH ###/YY followed by optional space/dash and 4 digits
+export const cashInvoiceNumberExtendedRegex = /^CASH [0-9]{3}\/[0-9]{2}([- ]?[0-9]{4})?$/;
+
 
 /**
  * Determines the numbering type ('regular', 'cash', or 'freeform') based on the invoice's functional type.
@@ -18,11 +21,18 @@ export const getInvoiceNumberingType = (invoiceType: Invoice['invoiceType']): 'r
  * Parses an invoice number string into its sequential part, year, and prefix.
  * Returns isValid: false if the format is incorrect.
  */
-export const parseInvoiceNumber = (number: string): { sequential: number; year: string; prefix: string; isValid: boolean } => {
+export const parseInvoiceNumber = (number: string): { sequential: number; year: string; prefix: string; isValid: boolean; suffix?: string } => {
   let match;
   let prefix = '';
+  let suffix = '';
 
-  if (cashInvoiceNumberRegex.test(number)) {
+  // Try to match extended cash format first
+  const extendedCashMatch = number.match(/^CASH ([0-9]{3})\/([0-9]{2})([- ]?([0-9]{4}))?$/);
+  if (extendedCashMatch) {
+    match = [number, extendedCashMatch[1], extendedCashMatch[2]]; // Base parts
+    prefix = 'CASH ';
+    suffix = extendedCashMatch[3] || ''; // Capture the optional suffix part
+  } else if (cashInvoiceNumberRegex.test(number)) {
     match = number.match(/^CASH ([0-9]{3})\/([0-9]{2})$/);
     prefix = 'CASH ';
   } else if (regularInvoiceNumberRegex.test(number)) {
@@ -32,10 +42,10 @@ export const parseInvoiceNumber = (number: string): { sequential: number; year: 
   if (match) {
     const sequential = parseInt(match[1], 10);
     const year = match[2];
-    return { sequential, year, prefix, isValid: true };
+    return { sequential, year, prefix, isValid: true, suffix };
   }
 
-  return { sequential: 0, year: '', prefix: '', isValid: false };
+  return { sequential: 0, year: '', prefix: '', isValid: false, suffix: '' };
 };
 
 /**
