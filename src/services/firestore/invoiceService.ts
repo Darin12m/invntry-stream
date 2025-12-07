@@ -40,42 +40,68 @@ export const invoiceService = {
     let newInvoiceNumber: string = '';
     let newInvoiceId: string = ''; // To store the generated ID
 
-    await runTransaction(db, async (transaction) => {
-      // 1. Get the latest invoice number within the transaction
-      // This query needs to be robust to get the highest number for the current fiscal year.
-      // Ordering by 'number' desc and limiting to 1 works for the "000/YY" format.
-      const latestInvoiceQuery = query(invoicesColRef, orderBy('number', 'desc'), limit(1));
-      const latestInvoiceSnapshot = await transaction.get(latestInvoiceQuery);
-      const lastInvoiceNumber = latestInvoiceSnapshot.docs.length > 0 ? latestInvoiceSnapshot.docs[0].data().number : null;
+    console.log("invoiceService.create: Starting invoice creation with payload:", invoice);
 
-      // 2. Generate the next sequential number
-      newInvoiceNumber = generateNextInvoiceNumber(lastInvoiceNumber);
+    try {
+      await runTransaction(db, async (transaction) => {
+        console.log("invoiceService.create: Inside Firestore transaction.");
 
-      // 3. Check for uniqueness (optional, but good for explicit safety within transaction)
-      const existingInvoiceQuery = query(invoicesColRef, where('number', '==', newInvoiceNumber));
-      const existingInvoiceSnapshot = await transaction.get(existingInvoiceQuery);
-      if (!existingInvoiceSnapshot.empty) {
-        // This indicates a race condition that `generateNextInvoiceNumber` might not have caught
-        // or a very rare edge case. Throwing will retry the transaction.
-        throw new Error(`Invoice number ${newInvoiceNumber} already exists. Retrying transaction.`);
-      }
+        // 1. Get the latest invoice number within the transaction
+        const latestInvoiceQuery = query(invoicesColRef, orderBy('number', 'desc'), limit(1));
+        console.log("invoiceService.create: Querying for latest invoice number.");
+        const latestInvoiceSnapshot = await transaction.get(latestInvoiceQuery);
+        
+        let lastInvoiceNumber: string | null = null;
+        if (!latestInvoiceSnapshot.empty) {
+          const lastInvoiceDoc = latestInvoiceSnapshot.docs[0];
+          if (!lastInvoiceDoc) {
+            throw new Error("invoiceService.create: latestInvoiceSnapshot.docs[0] is undefined.");
+          }
+          lastInvoiceNumber = lastInvoiceDoc.data().number;
+          console.log("invoiceService.create: Found last invoice number:", lastInvoiceNumber, "ID:", lastInvoiceDoc.id);
+        } else {
+          console.log("invoiceService.create: No previous invoices found.");
+        }
 
-      // 4. Create the new invoice document with the generated number
-      const newInvoiceDocRef = doc(invoicesColRef);
-      newInvoiceId = newInvoiceDocRef.id; // Capture the ID here
+        // 2. Generate the next sequential number
+        newInvoiceNumber = generateNextInvoiceNumber(lastInvoiceNumber);
+        console.log("invoiceService.create: Generated next invoice number:", newInvoiceNumber);
 
-      const invoiceWithNumber: Omit<Invoice, 'id'> = {
-        ...invoice,
-        number: newInvoiceNumber,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      transaction.set(newInvoiceDocRef, invoiceWithNumber);
-      console.log("Invoice created with ID:", newInvoiceId); // Add console log as requested
-    });
+        // 3. Check for uniqueness (optional, but good for explicit safety within transaction)
+        const existingInvoiceQuery = query(invoicesColRef, where('number', '==', newInvoiceNumber));
+        console.log("invoiceService.create: Checking for uniqueness of new invoice number:", newInvoiceNumber);
+        const existingInvoiceSnapshot = await transaction.get(existingInvoiceQuery);
+        if (!existingInvoiceSnapshot.empty) {
+          throw new Error(`invoiceService.create: Invoice number ${newInvoiceNumber} already exists. Retrying transaction.`);
+        }
+        console.log("invoiceService.create: Invoice number is unique.");
 
-    await activityLogService.logAction(`New invoice ${newInvoiceNumber} created by ${userEmail} (ID: ${newInvoiceId})`, userId, userEmail);
-    return { invoiceId: newInvoiceId, invoiceNumber: newInvoiceNumber };
+        // 4. Create the new invoice document with the generated number
+        const newInvoiceDocRef = doc(invoicesColRef);
+        if (!newInvoiceDocRef) {
+          throw new Error("invoiceService.create: newInvoiceDocRef is undefined after doc(invoicesColRef).");
+        }
+        newInvoiceId = newInvoiceDocRef.id; // Capture the ID here
+        console.log("invoiceService.create: New invoice document reference created with ID:", newInvoiceId);
+
+        const invoiceWithNumber: Omit<Invoice, 'id'> = {
+          ...invoice,
+          number: newInvoiceNumber,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        console.log("invoiceService.create: Setting invoice document with data:", invoiceWithNumber);
+        transaction.set(newInvoiceDocRef, invoiceWithNumber);
+        console.log("Invoice created with ID:", newInvoiceId); // Add console log as requested
+      });
+
+      await activityLogService.logAction(`New invoice ${newInvoiceNumber} created by ${userEmail} (ID: ${newInvoiceId})`, userId, userEmail);
+      console.log("invoiceService.create: Transaction committed successfully. Returning ID and number.");
+      return { invoiceId: newInvoiceId, invoiceNumber: newInvoiceNumber };
+    } catch (error: any) {
+      console.error("invoiceService.create: Error during invoice creation:", error);
+      throw new Error(`invoiceService.create: ${error.message || 'Unknown error'}`);
+    }
   },
   update: async (id: string, invoice: Partial<Omit<Invoice, 'id' | 'updatedAt'>>, userEmail: string = 'Unknown User', userId: string | null = null): Promise<void> => {
     const invoiceRef = doc(db, 'invoices', id);

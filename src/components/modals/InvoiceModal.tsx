@@ -373,17 +373,20 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       if (editingInvoice) {
         // For existing invoices, the number is already set and should not be re-generated
         await updateInvoice(editingInvoice.id, { ...invoicePayloadBase, number: editingInvoice.number });
+        console.log("Invoice updated successfully. ID:", editingInvoice.id, "Number:", editingInvoice.number);
+        toast.success(`Invoice ${editingInvoice.number} updated successfully!`);
       } else {
         // For new invoices, the createInvoice service will handle number generation transactionally
         const { invoiceId, invoiceNumber } = await createInvoice(invoicePayloadBase); // Handle new return type
-        console.log("Invoice saved successfully. Final ID:", invoiceId, "Number:", invoiceNumber); // Log as requested
+        console.log("Invoice created successfully. Final ID:", invoiceId, "Number:", invoiceNumber); // Log as requested
+        toast.success(`Invoice ${invoiceNumber} created successfully!`);
       }
       
       await batch.commit();
       await fetchProducts(); // Refresh products to reflect stock changes
       handleCloseInvoiceModal();
     } catch (error: any) {
-      console.error('Error saving invoice or updating stock:', error);
+      console.error('CREATE/UPDATE INVOICE ERROR in InvoiceModal.tsx:', error);
       toast.error(`Failed to save invoice: ${error.message || 'Unknown error'}`);
     }
   }, [
