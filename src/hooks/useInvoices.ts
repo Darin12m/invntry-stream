@@ -197,10 +197,12 @@ export const useInvoices = () => {
             }
 
             let newOnHand = product.onHand ?? 0;
-            if (invoiceToDelete.invoiceType === 'sale' || invoiceToDelete.invoiceType === 'gifted-damaged') {
+            // Revert stock: for sale/cash/gifted add back, for return subtract back
+            // Return qty is negative, so adding it back reverts the stock addition
+            if (invoiceToDelete.invoiceType === 'sale' || invoiceToDelete.invoiceType === 'cash' || invoiceToDelete.invoiceType === 'gifted-damaged') {
               newOnHand += item.quantity ?? 0;
             } else if (invoiceToDelete.invoiceType === 'return') {
-              newOnHand -= item.quantity ?? 0;
+              newOnHand += item.quantity ?? 0; // qty is negative, so this subtracts
             }
 
             batch.update(productRef, { onHand: newOnHand });
@@ -251,10 +253,11 @@ export const useInvoices = () => {
             }
 
             let newOnHand = product.onHand ?? 0;
-            if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'gifted-damaged') {
+            // Revert stock: for sale/cash/gifted add back, for return subtract back
+            if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged') {
               newOnHand += item.quantity ?? 0;
             } else if (invoice.invoiceType === 'return') {
-              newOnHand -= item.quantity ?? 0;
+              newOnHand += item.quantity ?? 0; // qty is negative, so this subtracts
             }
 
             batch.update(productRef, { onHand: newOnHand });

@@ -89,10 +89,12 @@ const InvoicesTab: React.FC = React.memo(() => {
     });
   }, [activeInvoices, invoiceSortBy, invoiceSortDirection]);
 
-  const getInvoiceTypeBadge = useCallback((type: 'sale' | 'return' | 'gifted-damaged') => {
+  const getInvoiceTypeBadge = useCallback((type: 'sale' | 'return' | 'gifted-damaged' | 'cash') => {
     switch (type) {
       case 'sale':
-        return <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white text-xs">Sale</Badge>; // Adjusted font size
+        return <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white text-xs">Sale</Badge>;
+      case 'cash':
+        return <Badge variant="default" className="bg-red-500 hover:bg-red-600 text-white text-xs">Cash</Badge>;
       case 'return':
         return <Badge variant="destructive" className="text-xs">Return</Badge>; // Adjusted font size
       case 'gifted-damaged':

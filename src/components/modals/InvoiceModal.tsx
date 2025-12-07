@@ -39,7 +39,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [customerInfo, setCustomerInfo] = useState({ name: '', email: '', address: '', phone: '' });
   const [invoiceProductSearch, setInvoiceProductSearch] = useState('');
   const [discount, setDiscount] = useState(0);
-  const [invoiceType, setInvoiceType] = useState<'sale' | 'return' | 'gifted-damaged'>('sale');
+  const [invoiceType, setInvoiceType] = useState<'sale' | 'return' | 'gifted-damaged' | 'cash'>('sale');
 
   useEffect(() => {
     if (editingInvoice) {
@@ -83,7 +83,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         phone: editingInvoice.customer.phone || '' 
       });
       setDiscount(editingInvoice.discountPercentage || 0);
-      setInvoiceType(editingInvoice.invoiceType || 'sale');
+      setInvoiceType(editingInvoice.invoiceType as 'sale' | 'return' | 'gifted-damaged' | 'cash' || 'sale');
     } else {
       const year = new Date().getFullYear().toString().slice(-2);
       const nextNumber = (allInvoices.length + 1).toString().padStart(3, '0'); // Use allInvoices from context
@@ -135,10 +135,13 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
   const addItemToInvoice = useCallback((product: Product) => {
     const existingItemIndex = invoiceItems.findIndex(item => item.productId === product.id);
+    // For return invoices, quantity should be negative (restores stock)
+    const initialQuantity = invoiceType === 'return' ? -1 : 1;
+    
     if (existingItemIndex > -1) {
       setInvoiceItems(prevItems => prevItems.map((item, index) =>
         index === existingItemIndex
-          ? { ...item, quantity: item.quantity + 1 }
+          ? { ...item, quantity: invoiceType === 'return' ? item.quantity - 1 : item.quantity + 1 }
           : item
       ));
     } else {
@@ -147,22 +150,30 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         name: product.name,
         sku: product.sku,
         price: product.price,
-        quantity: 1,
+        quantity: initialQuantity,
         purchasePrice: product.purchasePrice || 0,
         discount: 0
       }]);
     }
     toast.success(`${product.name} added to invoice`);
-  }, [invoiceItems]);
+  }, [invoiceItems, invoiceType]);
 
   const updateInvoiceItemQuantity = useCallback((productId: string, newQuantity: number) => {
     setInvoiceItems(prevItems => {
       return prevItems.map(item => {
         if (item.productId === productId) {
-          // Safety Logic: Allow Negative QTY ONLY for Return & Damaged
-          if (invoiceType === 'sale' && newQuantity < 0) {
-            toast.error("Sale invoice items cannot have negative quantity.");
-            return item;
+          // Return invoices: quantity must always be negative (or zero)
+          if (invoiceType === 'return') {
+            if (newQuantity > 0) {
+              toast.error("Return invoice items must have negative quantity (restores stock).");
+              return item;
+            }
+          } else if (invoiceType === 'sale' || invoiceType === 'cash') {
+            // Sale and Cash invoices: quantity must be positive
+            if (newQuantity < 0) {
+              toast.error("Sale/Cash invoice items cannot have negative quantity.");
+              return item;
+            }
           }
           if (newQuantity === 0) {
             toast.warning("Quantity is zero - this item will have no effect on stock.");
@@ -260,11 +271,13 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
               throw new Error(`Product "${item.name}" (ID: ${item.productId}) not found. Cannot revert previous stock changes.`);
             }
             let newOnHand = product.onHand;
-            // Reverse previous effect
-            if (previousInvoice.invoiceType === 'sale' || previousInvoice.invoiceType === 'gifted-damaged') {
+            // Reverse previous effect - revert stock changes
+            // For sale/cash/gifted: add back the quantity that was subtracted
+            // For return: qty was negative, so add it back (subtracts stock)
+            if (previousInvoice.invoiceType === 'sale' || previousInvoice.invoiceType === 'cash' || previousInvoice.invoiceType === 'gifted-damaged') {
               newOnHand += item.quantity;
             } else if (previousInvoice.invoiceType === 'return') {
-              newOnHand -= item.quantity;
+              newOnHand += item.quantity; // qty is negative, so this subtracts
             }
             batch.update(productRef, { onHand: newOnHand });
           }
@@ -280,9 +293,12 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           throw new Error(`Product "${item.name}" (ID: ${item.productId}) not found. Cannot update stock.`);
         }
 
-        // Safety Logic: Allow Negative QTY ONLY for Return & Damaged
-        if (invoicePayloadBase.invoiceType === 'sale' && item.quantity < 0) {
-          throw new Error(`Sale invoice item "${item.name}" cannot have negative quantity.`);
+        // Safety Logic: Validate quantity based on invoice type
+        if ((invoicePayloadBase.invoiceType === 'sale' || invoicePayloadBase.invoiceType === 'cash') && item.quantity < 0) {
+          throw new Error(`Sale/Cash invoice item "${item.name}" cannot have negative quantity.`);
+        }
+        if (invoicePayloadBase.invoiceType === 'return' && item.quantity > 0) {
+          throw new Error(`Return invoice item "${item.name}" must have negative quantity (restores stock).`);
         }
         if (item.quantity === 0) {
           toast.warning(`Item "${item.name}" has zero quantity and will not affect stock.`);
@@ -291,14 +307,18 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
         let newOnHand = product.onHand;
         // Base Math: Apply new effect
-        if (invoicePayloadBase.invoiceType === 'sale' || invoicePayloadBase.invoiceType === 'gifted-damaged') {
+        // Sale and Cash: decrease stock (qty is positive, so subtract)
+        // Return: increase stock (qty is negative, so subtracting negative = adding)
+        // Gifted-Damaged: decrease stock
+        if (invoicePayloadBase.invoiceType === 'sale' || invoicePayloadBase.invoiceType === 'cash' || invoicePayloadBase.invoiceType === 'gifted-damaged') {
           newOnHand -= item.quantity;
         } else if (invoicePayloadBase.invoiceType === 'return') {
-          newOnHand += item.quantity;
+          // Return qty is negative, so: onHand -= (-qty) = onHand += |qty|
+          newOnHand -= item.quantity;
         }
         
         // Safety Logic: Prevent Negative Stock (Except where allowed)
-        if (newOnHand < 0 && (invoicePayloadBase.invoiceType === 'sale' || invoicePayloadBase.invoiceType === 'gifted-damaged')) {
+        if (newOnHand < 0 && (invoicePayloadBase.invoiceType === 'sale' || invoicePayloadBase.invoiceType === 'cash' || invoicePayloadBase.invoiceType === 'gifted-damaged')) {
           throw new Error(`Cannot save invoice: Product "${item.name}" would go into negative stock (${newOnHand}). Current: ${product.onHand}, Change: -${item.quantity}`);
         }
         batch.update(productRef, { onHand: newOnHand });
@@ -448,20 +468,41 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 </div>
 
                 {/* Invoice Type */}
-                <div className="mb-4 sm:mb-6"> {/* Adjusted spacing */}
-                  <Label htmlFor="invoiceType" className="text-sm sm:text-base">Invoice Type</Label> {/* Adjusted font size */}
+                <div className="mb-4 sm:mb-6">
+                  <Label htmlFor="invoiceType" className="text-sm sm:text-base">Invoice Type</Label>
                   <select
                     id="invoiceType"
                     value={invoiceType}
-                    onChange={(e) => setInvoiceType(e.target.value as 'sale' | 'return' | 'gifted-damaged')}
-                    className="w-full p-2 border border-border rounded-md bg-background text-sm sm:text-base" /* Adjusted font size */
+                    onChange={(e) => {
+                      const newType = e.target.value as 'sale' | 'return' | 'gifted-damaged' | 'cash';
+                      setInvoiceType(newType);
+                      // Auto-convert quantities when switching to/from return
+                      if (newType === 'return') {
+                        setInvoiceItems(prevItems => prevItems.map(item => ({
+                          ...item,
+                          quantity: item.quantity > 0 ? -item.quantity : item.quantity
+                        })));
+                      } else if (invoiceType === 'return') {
+                        // Switching from return to another type - make quantities positive
+                        setInvoiceItems(prevItems => prevItems.map(item => ({
+                          ...item,
+                          quantity: Math.abs(item.quantity)
+                        })));
+                      }
+                    }}
+                    className="w-full p-2 border border-border rounded-md bg-background text-sm sm:text-base"
                   >
                     <option value="sale">Sale</option>
+                    <option value="cash">Cash</option>
                     <option value="return">Return</option>
                     <option value="gifted-damaged">Gifted/Damaged</option>
                   </select>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Sales decrease stock, Returns increase stock, Gifted/Damaged decreases stock.
+                    {invoiceType === 'return' 
+                      ? 'Return invoices restore stock (auto-negative quantity).'
+                      : invoiceType === 'cash'
+                        ? 'Cash invoices decrease stock (same as sale).'
+                        : 'Sales/Cash decrease stock, Returns increase stock, Gifted/Damaged decreases stock.'}
                   </p>
                 </div>
 

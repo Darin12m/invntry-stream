@@ -1,4 +1,4 @@
-import React, { useContext, useMemo } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
 import { BarChart3, DollarSign, ShoppingCart, TrendingUp, FileText, TrendingDown } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -7,8 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Invoice, Product, DashboardMetrics } from '@/types';
 import { AppContext } from '@/context/AppContext';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
-import { useInvoices } from '@/hooks/useInvoices'; // Import useInvoices to get handleViewInvoice
-import { useDeviceType } from '@/hooks/useDeviceType'; // Import useDeviceType
+import { useDeviceType } from '@/hooks/useDeviceType';
+import InvoiceViewerModal from '@/components/modals/InvoiceViewerModal';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import { Capacitor } from '@capacitor/core';
 
 interface DashboardTabProps {
   dateFilter: { from: string; to: string };
@@ -26,9 +29,17 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
   products,
 }) => {
   const { loading, settings } = useContext(AppContext);
-  const { handleViewInvoice } = useInvoices();
   const { isIOS } = useDeviceType();
   const currency = settings?.currency || 'MKD';
+  
+  // Invoice viewer modal state
+  const [showInvoiceViewer, setShowInvoiceViewer] = useState(false);
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
+
+  const handleViewInvoice = (invoice: Invoice) => {
+    setViewingInvoice(invoice);
+    setShowInvoiceViewer(true);
+  };
 
   if (loading) {
     return (
@@ -222,6 +233,15 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
           )}
         </div>
       </Card>
+      {/* Invoice Viewer Modal */}
+      <InvoiceViewerModal
+        showInvoiceViewer={showInvoiceViewer}
+        setShowInvoiceViewer={setShowInvoiceViewer}
+        viewingInvoice={viewingInvoice}
+        Capacitor={Capacitor}
+        html2canvas={html2canvas}
+        jsPDF={jsPDF}
+      />
     </div>
   );
 };
