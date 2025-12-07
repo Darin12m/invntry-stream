@@ -262,10 +262,13 @@ const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
                       margin: "5px 0 0 0",
                       fontSize: "12px",
                       fontWeight: "bold",
-                      color: viewingInvoice.invoiceType === 'sale' ? '#22c55e' : viewingInvoice.invoiceType === 'return' ? '#ef4444' : '#eab308',
+                      color: viewingInvoice.invoiceType === 'sale' ? '#22c55e' 
+                        : viewingInvoice.invoiceType === 'cash' ? '#ef4444'
+                        : viewingInvoice.invoiceType === 'return' ? '#f97316' 
+                        : '#eab308',
                       textTransform: 'uppercase',
                     }}>
-                      Тип: {viewingInvoice.invoiceType === 'gifted-damaged' ? 'Gifted/Damaged' : viewingInvoice.invoiceType}
+                      Тип: {viewingInvoice.invoiceType === 'gifted-damaged' ? 'Gifted/Damaged' : viewingInvoice.invoiceType.toUpperCase()}
                     </p>
                   )}
                 </div>
