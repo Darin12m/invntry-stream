@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useContext, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useContext } from 'react';
 import { Search, Plus, Edit, Trash2, Trash, ChevronUp, ChevronDown, Package, CheckSquare, History, Check } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,8 +13,6 @@ import { AppContext } from '@/context/AppContext';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useDebounce } from 'use-debounce';
 import { useDeviceType } from '@/hooks/useDeviceType';
-
-const LONG_PRESS_DURATION = 500;
 
 const InventoryTab: React.FC = React.memo(() => {
   const { currentUser, products, invoices } = useContext(AppContext);
@@ -34,8 +32,8 @@ const InventoryTab: React.FC = React.memo(() => {
     selectAllProducts: selectAllProductsHook,
     clearSelectedProducts
   } = useProducts();
-  const { invoices: allInvoices } = useInvoices(); // Use allInvoices from useInvoices
-  const { isIOS } = useDeviceType(); // Use the hook
+  const { invoices: allInvoices } = useInvoices();
+  const { isIOS } = useDeviceType();
 
   const [localSearchInput, setLocalSearchInput] = useState('');
   const [debouncedSearchTerm] = useDebounce(localSearchInput, 300);
@@ -46,9 +44,6 @@ const InventoryTab: React.FC = React.memo(() => {
   const [showSellHistoryModal, setShowSellHistoryModal] = useState(false);
   const [currentProductSellHistory, setCurrentProductSellHistory] = useState<any[]>([]);
   const [currentProductForSellHistory, setCurrentProductForSellHistory] = useState<string>('');
-
-  const [selectionMode, setSelectionMode] = useState(false);
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
@@ -88,7 +83,6 @@ const InventoryTab: React.FC = React.memo(() => {
 
   const handleBulkDelete = useCallback(() => {
     bulkDeleteProducts(selectedProducts);
-    setSelectionMode(false);
     clearSelectedProducts();
   }, [bulkDeleteProducts, selectedProducts, clearSelectedProducts]);
 
@@ -112,39 +106,14 @@ const InventoryTab: React.FC = React.memo(() => {
     setShowSellHistoryModal(true);
   }, [allInvoices]);
 
-  // Long-press / Tap selection logic
-  const clearLongPressTimer = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
+  // Handle checkbox selection only - no long-press
+  const handleCheckboxSelect = useCallback((productId: string, e?: React.MouseEvent | React.TouchEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
     }
-  }, []);
-
-  const handleInteractionStart = useCallback((productId: string) => {
-    clearLongPressTimer(); // Clear any previous timer
-    longPressTimer.current = setTimeout(() => {
-      setSelectionMode(true);
-      toggleProductSelection(productId);
-      longPressTimer.current = null; // Clear timer after it fires
-    }, LONG_PRESS_DURATION);
-  }, [clearLongPressTimer, toggleProductSelection]);
-
-  const handleInteractionEnd = useCallback((productId: string, isClick: boolean) => {
-    clearLongPressTimer();
-    if (selectionMode) {
-      if (isClick) { // Only toggle on click/tap if in selection mode
-        toggleProductSelection(productId);
-      }
-    } else {
-      // A simple tap/click when not in selection mode will now do nothing on the card itself.
-      // The edit modal will only open via the explicit 'Edit' button.
-    }
-  }, [selectionMode, toggleProductSelection, clearLongPressTimer]);
-
-  const handleCancelSelectionMode = useCallback(() => {
-    setSelectionMode(false);
-    clearSelectedProducts();
-  }, [clearSelectedProducts]);
+    toggleProductSelection(productId);
+  }, [toggleProductSelection]);
 
   if (loadingProducts) {
     return (
@@ -171,38 +140,25 @@ const InventoryTab: React.FC = React.memo(() => {
           <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage your products and stock levels</p>
         </div>
         <div className="flex gap-2 sm:gap-3 flex-wrap justify-end">
-          {selectionMode ? (
-            <>
-              {selectedProducts.size > 0 && (
-                <Button
-                  onClick={handleBulkDelete}
-                  variant="destructive"
-                  className="shadow-elegant"
-                  size="sm"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Selected ({selectedProducts.size})
-                </Button>
-              )}
-              <Button
-                onClick={handleCancelSelectionMode}
-                variant="outline"
-                size="sm"
-              >
-                <Check className="h-4 w-4 mr-2" />
-                Done
-              </Button>
-            </>
-          ) : (
+          {selectedProducts.size > 0 && (
             <Button
-              onClick={handleAddProduct}
-              className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
+              onClick={handleBulkDelete}
+              variant="destructive"
+              className="shadow-elegant"
               size="sm"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Product
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Selected ({selectedProducts.size})
             </Button>
           )}
+          <Button
+            onClick={handleAddProduct}
+            className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
+            size="sm"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Product
+          </Button>
         </div>
       </div>
 
@@ -390,7 +346,6 @@ const InventoryTab: React.FC = React.memo(() => {
                           variant="outline"
                           size="icon"
                           className="h-9 w-9 rounded-lg border-border/50"
-                          disabled={selectionMode}
                         >
                           <Edit className="h-4 w-4 text-muted-foreground" />
                         </Button>
@@ -399,7 +354,6 @@ const InventoryTab: React.FC = React.memo(() => {
                           variant="outline"
                           size="icon"
                           className="h-9 w-9 rounded-lg border-border/50"
-                          disabled={selectionMode}
                         >
                           <History className="h-4 w-4 text-muted-foreground" />
                         </Button>
@@ -408,7 +362,6 @@ const InventoryTab: React.FC = React.memo(() => {
                           variant="destructive"
                           size="icon"
                           className="h-9 w-9 rounded-lg"
-                          disabled={selectionMode}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -431,10 +384,7 @@ const InventoryTab: React.FC = React.memo(() => {
           return (
             <Card 
               key={product.id} 
-              className={`p-4 hover:shadow-lg transition-all duration-300 w-full max-w-full overflow-hidden ${selectedProducts.has(product.id) ? 'bg-primary/5' : ''}`}
-              onTouchStart={() => handleInteractionStart(product.id)}
-              onTouchEnd={() => handleInteractionEnd(product.id, true)}
-              onTouchCancel={clearLongPressTimer}
+              className={`p-4 hover:shadow-lg transition-all duration-300 w-full max-w-full overflow-hidden select-none ${selectedProducts.has(product.id) ? 'bg-primary/5' : ''}`}
             >
               <div className="flex items-start gap-3 mb-3">
                 <div 
@@ -527,22 +477,22 @@ const InventoryTab: React.FC = React.memo(() => {
       </div>
 
       {sortedProducts.length === 0 && (
-        <Card className="p-8 sm:p-12 text-center animate-scale-in"> {/* Adjusted padding */}
+        <Card className="p-8 sm:p-12 text-center animate-scale-in">
           <div className="max-w-md mx-auto">
-            <Package className="h-16 w-16 sm:h-20 sm:w-20 mx-auto mb-3 sm:mb-4 text-muted-foreground opacity-50" /> {/* Adjusted icon size */}
-            <h3 className="text-xl sm:text-2xl font-bold mb-2"> {/* Adjusted font size */}
+            <Package className="h-16 w-16 sm:h-20 sm:w-20 mx-auto mb-3 sm:mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-xl sm:text-2xl font-bold mb-2">
               {products.length === 0 ? 'No products yet' : 'No results found'}
             </h3>
-            <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6"> {/* Adjusted font size and spacing */}
+            <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
               {products.length === 0 
                 ? "Add your first product using the + button above to get started with your inventory." 
                 : debouncedSearchTerm 
                   ? `No products match "${debouncedSearchTerm}". Try adjusting your search.`
                   : "No products match the selected filters. Try different filter options."}
             </p>
-            {products.length === 0 && !selectionMode && (
-              <Button onClick={handleAddProduct} className="transition-all duration-200 hover:scale-105" size={isIOS ? "sm" : "default"}> {/* Smaller button on iOS */}
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> {/* Adjusted icon size */}
+            {products.length === 0 && (
+              <Button onClick={handleAddProduct} className="transition-all duration-200 hover:scale-105" size={isIOS ? "sm" : "default"}>
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 Add Your First Product
               </Button>
             )}
