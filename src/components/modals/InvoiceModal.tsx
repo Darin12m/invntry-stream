@@ -251,7 +251,42 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       discount: parseFloat(item.discount?.toFixed(2) || '0'),
     }));
 
-    // Corrected type: Omit createdAt and updatedAt as the service will add them
+    // --- START: Robust Validation ---
+    // Validate newItems for completeness and valid numbers
+    for (const item of newItems) {
+      if (!item.productId || !item.name || !item.sku) {
+        toast.error(`Invoice item is missing critical information (ID, name, or SKU).`);
+        return;
+      }
+      if (isNaN(item.price) || isNaN(item.quantity)) {
+        toast.error(`Invoice item "${item.name}" has invalid price or quantity.`);
+        return;
+      }
+      if (item.purchasePrice !== undefined && isNaN(item.purchasePrice)) {
+        toast.error(`Invoice item "${item.name}" has an invalid purchase price.`);
+        return;
+      }
+      if (item.discount !== undefined && isNaN(item.discount)) {
+        toast.error(`Invoice item "${item.name}" has an invalid discount value.`);
+        return;
+      }
+    }
+
+    // Validate top-level invoice fields
+    if (!currentInvoice.date) {
+      toast.error("Invoice date is missing.");
+      return;
+    }
+    if (!customerInfo.name) {
+      toast.error("Customer name is missing.");
+      return;
+    }
+    if (isNaN(subtotal) || isNaN(calculatedDiscountAmount) || isNaN(total)) {
+      toast.error("Calculated invoice totals are invalid. Please check item prices and quantities.");
+      return;
+    }
+    // --- END: Robust Validation ---
+
     const invoicePayloadBase: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt' | 'number'> = {
       date: currentInvoice.date,
       customer: customerInfo,
