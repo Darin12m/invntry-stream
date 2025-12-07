@@ -2,7 +2,6 @@ import { db } from '@/firebase/config';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, getDoc, writeBatch, serverTimestamp, FieldValue, setDoc, limit } from 'firebase/firestore';
 import { Invoice, Product } from '@/types';
 import { activityLogService } from '@/services/firestore/activityLogService';
-import { debugLog } from '@/utils/debugLog'; // Import debugLog
 
 export const invoiceService = {
   list: async (): Promise<Invoice[]> => {
@@ -38,25 +37,20 @@ export const invoiceService = {
 
   // Helper to get the latest invoice number for pre-filling UI (no auto-incrementing here)
   _getLatestInvoiceNumber: async (): Promise<string> => {
-    debugLog("invoiceService._getLatestInvoiceNumber: Querying for latest invoice number.");
     const invoicesColRef = collection(db, 'invoices');
     const q = query(invoicesColRef, orderBy('createdAt', 'desc'), limit(1));
     const latestInvoiceSnapshot = await getDocs(q);
 
     if (!latestInvoiceSnapshot.empty) {
       const lastInvoiceData = latestInvoiceSnapshot.docs[0].data();
-      debugLog("invoiceService._getLatestInvoiceNumber: Found last invoice number:", lastInvoiceData.number);
       return lastInvoiceData.number;
     }
-    debugLog("invoiceService._getLatestInvoiceNumber: No previous invoices found. Returning empty string.");
     return ''; // Return empty if no invoices exist
   },
 
   create: async (invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>, userEmail: string = 'Unknown User', userId: string | null = null): Promise<{ invoiceId: string; invoiceNumber: string }> => {
     const invoicesColRef = collection(db, 'invoices');
     let newInvoiceId: string = '';
-
-    debugLog("invoiceService.create: Starting invoice creation with payload:", invoiceData);
 
     try {
       // Check for duplicate invoice number before creating
@@ -69,22 +63,17 @@ export const invoiceService = {
       // Create the new invoice document
       const newInvoiceDocRef = doc(invoicesColRef);
       newInvoiceId = newInvoiceDocRef.id;
-      debugLog("invoiceService.create: New invoice document reference created with ID:", newInvoiceId);
 
       const invoiceToSave: Omit<Invoice, 'id'> = {
         ...invoiceData,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      debugLog("invoiceService.create: Setting invoice document with data:", invoiceToSave);
       await setDoc(newInvoiceDocRef, invoiceToSave);
-      debugLog("Invoice created with ID:", newInvoiceId, "Number:", invoiceData.number);
 
       await activityLogService.logAction(`New invoice ${invoiceData.number} created by ${userEmail} (ID: ${newInvoiceId})`, userId, userEmail);
-      debugLog("invoiceService.create: Invoice document added and activity logged. Returning ID and number.");
       return { invoiceId: newInvoiceId, invoiceNumber: invoiceData.number };
     } catch (error: any) {
-      debugLog("ERROR in invoiceService.create:", error, error?.stack);
       throw new Error(`invoiceService.create: ${error.message || 'Unknown error'}`);
     }
   },

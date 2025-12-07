@@ -14,7 +14,6 @@ import { useInvoices } from '@/hooks/useInvoices';
 import { useProducts } from '@/hooks/useProducts';
 import { calculateInvoiceTotals } from '@/utils/invoiceCalculations';
 import { useDeviceType } from '@/hooks/useDeviceType';
-import { debugLog } from '@/utils/debugLog'; // Import debugLog
 import { invoiceService } from '@/services/firestore/invoiceService'; // Import invoiceService to access new helper
 
 interface InvoiceModalProps {
@@ -53,7 +52,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   useEffect(() => {
     const initializeInvoiceData = async () => {
       if (!editingInvoice) { // Only for new invoices
-        debugLog("InvoiceModal: Initializing new invoice.");
         const latestInvoiceNumber = await invoiceService._getLatestInvoiceNumber();
         
         let suggestedNumber = '';
@@ -104,7 +102,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         setInvoiceType('sale');
       } else {
         // For existing invoices, populate with existing data
-        debugLog("InvoiceModal: Initializing existing invoice for editing:", editingInvoice.number);
         setCurrentInvoice({
           id: editingInvoice.id,
           number: editingInvoice.number,
@@ -470,12 +467,10 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       if (editingInvoice) {
         // For existing invoices, the number is already set and should not be re-generated
         await updateInvoice(editingInvoice.id, invoicePayloadBase); // Pass the full payload including number
-        debugLog("Invoice updated successfully. ID:", editingInvoice.id, "Number:", manualInvoiceNumber);
         toast.success(`Invoice ${manualInvoiceNumber} updated successfully!`);
       } else {
         // For new invoices, the createInvoice service will handle number generation transactionally
         const { invoiceId, invoiceNumber } = await createInvoice(invoicePayloadBase); // Pass the pre-filled number
-        debugLog("Invoice created successfully. Final ID:", invoiceId, "Number:", invoiceNumber); // Log as requested
         toast.success(`Invoice ${invoiceNumber} created successfully!`);
       }
       
@@ -483,7 +478,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       await fetchProducts(); // Refresh products to reflect stock changes
       handleCloseInvoiceModal();
     } catch (error: any) {
-      debugLog("ERROR in InvoiceModal.tsx (handleSaveInvoice):", error, error?.stack);
       toast.error(`Failed to save invoice: ${error.message || 'Unknown error'}`);
     }
   }, [

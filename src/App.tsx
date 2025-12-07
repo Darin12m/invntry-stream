@@ -9,7 +9,6 @@ import { AppProvider, AppContext } from "./context/AppContext";
 import AppLayout from "./layouts/AppLayout";
 import ConsolePage from "./pages/ConsolePage";
 import { useEffect, useContext } from "react";
-import DebugConsole from "./components/DebugConsole"; // Import DebugConsole
 
 const queryClient = new QueryClient();
 
@@ -89,7 +88,6 @@ const App = () => (
               </AuthWrapper>
             } />
           </Routes>
-          <DebugConsole /> {/* Inject DebugConsole here */}
         </AppProvider>
       </BrowserRouter>
     </TooltipProvider>
