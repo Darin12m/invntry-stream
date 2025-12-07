@@ -89,12 +89,14 @@ const InvoicesTab: React.FC = React.memo(() => {
     });
   }, [activeInvoices, invoiceSortBy, invoiceSortDirection]);
 
-  const getInvoiceTypeBadge = useCallback((type: 'sale' | 'return' | 'gifted-damaged' | 'cash') => {
+  const getInvoiceTypeBadge = useCallback((type: 'sale' | 'return' | 'gifted-damaged' | 'cash' | 'online-sale') => {
     switch (type) {
       case 'sale':
         return <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white text-xs">Sale</Badge>;
       case 'cash':
         return <Badge variant="default" className="bg-red-500 hover:bg-red-600 text-white text-xs">Cash</Badge>;
+      case 'online-sale':
+        return <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 text-white text-xs">Online Sale</Badge>;
       case 'return':
         return <Badge variant="destructive" className="text-xs">Return</Badge>; // Adjusted font size
       case 'gifted-damaged':
@@ -312,7 +314,7 @@ const InvoicesTab: React.FC = React.memo(() => {
                       variant="destructive"
                       size="sm"
                     >
-                      <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" /> {/* Adjusted icon size */}
+                      <Trash2 className="h-3 w-3 sm:h-4 w-4" /> {/* Adjusted icon size */}
                     </Button>
                   </div>
                 </Card>

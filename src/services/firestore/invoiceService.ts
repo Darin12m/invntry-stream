@@ -47,21 +47,19 @@ export const invoiceService = {
     let q;
 
     // Filter by year suffix in the number field
-    const yearFilterStart = numberingType === 'cash' ? `CASH 000/${yearShort}` : `000/${yearShort}`;
-    const yearFilterEnd = numberingType === 'cash' ? `CASH 999/${yearShort}` : `999/${yearShort}`;
-
     if (numberingType === 'cash') {
       q = query(
         invoicesColRef,
+        where('invoiceType', '==', 'cash'), // Explicitly filter for cash
         where('number', '>=', `CASH 001/${yearShort}`),
         where('number', '<=', `CASH 999/${yearShort}`),
         orderBy('number', 'desc'), // Order by number string to get highest sequential
         limit(1)
       );
-    } else { // 'regular'
-      // For regular invoices, we need to exclude 'CASH' invoices
+    } else { // 'regular' (includes 'sale', 'return', 'gifted-damaged', 'online-sale')
       q = query(
         invoicesColRef,
+        where('invoiceType', 'in', ['sale', 'return', 'gifted-damaged', 'online-sale']), // Include online-sale here
         where('number', '>=', `001/${yearShort}`),
         where('number', '<=', `999/${yearShort}`),
         orderBy('number', 'desc'), // Order by number string to get highest sequential
@@ -92,14 +90,21 @@ export const invoiceService = {
     try {
       // Determine the numbering type for the new invoice
       const numberingType = getInvoiceNumberingType(invoiceData.invoiceType);
+      const currentYearShort = String(new Date().getFullYear()).slice(-2); // Get current year for uniqueness scope
 
       // Check for duplicate invoice number within the same numbering type and year
-      const q = query(invoicesColRef, where("number", "==", invoiceData.number));
+      const q = query(
+        invoicesColRef,
+        where("number", "==", invoiceData.number),
+        where("invoiceType", "==", invoiceData.invoiceType) // Ensure uniqueness is type-specific
+      );
       const existingInvoiceSnapshot = await getDocs(q);
       if (!existingInvoiceSnapshot.empty) {
-        // Further check if the duplicate is of the same numbering type
+        // Further check if the duplicate is of the same numbering type and year
         const duplicateInvoice = existingInvoiceSnapshot.docs[0].data() as Invoice;
-        if (getInvoiceNumberingType(duplicateInvoice.invoiceType) === numberingType) {
+        const duplicateYearShort = duplicateInvoice.number.split('/').pop(); // Extract year from number
+        
+        if (getInvoiceNumberingType(duplicateInvoice.invoiceType) === numberingType && duplicateYearShort === currentYearShort) {
           throw new Error(`Invoice number "${invoiceData.number}" already exists for this invoice type and year.`);
         }
       }
@@ -184,16 +189,16 @@ export const invoiceService = {
 
       let newOnHand = product.onHand;
       // Reversing logic - for return invoices qty is negative, so:
-      // sale/cash/gifted: we subtracted positive qty, so add it back
+      // sale/cash/gifted/online-sale: we subtracted positive qty, so add it back
       // return: we subtracted negative qty (added stock), so subtract to revert
-      if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged') {
-        newOnHand += item.quantity; // Add back stock for sales/cash/gifted
+      if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged' || invoice.invoiceType === 'online-sale') {
+        newOnHand += item.quantity; // Add back stock for sales/cash/gifted/online-sale
       } else if (invoice.invoiceType === 'return') {
         // Return qty is negative, so adding negative = subtracting
         newOnHand += item.quantity; // This subtracts because qty is negative
       }
 
-      if (newOnHand < 0 && (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged')) {
+      if (newOnHand < 0 && (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged' || invoice.invoiceType === 'online-sale')) {
         throw new Error(`Cannot delete invoice ${invoice.number}: Reverting stock would cause negative stock for product "${item.name}". Current: ${product.onHand}, Change: +${item.quantity}, New: ${newOnHand}`);
       }
       batch.update(productRef, { onHand: newOnHand });
@@ -221,15 +226,15 @@ export const invoiceService = {
 
       let newOnHand = product.onHand;
       // Apply original effect (same as creating the invoice)
-      // For sale/cash/gifted: subtract qty (qty is positive)
+      // For sale/cash/gifted/online-sale: subtract qty (qty is positive)
       // For return: subtract qty (qty is negative, so it adds stock)
-      if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged') {
-        newOnHand -= item.quantity; // Subtract stock for sales/cash/gifted
+      if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged' || invoice.invoiceType === 'online-sale') {
+        newOnHand -= item.quantity; // Subtract stock for sales/cash/gifted/online-sale
       } else if (invoice.invoiceType === 'return') {
         newOnHand -= item.quantity; // qty is negative, so this adds stock
       }
 
-      if (newOnHand < 0 && (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged')) {
+      if (newOnHand < 0 && (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged' || invoice.invoiceType === 'online-sale')) {
         throw new Error(`Cannot restore invoice ${invoice.number}: Insufficient stock for product "${item.name}". Current: ${product.onHand}, Change: -${item.quantity}, New: ${newOnHand}`);
       }
       batch.update(productRef, { onHand: newOnHand });
@@ -258,13 +263,13 @@ export const invoiceService = {
 
       let newOnHand = product.onHand;
       // Revert stock - same as soft delete logic
-      if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged') {
+      if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged' || invoice.invoiceType === 'online-sale') {
         newOnHand += item.quantity;
       } else if (invoice.invoiceType === 'return') {
         newOnHand += item.quantity; // qty is negative, so this subtracts
       }
 
-      if (newOnHand < 0 && (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged')) {
+      if (newOnHand < 0 && (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'gifted-damaged' || invoice.invoiceType === 'online-sale')) {
         throw new Error(`Cannot permanently delete invoice ${invoice.number}: Reverting stock would cause negative stock for product "${item.name}".`);
       }
       batch.update(productRef, { onHand: newOnHand });

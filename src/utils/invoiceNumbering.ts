@@ -8,9 +8,10 @@ export const cashInvoiceNumberRegex = /^CASH [0-9]{3}\/[0-9]{2}$/;
 
 /**
  * Determines the numbering type ('regular' or 'cash') based on the invoice's functional type.
+ * 'online-sale' is treated as 'regular' for numbering sequence purposes.
  */
 export const getInvoiceNumberingType = (invoiceType: Invoice['invoiceType']): 'regular' | 'cash' => {
-  return invoiceType === 'cash' ? 'cash' : 'regular';
+  return invoiceType === 'cash' ? 'cash' : 'regular'; // 'online-sale' will fall into 'regular'
 };
 
 /**
