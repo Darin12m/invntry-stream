@@ -7,10 +7,13 @@ export const regularInvoiceNumberRegex = /^[0-9]{3}\/[0-9]{2}$/;
 export const cashInvoiceNumberRegex = /^CASH [0-9]{3}\/[0-9]{2}$/;
 
 /**
- * Determines the numbering type ('regular' or 'cash') based on the invoice's functional type.
+ * Determines the numbering type ('regular', 'cash', or 'online-sale') based on the invoice's functional type.
+ * This is used for type-specific validation and uniqueness checks.
  */
-export const getInvoiceNumberingType = (invoiceType: Invoice['invoiceType']): 'regular' | 'cash' => {
-  return invoiceType === 'cash' ? 'cash' : 'regular';
+export const getInvoiceNumberingType = (invoiceType: Invoice['invoiceType']): 'regular' | 'cash' | 'online-sale' => {
+  if (invoiceType === 'cash') return 'cash';
+  if (invoiceType === 'online-sale') return 'online-sale';
+  return 'regular'; // Covers 'sale', 'return', 'gifted-damaged'
 };
 
 /**
@@ -37,34 +40,7 @@ export const parseInvoiceNumber = (number: string): { sequential: number; year: 
   return { sequential: 0, year: '', prefix: '', isValid: false };
 };
 
-/**
- * Generates the next suggested invoice number based on the latest number, current year, and numbering type.
- */
-export const generateNextSuggestedNumber = (
-  latestNumber: string,
-  currentYearShort: string,
-  numberingType: 'regular' | 'cash'
-): string => {
-  const prefix = numberingType === 'cash' ? 'CASH ' : '';
-  let nextSequential = 1;
-  let yearSuffix = currentYearShort;
-
-  if (latestNumber) {
-    const parsed = parseInvoiceNumber(latestNumber);
-    // Only consider numbers of the same type and valid format
-    if (parsed.isValid && parsed.prefix === prefix) {
-      if (parsed.year === currentYearShort) {
-        nextSequential = parsed.sequential + 1;
-      }
-      // If year is different, nextSequential remains 1 for the new year
-    }
-  }
-  
-  // Ensure sequential part is at least 1
-  if (nextSequential === 0) nextSequential = 1;
-
-  return `${prefix}${String(nextSequential).padStart(3, '0')}/${yearSuffix}`;
-};
+// Removed generateNextSuggestedNumber as auto-incrementing is no longer desired.
 
 /**
  * Formats an invoice number for display. (Currently, the stored number should already be formatted correctly).
