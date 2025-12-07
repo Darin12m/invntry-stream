@@ -379,7 +379,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         toast.success(`Invoice ${editingInvoice.number} updated successfully!`);
       } else {
         // For new invoices, the createInvoice service will handle number generation transactionally
-        const { invoiceId, invoiceNumber } = await createInvoice({ ...invoicePayloadBase, number: currentInvoice.number }); // Pass the pre-filled number
+        const { invoiceId, invoiceNumber } = await createInvoice(invoicePayloadBase); // Pass the pre-filled number
         debugLog("Invoice created successfully. Final ID:", invoiceId, "Number:", invoiceNumber); // Log as requested
         toast.success(`Invoice ${invoiceNumber} created successfully!`);
       }

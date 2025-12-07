@@ -1,5 +1,5 @@
 import { db } from '@/firebase/config';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, getDoc, writeBatch, serverTimestamp, FieldValue, setDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, getDoc, writeBatch, serverTimestamp, FieldValue, setDoc, limit } from 'firebase/firestore';
 import { Invoice, Product } from '@/types';
 import { activityLogService } from '@/services/firestore/activityLogService';
 import { debugLog } from '@/utils/debugLog'; // Import debugLog
@@ -84,12 +84,12 @@ export const invoiceService = {
     return _getNextInvoiceNumberLogic();
   },
 
-  create: async (invoice: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>, userEmail: string = 'Unknown User', userId: string | null = null): Promise<{ invoiceId: string; invoiceNumber: string }> => {
+  create: async (invoiceData: Omit<Invoice, 'id' | 'number' | 'createdAt' | 'updatedAt'>, userEmail: string = 'Unknown User', userId: string | null = null): Promise<{ invoiceId: string; invoiceNumber: string }> => {
     const invoicesColRef = collection(db, 'invoices');
     let finalInvoiceNumber: string = '';
     let newInvoiceId: string = '';
 
-    debugLog("invoiceService.create: Starting invoice creation with payload:", invoice);
+    debugLog("invoiceService.create: Starting invoice creation with payload:", invoiceData);
 
     try {
       // 1. Determine the next invoice number
@@ -102,7 +102,7 @@ export const invoiceService = {
       debugLog("invoiceService.create: New invoice document reference created with ID:", newInvoiceId);
 
       const invoiceWithNumber: Omit<Invoice, 'id'> = {
-        ...invoice,
+        ...invoiceData,
         number: finalInvoiceNumber, // Use the determined number
         createdAt: new Date(),
         updatedAt: new Date(),
