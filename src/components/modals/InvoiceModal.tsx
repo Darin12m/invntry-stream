@@ -427,24 +427,21 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       const latestNumberFromDb = await invoiceService._getLatestInvoiceNumber(numberingType, currentYearShort);
       const suggestedNextNumber = generateNextSuggestedNumber(latestNumberFromDb, currentYearShort, numberingType);
 
-      if (manualInvoiceNumber !== suggestedNextNumber) {
-        const parsedManual = parseInvoiceNumber(manualInvoiceNumber);
-        const parsedSuggested = parseInvoiceNumber(suggestedNextNumber);
+      // Do not overwrite user's manual input if it's valid and not a lower sequential number
+      const parsedManual = parseInvoiceNumber(manualInvoiceNumber);
+      const parsedSuggested = parseInvoiceNumber(suggestedNextNumber);
 
-        // Only auto-update if the user's number is not a valid higher sequential number
-        // or if it's invalid, and the suggested one is valid.
-        if (parsedSuggested.isValid && 
-            (!parsedManual.isValid || 
-             (parsedManual.isValid && parsedManual.year === parsedSuggested.year && parsedManual.prefix === parsedSuggested.prefix && parsedManual.sequential < parsedSuggested.sequential))) {
-          
-          setManualInvoiceNumber(suggestedNextNumber);
-          toast.info(`Invoice number updated to maintain sequence: ${suggestedNextNumber}`);
-          // Re-run validation with the new number
-          const reValidated = await validateManualInvoiceNumber(suggestedNextNumber, invoiceType);
-          if (!reValidated) {
-            toast.error("Auto-updated invoice number is invalid. Please review.");
-            return;
-          }
+      if (parsedSuggested.isValid && 
+          (!parsedManual.isValid || 
+           (parsedManual.isValid && parsedManual.year === parsedSuggested.year && parsedManual.prefix === parsedSuggested.prefix && parsedManual.sequential < parsedSuggested.sequential))) {
+        
+        setManualInvoiceNumber(suggestedNextNumber);
+        toast.info(`Invoice number updated to maintain sequence: ${suggestedNextNumber}`);
+        // Re-run validation with the new number
+        const reValidated = await validateManualInvoiceNumber(suggestedNextNumber, invoiceType);
+        if (!reValidated) {
+          toast.error("Auto-updated invoice number is invalid. Please review.");
+          return;
         }
       }
     }
