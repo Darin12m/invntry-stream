@@ -13,7 +13,7 @@ import { AppContext } from '@/context/AppContext';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useProducts } from '@/hooks/useProducts';
 import { calculateInvoiceTotals } from '@/utils/invoiceCalculations';
-import { useDeviceType } => '@/hooks/useDeviceType';
+import { useDeviceType } from '@/hooks/useDeviceType';
 import { invoiceService } from '@/services/firestore/invoiceService';
 import {
   getInvoiceNumberingType,
@@ -266,45 +266,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
   const handleManualInvoiceNumberChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    
-    if (invoiceType === 'cash') {
-      const currentYearShort = String(new Date().getFullYear()).slice(-2);
-      const baseCashPrefixRegex = new RegExp(`^CASH [0-9]{3}\/${currentYearShort}`);
-      
-      let newNumber = value;
-
-      // If the input doesn't start with "CASH ", try to prepend it
-      if (!newNumber.startsWith('CASH ')) {
-        newNumber = 'CASH ' + newNumber.replace(/^CASH\s*/i, ''); // Ensure "CASH " prefix
-      }
-
-      // If the base prefix (CASH ###/YY) is being deleted or altered, revert it
-      const currentParsed = parseInvoiceNumber(manualInvoiceNumber);
-      const currentBasePrefix = currentParsed.isValid && currentParsed.prefix === 'CASH ' && currentParsed.year === currentYearShort
-        ? `${currentParsed.prefix}${String(currentParsed.sequential).padStart(3, '0')}/${currentParsed.year}`
-        : '';
-
-      if (currentBasePrefix && !newNumber.startsWith(currentBasePrefix)) {
-        // User tried to modify the base prefix. Revert to base prefix + any valid suffix they might have typed.
-        const suffixPart = newNumber.substring(currentBasePrefix.length);
-        const suffixMatch = suffixPart.match(/^([- ]?[0-9]{0,4})?$/);
-        const validSuffix = suffixMatch ? suffixMatch[0] : '';
-        newNumber = currentBasePrefix + validSuffix;
-        setInvoiceNumberError("Cannot modify the base CASH invoice number prefix.");
-        setIsDuplicateInvoiceNumber(false);
-      } else {
-        setInvoiceNumberError(null); // Clear error if base prefix is valid
-      }
-
-      setManualInvoiceNumber(newNumber);
-      await validateManualInvoiceNumber(newNumber, invoiceType);
-
-    } else {
-      // For other invoice types, allow full editing and validate
-      setManualInvoiceNumber(value);
-      await validateManualInvoiceNumber(value, invoiceType);
-    }
-  }, [validateManualInvoiceNumber, invoiceType, manualInvoiceNumber]);
+    setManualInvoiceNumber(value);
+    await validateManualInvoiceNumber(value, invoiceType);
+  }, [validateManualInvoiceNumber, invoiceType]);
 
   const handleInvoiceTypeChange = useCallback(async (newType: Invoice['invoiceType']) => {
     setInvoiceType(newType);
