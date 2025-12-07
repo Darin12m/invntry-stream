@@ -1,50 +1,12 @@
 import { db } from '@/firebase/config';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, getDoc, writeBatch, serverTimestamp, FieldValue, setDoc, limit } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, getDoc, writeBatch, serverTimestamp, FieldValue, setDoc } from 'firebase/firestore';
 import { Invoice, Product } from '@/types';
 import { activityLogService } from '@/services/firestore/activityLogService';
 import { debugLog } from '@/utils/debugLog'; // Import debugLog
 
-// Helper to format invoice number (e.g., 1 -> 001/25)
-const formatInvoiceNumber = (seq: number, year: number): string => {
-  const yearSuffix = String(year).slice(-2);
-  const paddedSeq = String(seq).padStart(3, '0');
-  return `${paddedSeq}/${yearSuffix}`;
-};
-
-// Internal helper to determine the next invoice number based on the latest existing invoice
-const _getNextInvoiceNumberLogic = async (): Promise<string> => {
-  debugLog("_getNextInvoiceNumberLogic: Querying for latest invoice to determine next number.");
-  const invoicesColRef = collection(db, 'invoices');
-  const q = query(invoicesColRef, orderBy('createdAt', 'desc'), limit(1));
-  const latestInvoiceSnapshot = await getDocs(q);
-
-  const currentYear = new Date().getFullYear();
-  let nextSequentialNumber = 1;
-
-  if (!latestInvoiceSnapshot.empty) {
-    const lastInvoiceDoc = latestInvoiceSnapshot.docs[0];
-    const lastInvoiceData = lastInvoiceDoc.data();
-    const lastInvoiceNumber = lastInvoiceData.number; // e.g., "006/25"
-    debugLog("_getNextInvoiceNumberLogic: Found last invoice number:", lastInvoiceNumber, "ID:", lastInvoiceDoc.id);
-
-    const parts = lastInvoiceNumber.split('/');
-    const parsedSequential = parseInt(parts[0], 10);
-    const parsedYearSuffix = parseInt(parts[1], 10);
-    const parsedFullYear = 2000 + parsedYearSuffix; // Assuming 20xx years
-
-    if (parsedFullYear === currentYear) {
-      nextSequentialNumber = parsedSequential + 1;
-      debugLog("_getNextInvoiceNumberLogic: Same year. Next sequential number:", nextSequentialNumber);
-    } else {
-      nextSequentialNumber = 1; // Reset for new year
-      debugLog("_getNextInvoiceNumberLogic: New year. Resetting sequential number to 1.");
-    }
-  } else {
-    debugLog("_getNextInvoiceNumberLogic: No previous invoices found. Starting from 1.");
-  }
-
-  return formatInvoiceNumber(nextSequentialNumber, currentYear);
-};
+// Removed formatInvoiceNumber
+// Removed _getNextInvoiceNumberLogic
+// Removed _getInvoiceNumberPreview
 
 export const invoiceService = {
   list: async (): Promise<Invoice[]> => {
@@ -78,42 +40,37 @@ export const invoiceService = {
     } as Invoice;
   },
 
-  // New helper to get the next invoice number for UI preview (does not update counter)
-  _getInvoiceNumberPreview: async (): Promise<string> => {
-    debugLog("invoiceService._getInvoiceNumberPreview: Getting next invoice number for UI preview.");
-    return _getNextInvoiceNumberLogic();
-  },
-
-  create: async (invoiceData: Omit<Invoice, 'id' | 'number' | 'createdAt' | 'updatedAt'>, userEmail: string = 'Unknown User', userId: string | null = null): Promise<{ invoiceId: string; invoiceNumber: string }> => {
+  create: async (invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>, userEmail: string = 'Unknown User', userId: string | null = null): Promise<{ invoiceId: string; invoiceNumber: string }> => {
     const invoicesColRef = collection(db, 'invoices');
-    let finalInvoiceNumber: string = '';
     let newInvoiceId: string = '';
 
     debugLog("invoiceService.create: Starting invoice creation with payload:", invoiceData);
 
     try {
-      // 1. Determine the next invoice number
-      finalInvoiceNumber = await _getNextInvoiceNumberLogic();
-      debugLog("invoiceService.create: Determined final invoice number:", finalInvoiceNumber);
+      // Check for duplicate invoice number before creating
+      const q = query(invoicesColRef, where("number", "==", invoiceData.number));
+      const existingInvoiceSnapshot = await getDocs(q);
+      if (!existingInvoiceSnapshot.empty) {
+        throw new Error(`Invoice number "${invoiceData.number}" already exists.`);
+      }
 
-      // 2. Create the new invoice document
+      // Create the new invoice document
       const newInvoiceDocRef = doc(invoicesColRef);
       newInvoiceId = newInvoiceDocRef.id;
       debugLog("invoiceService.create: New invoice document reference created with ID:", newInvoiceId);
 
-      const invoiceWithNumber: Omit<Invoice, 'id'> = {
+      const invoiceToSave: Omit<Invoice, 'id'> = {
         ...invoiceData,
-        number: finalInvoiceNumber, // Use the determined number
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      debugLog("invoiceService.create: Setting invoice document with data:", invoiceWithNumber);
-      await setDoc(newInvoiceDocRef, invoiceWithNumber);
-      debugLog("Invoice created with ID:", newInvoiceId, "Number:", finalInvoiceNumber);
+      debugLog("invoiceService.create: Setting invoice document with data:", invoiceToSave);
+      await setDoc(newInvoiceDocRef, invoiceToSave);
+      debugLog("Invoice created with ID:", newInvoiceId, "Number:", invoiceData.number);
 
-      await activityLogService.logAction(`New invoice ${finalInvoiceNumber} created by ${userEmail} (ID: ${newInvoiceId})`, userId, userEmail);
+      await activityLogService.logAction(`New invoice ${invoiceData.number} created by ${userEmail} (ID: ${newInvoiceId})`, userId, userEmail);
       debugLog("invoiceService.create: Invoice document added and activity logged. Returning ID and number.");
-      return { invoiceId: newInvoiceId, invoiceNumber: finalInvoiceNumber };
+      return { invoiceId: newInvoiceId, invoiceNumber: invoiceData.number };
     } catch (error: any) {
       debugLog("ERROR in invoiceService.create:", error, error?.stack);
       throw new Error(`invoiceService.create: ${error.message || 'Unknown error'}`);

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Search, Plus, Trash, X, Save } from 'lucide-react';
 import { db } from '@/firebase/config';
-import { doc, writeBatch, collection } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore'; // Added query, where, getDocs
 import { Product, Invoice, InvoiceItem } from '@/types';
 import { toast } from "sonner";
 import { AppContext } from '@/context/AppContext';
@@ -23,6 +23,8 @@ interface InvoiceModalProps {
   editingInvoice: Invoice | null;
   setEditingInvoice: (invoice: Invoice | null) => void;
 }
+
+const invoiceNumberRegex = /^[0-9]{3}\/[0-9]{2}$/; // Validation regex
 
 const InvoiceModal: React.FC<InvoiceModalProps> = ({
   showInvoiceModal,
@@ -41,16 +43,21 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [invoiceProductSearch, setInvoiceProductSearch] = useState('');
   const [discount, setDiscount] = useState(0);
   const [invoiceType, setInvoiceType] = useState<'sale' | 'return' | 'gifted-damaged' | 'cash'>('sale');
+  
+  // New states for manual invoice number entry and validation
+  const [manualInvoiceNumber, setManualInvoiceNumber] = useState('');
+  const [invoiceNumberError, setInvoiceNumberError] = useState<string | null>(null);
+  const [isDuplicateInvoiceNumber, setIsDuplicateInvoiceNumber] = useState(false);
+
 
   useEffect(() => {
     const initializeInvoiceData = async () => {
       if (!editingInvoice) { // Only for new invoices
-        const nextNumberPreview = await invoiceService._getInvoiceNumberPreview();
-        debugLog("InvoiceModal: Initializing new invoice with preview number:", nextNumberPreview);
+        debugLog("InvoiceModal: Initializing new invoice.");
         
         setCurrentInvoice({
           id: Date.now().toString(), // Temporary ID
-          number: nextNumberPreview, // Auto-generated number preview
+          number: '', // Start with empty for manual entry
           date: new Date().toISOString().split('T')[0],
           customer: { name: '', email: '', address: '', phone: '' },
           items: [],
@@ -67,6 +74,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           buyerEmail: '',
           buyerAddress: '',
         });
+        setManualInvoiceNumber(''); // Clear manual input
+        setInvoiceNumberError(null);
+        setIsDuplicateInvoiceNumber(false);
         setInvoiceItems([]);
         setCustomerInfo({ name: '', email: '', address: '', phone: '' });
         setDiscount(0);
@@ -92,6 +102,10 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           buyerEmail: editingInvoice.buyerEmail || '',
           buyerAddress: editingInvoice.buyerAddress || '',
         });
+
+        setManualInvoiceNumber(editingInvoice.number); // Set manual input for editing
+        setInvoiceNumberError(null);
+        setIsDuplicateInvoiceNumber(false);
 
         const refreshedItems = editingInvoice.items.map((item) => {
           const latestProduct = products.find(p => p.id === item.productId);
@@ -133,7 +147,55 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     setInvoiceProductSearch('');
     setDiscount(0);
     setInvoiceType('sale');
+    setManualInvoiceNumber(''); // Reset manual input
+    setInvoiceNumberError(null);
+    setIsDuplicateInvoiceNumber(false);
   }, [setShowInvoiceModal, setEditingInvoice]);
+
+  const validateManualInvoiceNumber = useCallback(async (number: string) => {
+    if (!number.trim()) {
+      setInvoiceNumberError("Invoice number is required.");
+      setIsDuplicateInvoiceNumber(false);
+      return false;
+    }
+    if (!invoiceNumberRegex.test(number)) {
+      setInvoiceNumberError("Format must be ###/YY (e.g., 001/25)");
+      setIsDuplicateInvoiceNumber(false);
+      return false;
+    }
+
+    // Check for duplicates in Firestore
+    const invoicesColRef = collection(db, 'invoices');
+    const q = query(invoicesColRef, where("number", "==", number));
+    const querySnapshot = await getDocs(q);
+
+    let isDuplicate = false;
+    if (!querySnapshot.empty) {
+      // If editing, allow the current invoice to have its own number
+      if (editingInvoice && querySnapshot.docs.some(doc => doc.id === editingInvoice.id)) {
+        isDuplicate = false; // It's the same invoice being edited
+      } else {
+        isDuplicate = true;
+      }
+    }
+    
+    setIsDuplicateInvoiceNumber(isDuplicate);
+    if (isDuplicate) {
+      setInvoiceNumberError(`Invoice number "${number}" already exists.`);
+      return false;
+    }
+
+    setInvoiceNumberError(null);
+    return true;
+  }, [editingInvoice]);
+
+  const handleManualInvoiceNumberChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setManualInvoiceNumber(value);
+    // Validate immediately, but also before saving
+    await validateManualInvoiceNumber(value);
+  }, [validateManualInvoiceNumber]);
+
 
   const filteredInvoiceProducts = useMemo(() => products.filter(product =>
     (product.name || '').toLowerCase().includes(invoiceProductSearch.toLowerCase()) ||
@@ -241,6 +303,17 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       return;
     }
 
+    // Re-validate invoice number before saving
+    const isInvoiceNumberValid = await validateManualInvoiceNumber(manualInvoiceNumber);
+    if (!isInvoiceNumberValid) {
+      toast.error(invoiceNumberError || "Please fix the invoice number errors.");
+      return;
+    }
+    if (isDuplicateInvoiceNumber) {
+      toast.error(`Invoice number "${manualInvoiceNumber}" already exists.`);
+      return;
+    }
+
     const { subtotal, discount: calculatedDiscountAmount, total } = calculateInvoiceTotals(invoiceItems, discount);
     
     const newItems = invoiceItems.map(item => ({
@@ -289,7 +362,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
     // --- END: Robust Validation ---
 
-    const invoicePayloadBase: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt' | 'number'> = {
+    const invoicePayloadBase: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'> = { // Removed 'number' from Omit
+      number: manualInvoiceNumber, // Use the manually entered number
       date: currentInvoice.date,
       customer: customerInfo,
       subtotal: subtotal,
@@ -374,9 +448,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       // Add invoice update/create to the batch
       if (editingInvoice) {
         // For existing invoices, the number is already set and should not be re-generated
-        await updateInvoice(editingInvoice.id, { ...invoicePayloadBase, number: editingInvoice.number });
-        debugLog("Invoice updated successfully. ID:", editingInvoice.id, "Number:", editingInvoice.number);
-        toast.success(`Invoice ${editingInvoice.number} updated successfully!`);
+        await updateInvoice(editingInvoice.id, invoicePayloadBase); // Pass the full payload including number
+        debugLog("Invoice updated successfully. ID:", editingInvoice.id, "Number:", manualInvoiceNumber);
+        toast.success(`Invoice ${manualInvoiceNumber} updated successfully!`);
       } else {
         // For new invoices, the createInvoice service will handle number generation transactionally
         const { invoiceId, invoiceNumber } = await createInvoice(invoicePayloadBase); // Pass the pre-filled number
@@ -404,6 +478,10 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     createInvoice,
     fetchProducts,
     handleCloseInvoiceModal,
+    manualInvoiceNumber,
+    validateManualInvoiceNumber,
+    invoiceNumberError,
+    isDuplicateInvoiceNumber,
   ]);
 
   // Lock body scroll when modal is open
@@ -421,6 +499,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   if (!showInvoiceModal || !currentInvoice) return null;
 
   const { subtotal, discount: calculatedDiscountAmount, total } = calculateInvoiceTotals(invoiceItems, discount);
+
+  const isSaveDisabled = invoiceItems.length === 0 || !customerInfo.name.trim() || !!invoiceNumberError || isDuplicateInvoiceNumber || !manualInvoiceNumber.trim();
 
   return (
     <div className="modal-overlay">
@@ -495,12 +575,17 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 {/* Invoice Number and Date */}
                 <div className="mb-4 sm:mb-6 grid grid-cols-2 gap-3 sm:gap-4">
                   <div>
-                    <Label className="text-sm sm:text-base">Invoice Number</Label>
+                    <Label htmlFor="invoiceNumber" className="text-sm sm:text-base">Invoice Number *</Label>
                     <Input
-                      value={currentInvoice.number}
-                      readOnly // Make invoice number read-only
-                      className="text-sm sm:text-base bg-muted/50" // Add muted background for read-only
+                      id="invoiceNumber"
+                      value={manualInvoiceNumber}
+                      onChange={handleManualInvoiceNumberChange}
+                      placeholder="e.g., 001/25"
+                      className={`text-sm sm:text-base ${invoiceNumberError ? 'border-destructive' : ''}`}
                     />
+                    {invoiceNumberError && (
+                      <p className="text-xs text-destructive mt-1">{invoiceNumberError}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="invoiceDate" className="text-sm sm:text-base">Invoice Date *</Label>
@@ -762,7 +847,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
               </Button>
               <Button
                 onClick={handleSaveInvoice}
-                disabled={invoiceItems.length === 0 || !customerInfo.name.trim()}
+                disabled={isSaveDisabled}
                 className="bg-success"
                 size="sm"
               >

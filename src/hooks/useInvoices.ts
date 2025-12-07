@@ -105,7 +105,7 @@ export const useInvoices = () => {
     };
   }, [currentUser, setInvoices, setError]);
 
-  const createInvoice = useCallback(async (invoice: Omit<Invoice, 'id' | 'number'>) => {
+  const createInvoice = useCallback(async (invoice: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>) => { // Updated type to include 'number'
     try {
       const userEmail = currentUser?.email || 'Unknown User';
       const userId = currentUser?.uid || null;
@@ -121,7 +121,7 @@ export const useInvoices = () => {
     }
   }, [currentUser, setError]);
 
-  const updateInvoice = useCallback(async (id: string, invoice: Partial<Invoice>) => {
+  const updateInvoice = useCallback(async (id: string, invoice: Partial<Omit<Invoice, 'id' | 'updatedAt'>>) => {
     try {
       const userEmail = currentUser?.email || 'Unknown User';
       const userId = currentUser?.uid || null;
