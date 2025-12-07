@@ -56,6 +56,23 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         debugLog("InvoiceModal: Initializing new invoice.");
         const latestInvoiceNumber = await invoiceService._getLatestInvoiceNumber();
         
+        let suggestedNumber = '';
+        const currentYearShort = String(new Date().getFullYear()).slice(-2);
+
+        if (latestInvoiceNumber && invoiceNumberRegex.test(latestInvoiceNumber)) {
+          const parts = latestInvoiceNumber.split('/');
+          const lastSequential = parseInt(parts[0], 10);
+          const lastYearSuffix = parts[1];
+
+          if (lastYearSuffix === currentYearShort) {
+            suggestedNumber = `${String(lastSequential + 1).padStart(3, '0')}/${currentYearShort}`;
+          } else {
+            suggestedNumber = `001/${currentYearShort}`;
+          }
+        } else {
+          suggestedNumber = `001/${currentYearShort}`;
+        }
+        
         setCurrentInvoice({
           id: Date.now().toString(), // Temporary ID
           number: '', // Will be set by manualInvoiceNumber
@@ -75,7 +92,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           buyerEmail: '',
           buyerAddress: '',
         });
-        setManualInvoiceNumber(latestInvoiceNumber); // Pre-fill with the last invoice number
+        setManualInvoiceNumber(suggestedNumber); // Pre-fill with the suggested number
         setInvoiceNumberError(null);
         setIsDuplicateInvoiceNumber(false);
         setInvoiceItems([]);

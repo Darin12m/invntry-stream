@@ -4,10 +4,6 @@ import { Invoice, Product } from '@/types';
 import { activityLogService } from '@/services/firestore/activityLogService';
 import { debugLog } from '@/utils/debugLog'; // Import debugLog
 
-// Removed formatInvoiceNumber
-// Removed _getNextInvoiceNumberLogic
-// Removed _getInvoiceNumberPreview
-
 export const invoiceService = {
   list: async (): Promise<Invoice[]> => {
     const invoicesCol = collection(db, 'invoices');
@@ -40,7 +36,7 @@ export const invoiceService = {
     } as Invoice;
   },
 
-  // New helper to get the latest invoice number for pre-filling UI
+  // Helper to get the latest invoice number for pre-filling UI (no auto-incrementing here)
   _getLatestInvoiceNumber: async (): Promise<string> => {
     debugLog("invoiceService._getLatestInvoiceNumber: Querying for latest invoice number.");
     const invoicesColRef = collection(db, 'invoices');
