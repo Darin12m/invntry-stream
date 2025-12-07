@@ -323,6 +323,7 @@ const InvoicesTab: React.FC = React.memo(() => {
       </Card>
 
       <InvoiceModal
+        key={showInvoiceModal ? "invoice-modal-open" : "invoice-modal-closed"}
         showInvoiceModal={showInvoiceModal}
         setShowInvoiceModal={setShowInvoiceModal}
         editingInvoice={editingInvoice}
