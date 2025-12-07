@@ -14,8 +14,8 @@ import { useInvoices } from '@/hooks/useInvoices';
 import { useProducts } from '@/hooks/useProducts';
 import { calculateInvoiceTotals } from '@/utils/invoiceCalculations';
 import { useDeviceType } from '@/hooks/useDeviceType';
-import { generateNextInvoiceNumber, getLatestInvoiceNumberFromDB } from '@/utils/invoiceNumbering'; // Import numbering utilities
 import { debugLog } from '@/utils/debugLog'; // Import debugLog
+import { invoiceService } from '@/services/firestore/invoiceService'; // Import invoiceService to access new helper
 
 interface InvoiceModalProps {
   showInvoiceModal: boolean;
@@ -43,14 +43,14 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [invoiceType, setInvoiceType] = useState<'sale' | 'return' | 'gifted-damaged' | 'cash'>('sale');
 
   useEffect(() => {
-    const initializeInvoiceNumber = async () => {
+    const initializeInvoiceData = async () => {
       if (!editingInvoice) { // Only for new invoices
-        const latestNumber = await getLatestInvoiceNumberFromDB();
-        const nextNumber = generateNextInvoiceNumber(latestNumber);
+        const nextNumberPreview = await invoiceService._getInvoiceNumberPreview();
+        debugLog("InvoiceModal: Initializing new invoice with preview number:", nextNumberPreview);
         
         setCurrentInvoice({
           id: Date.now().toString(), // Temporary ID
-          number: nextNumber, // Auto-generated number
+          number: nextNumberPreview, // Auto-generated number preview
           date: new Date().toISOString().split('T')[0],
           customer: { name: '', email: '', address: '', phone: '' },
           items: [],
@@ -73,6 +73,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         setInvoiceType('sale');
       } else {
         // For existing invoices, populate with existing data
+        debugLog("InvoiceModal: Initializing existing invoice for editing:", editingInvoice.number);
         setCurrentInvoice({
           id: editingInvoice.id,
           number: editingInvoice.number,
@@ -84,7 +85,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           discountPercentage: editingInvoice.discountPercentage,
           total: editingInvoice.total,
           status: editingInvoice.status,
-          invoiceType: editingInvoice.invoiceType || 'sale',
+          invoiceType: editingInvoice.invoiceType as 'sale' | 'return' | 'gifted-damaged' | 'cash' || 'sale',
           itemsIds: editingInvoice.itemsIds || [],
           createdAt: editingInvoice.createdAt,
           buyerName: editingInvoice.buyerName || '',
@@ -119,7 +120,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     };
 
     if (showInvoiceModal) {
-      initializeInvoiceNumber();
+      initializeInvoiceData();
     }
   }, [editingInvoice, showInvoiceModal, products]); // Added products to dependency array
 
@@ -378,7 +379,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         toast.success(`Invoice ${editingInvoice.number} updated successfully!`);
       } else {
         // For new invoices, the createInvoice service will handle number generation transactionally
-        const { invoiceId, invoiceNumber } = await createInvoice(invoicePayloadBase); // Handle new return type
+        const { invoiceId, invoiceNumber } = await createInvoice({ ...invoicePayloadBase, number: currentInvoice.number }); // Pass the pre-filled number
         debugLog("Invoice created successfully. Final ID:", invoiceId, "Number:", invoiceNumber); // Log as requested
         toast.success(`Invoice ${invoiceNumber} created successfully!`);
       }
