@@ -251,7 +251,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       discount: parseFloat(item.discount?.toFixed(2) || '0'),
     }));
 
-    const invoicePayloadBase: Omit<Invoice, 'id' | 'number'> = { // Omit 'number' for new invoices
+    // Corrected type: Omit createdAt and updatedAt as the service will add them
+    const invoicePayloadBase: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt' | 'number'> = {
       date: currentInvoice.date,
       customer: customerInfo,
       subtotal: subtotal,
@@ -262,8 +263,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       items: newItems,
       invoiceType,
       itemsIds: newItems.map(item => item.productId),
-      createdAt: currentInvoice.createdAt || new Date(),
-      updatedAt: new Date(),
       buyerName: customerInfo.name,
       buyerEmail: customerInfo.email,
       buyerAddress: customerInfo.address,
