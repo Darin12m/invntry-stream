@@ -67,10 +67,13 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           if (lastYearSuffix === currentYearShort) {
             suggestedNumber = `${String(lastSequential + 1).padStart(3, '0')}/${currentYearShort}`;
           } else {
+            // New year, start from 001 for the current year
             suggestedNumber = `001/${currentYearShort}`;
           }
         } else {
-          suggestedNumber = `001/${currentYearShort}`;
+          // No previous valid invoice number found, or it's the very first invoice
+          // User wants to start from 006/25
+          suggestedNumber = `006/25`;
         }
         
         setCurrentInvoice({
