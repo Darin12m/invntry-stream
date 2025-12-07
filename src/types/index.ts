@@ -41,7 +41,7 @@ export interface Invoice {
   discountPercentage: number; // Global discount percentage
   total: number;
   status: string;
-  invoiceType: 'sale' | 'return' | 'gifted-damaged' | 'cash';
+  invoiceType: 'sale' | 'return' | 'gifted-damaged' | 'cash' | 'online-sale'; // Added 'online-sale'
   itemsIds: string[];
   deletedAt?: Date | FieldValue | null;
   createdAt?: Date | FieldValue;
