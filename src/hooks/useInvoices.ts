@@ -13,7 +13,7 @@ export const useInvoices = () => {
   const [errorInvoices, setErrorInvoices] = useState<string | null>(null);
   const [invoiceSortBy, setInvoiceSortBy] = useState<'number' | 'date' | 'customer' | 'total' | 'invoiceType'>('number');
   const [invoiceSortDirection, setInvoiceSortDirection] = useState<SortDirection>('asc');
-  const [selectedInvoices, setSelectedInvoices] = new Set<string>());
+  const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set<string>()); // Corrected this line
 
   // Track if we've received the first snapshot
   const hasInitialSnapshot = useRef(false);
