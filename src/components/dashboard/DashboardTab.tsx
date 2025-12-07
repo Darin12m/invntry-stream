@@ -1,5 +1,5 @@
 import React, { useContext, useMemo, useState } from 'react';
-import { BarChart3, DollarSign, ShoppingCart, TrendingUp, FileText, TrendingDown } from 'lucide-react';
+import { BarChart3, DollarSign, ShoppingCart, TrendingUp, FileText, TrendingDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,10 +36,76 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
   const [showInvoiceViewer, setShowInvoiceViewer] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
 
+  // Sorting state for the invoice table
+  const [sortColumn, setSortColumn] = useState<'number' | 'date' | 'customer' | 'sales' | 'costs' | 'profit'>('date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc'); // Default to date descending
+
   const handleViewInvoice = (invoice: Invoice) => {
     setViewingInvoice(invoice);
     setShowInvoiceViewer(true);
   };
+
+  const handleSort = (column: typeof sortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedInvoices = useMemo(() => {
+    const sortableInvoices = [...metrics.filteredInvoices].map(invoice => {
+      let invoiceCosts = 0;
+      invoice.items.forEach(item => {
+        const product = products.find(p => p.id === item.productId);
+        const purchasePrice = product?.purchasePrice || item.purchasePrice || 0;
+        invoiceCosts += purchasePrice * item.quantity;
+      });
+      const invoiceProfit = invoice.total - invoiceCosts;
+      return { ...invoice, invoiceCosts, invoiceProfit };
+    });
+
+    return sortableInvoices.sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortColumn) {
+        case 'number':
+          // Extract numeric part for proper sorting (e.g., "001/25" -> 1)
+          aValue = parseInt(a.number.split('/')[0], 10);
+          bValue = parseInt(b.number.split('/')[0], 10);
+          break;
+        case 'date':
+          aValue = new Date(a.date).getTime();
+          bValue = new Date(b.date).getTime();
+          break;
+        case 'customer':
+          aValue = a.customer.name.toLowerCase();
+          bValue = b.customer.name.toLowerCase();
+          break;
+        case 'sales':
+          aValue = a.total;
+          bValue = b.total;
+          break;
+        case 'costs':
+          aValue = a.invoiceCosts;
+          bValue = b.invoiceCosts;
+          break;
+        case 'profit':
+          aValue = a.invoiceProfit;
+          bValue = b.invoiceProfit;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [metrics.filteredInvoices, products, sortColumn, sortDirection]);
+
 
   if (loading) {
     return (
@@ -187,24 +253,79 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
             <table className="w-full min-w-[600px]">
               <thead>
                 <tr className="border-b bg-muted/30">
-                  <th className="text-left p-2 sm:p-4 font-medium text-xs sm:text-sm">Invoice #</th>
-                  <th className="text-left p-2 sm:p-4 font-medium text-xs sm:text-sm">Date</th>
-                  <th className="text-left p-2 sm:p-4 font-medium text-xs sm:text-sm">Customer</th>
-                  <th className="text-right p-2 sm:p-4 font-medium text-xs sm:text-sm">Sales</th>
-                  <th className="text-right p-2 sm:p-4 font-medium text-xs sm:text-sm">Costs</th>
-                  <th className="text-right p-2 sm:p-4 font-medium text-xs sm:text-sm">Profit</th>
+                  <th className="text-left p-2 sm:p-4 font-medium text-xs sm:text-sm">
+                    <button
+                      onClick={() => handleSort('number')}
+                      className="flex items-center gap-1 hover:text-primary transition-colors"
+                    >
+                      Invoice #
+                      {sortColumn === 'number' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="text-left p-2 sm:p-4 font-medium text-xs sm:text-sm">
+                    <button
+                      onClick={() => handleSort('date')}
+                      className="flex items-center gap-1 hover:text-primary transition-colors"
+                    >
+                      Date
+                      {sortColumn === 'date' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="text-left p-2 sm:p-4 font-medium text-xs sm:text-sm">
+                    <button
+                      onClick={() => handleSort('customer')}
+                      className="flex items-center gap-1 hover:text-primary transition-colors"
+                    >
+                      Customer
+                      {sortColumn === 'customer' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="text-right p-2 sm:p-4 font-medium text-xs sm:text-sm">
+                    <button
+                      onClick={() => handleSort('sales')}
+                      className="flex items-center justify-end gap-1 hover:text-primary transition-colors w-full"
+                    >
+                      Sales
+                      {sortColumn === 'sales' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="text-right p-2 sm:p-4 font-medium text-xs sm:text-sm">
+                    <button
+                      onClick={() => handleSort('costs')}
+                      className="flex items-center justify-end gap-1 hover:text-primary transition-colors w-full"
+                    >
+                      Costs
+                      {sortColumn === 'costs' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="text-right p-2 sm:p-4 font-medium text-xs sm:text-sm">
+                    <button
+                      onClick={() => handleSort('profit')}
+                      className="flex items-center justify-end gap-1 hover:text-primary transition-colors w-full"
+                    >
+                      Profit
+                      {sortColumn === 'profit' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </th>
                   <th className="text-center p-2 sm:p-4 font-medium text-xs sm:text-sm">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {metrics.filteredInvoices.map(invoice => {
-                  let invoiceCosts = 0;
-                  invoice.items.forEach(item => {
-                    const product = products.find(p => p.id === item.productId);
-                    const purchasePrice = product?.purchasePrice || item.purchasePrice || 0;
-                    invoiceCosts += purchasePrice * item.quantity;
-                  });
-                  const invoiceProfit = invoice.total - invoiceCosts;
+                {sortedInvoices.map(invoice => {
+                  // invoiceCosts and invoiceProfit are already calculated in sortedInvoices useMemo
+                  // No need to recalculate here
                   
                   return (
                     <tr key={invoice.id} className="border-b hover:bg-muted/20 transition-colors">
@@ -212,9 +333,9 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                       <td className="p-2 sm:p-4 text-muted-foreground text-xs sm:text-sm">{new Date(invoice.date).toLocaleDateString()}</td> {/* Adjusted padding and font size */}
                       <td className="p-2 sm:p-4 text-xs sm:text-sm">{invoice.customer.name}</td> {/* Adjusted padding and font size */}
                       <td className="p-2 sm:p-4 text-right font-medium text-blue-600 text-xs sm:text-sm">{invoice.total.toFixed(2)} {currency}</td> {/* Adjusted padding and font size */}
-                      <td className="p-2 sm:p-4 text-right font-medium text-red-600 text-xs sm:text-sm">{invoiceCosts.toFixed(2)} {currency}</td> {/* Adjusted padding and font size */}
-                      <td className={`p-2 sm:p-4 text-right font-medium text-xs sm:text-sm ${invoiceProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}> {/* Adjusted padding and font size */}
-                        {invoiceProfit.toFixed(2)} {currency}
+                      <td className="p-2 sm:p-4 text-right font-medium text-red-600 text-xs sm:text-sm">{invoice.invoiceCosts.toFixed(2)} {currency}</td> {/* Adjusted padding and font size */}
+                      <td className={`p-2 sm:p-4 text-right font-medium text-xs sm:text-sm ${invoice.invoiceProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}> {/* Adjusted padding and font size */}
+                        {invoice.invoiceProfit.toFixed(2)} {currency}
                       </td>
                       <td className="p-2 sm:p-4 text-center"> {/* Adjusted padding */}
                         <Button
