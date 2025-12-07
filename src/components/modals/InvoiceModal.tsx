@@ -153,7 +153,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           if (parsed.isValid && parsed.prefix === 'CASH ') {
             cashLockedPrefixRef.current = `${parsed.prefix}${String(parsed.sequential).padStart(3, '0')}/${parsed.year}`;
           } else {
-            cashLockedPrefixRef.current = ''; // Fallback if existing CASH number is malformed
+            cashLockedPrefix.current = ''; // Fallback if existing CASH number is malformed
           }
         } else {
           cashLockedPrefixRef.current = '';
@@ -334,7 +334,11 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setIsDuplicateInvoiceNumber(false);
       cashLockedPrefixRef.current = ''; // Clear locked prefix for online-sale
     } else {
-      // For other types, re-suggest number based on new type
+      // For 'regular' and 'cash' types, re-suggest number based on new type.
+      // This will fetch the last number for the specific type and increment it,
+      // or default to '001' if no previous invoices of that type exist for the year.
+      // This ensures that CASH numbering continues from the last CASH invoice,
+      // and does not reset to 001 if any Cash invoice already exists.
       const suggestedNum = await getSuggestedInvoiceNumber(newType);
       setManualInvoiceNumber(suggestedNum);
       
