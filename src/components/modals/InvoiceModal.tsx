@@ -15,6 +15,7 @@ import { useProducts } from '@/hooks/useProducts';
 import { calculateInvoiceTotals } from '@/utils/invoiceCalculations';
 import { useDeviceType } from '@/hooks/useDeviceType';
 import { generateNextInvoiceNumber, getLatestInvoiceNumberFromDB } from '@/utils/invoiceNumbering'; // Import numbering utilities
+import { debugLog } from '@/utils/debugLog'; // Import debugLog
 
 interface InvoiceModalProps {
   showInvoiceModal: boolean;
@@ -373,12 +374,12 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       if (editingInvoice) {
         // For existing invoices, the number is already set and should not be re-generated
         await updateInvoice(editingInvoice.id, { ...invoicePayloadBase, number: editingInvoice.number });
-        console.log("Invoice updated successfully. ID:", editingInvoice.id, "Number:", editingInvoice.number);
+        debugLog("Invoice updated successfully. ID:", editingInvoice.id, "Number:", editingInvoice.number);
         toast.success(`Invoice ${editingInvoice.number} updated successfully!`);
       } else {
         // For new invoices, the createInvoice service will handle number generation transactionally
         const { invoiceId, invoiceNumber } = await createInvoice(invoicePayloadBase); // Handle new return type
-        console.log("Invoice created successfully. Final ID:", invoiceId, "Number:", invoiceNumber); // Log as requested
+        debugLog("Invoice created successfully. Final ID:", invoiceId, "Number:", invoiceNumber); // Log as requested
         toast.success(`Invoice ${invoiceNumber} created successfully!`);
       }
       
@@ -386,7 +387,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       await fetchProducts(); // Refresh products to reflect stock changes
       handleCloseInvoiceModal();
     } catch (error: any) {
-      console.error('CREATE/UPDATE INVOICE ERROR in InvoiceModal.tsx:', error);
+      debugLog("ERROR in InvoiceModal.tsx (handleSaveInvoice):", error, error?.stack);
       toast.error(`Failed to save invoice: ${error.message || 'Unknown error'}`);
     }
   }, [
