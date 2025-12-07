@@ -285,7 +285,7 @@ const ImportProductsModal: React.FC<ImportProductsModalProps> = ({
                         value={columnMappings[field]}
                         onValueChange={(value) => handleMappingChange(field, value)}
                       >
-                        <SelectTrigger id={`map-${field}`} className="w-full">
+                        <SelectTrigger id={`map-${field}`} className="w-full text-foreground"> {/* Added text-foreground here */}
                           <SelectValue placeholder={`Select column for ${FIELD_LABELS[field]}`} />
                         </SelectTrigger>
                         <SelectContent>
