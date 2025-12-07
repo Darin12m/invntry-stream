@@ -14,6 +14,7 @@ import { useInvoices } from '@/hooks/useInvoices';
 import { useProducts } from '@/hooks/useProducts';
 import { calculateInvoiceTotals } from '@/utils/invoiceCalculations';
 import { useDeviceType } from '@/hooks/useDeviceType';
+import { generateNextInvoiceNumber, getLatestInvoiceNumberFromDB } from '@/utils/invoiceNumbering'; // Import numbering utilities
 
 interface InvoiceModalProps {
   showInvoiceModal: boolean;
@@ -41,85 +42,90 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [invoiceType, setInvoiceType] = useState<'sale' | 'return' | 'gifted-damaged' | 'cash'>('sale');
 
   useEffect(() => {
-    if (editingInvoice) {
-      setCurrentInvoice({
-        id: editingInvoice.id,
-        number: editingInvoice.number,
-        date: editingInvoice.date,
-        customer: editingInvoice.customer,
-        items: editingInvoice.items,
-        subtotal: editingInvoice.subtotal,
-        discount: editingInvoice.discount,
-        discountPercentage: editingInvoice.discountPercentage,
-        total: editingInvoice.total,
-        status: editingInvoice.status,
-        invoiceType: editingInvoice.invoiceType || 'sale',
-        itemsIds: editingInvoice.itemsIds || [],
-        createdAt: editingInvoice.createdAt,
-        buyerName: editingInvoice.buyerName || '',
-        buyerEmail: editingInvoice.buyerEmail || '',
-        buyerAddress: editingInvoice.buyerAddress || '',
-      });
+    const initializeInvoiceNumber = async () => {
+      if (!editingInvoice) { // Only for new invoices
+        const latestNumber = await getLatestInvoiceNumberFromDB();
+        const nextNumber = generateNextInvoiceNumber(latestNumber);
+        
+        setCurrentInvoice({
+          id: Date.now().toString(), // Temporary ID
+          number: nextNumber, // Auto-generated number
+          date: new Date().toISOString().split('T')[0],
+          customer: { name: '', email: '', address: '', phone: '' },
+          items: [],
+          subtotal: 0,
+          discount: 0,
+          discountPercentage: 0,
+          total: 0,
+          status: 'draft',
+          invoiceType: 'sale',
+          itemsIds: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          buyerName: '',
+          buyerEmail: '',
+          buyerAddress: '',
+        });
+        setInvoiceItems([]);
+        setCustomerInfo({ name: '', email: '', address: '', phone: '' });
+        setDiscount(0);
+        setInvoiceType('sale');
+      } else {
+        // For existing invoices, populate with existing data
+        setCurrentInvoice({
+          id: editingInvoice.id,
+          number: editingInvoice.number,
+          date: editingInvoice.date,
+          customer: editingInvoice.customer,
+          items: editingInvoice.items,
+          subtotal: editingInvoice.subtotal,
+          discount: editingInvoice.discount,
+          discountPercentage: editingInvoice.discountPercentage,
+          total: editingInvoice.total,
+          status: editingInvoice.status,
+          invoiceType: editingInvoice.invoiceType || 'sale',
+          itemsIds: editingInvoice.itemsIds || [],
+          createdAt: editingInvoice.createdAt,
+          buyerName: editingInvoice.buyerName || '',
+          buyerEmail: editingInvoice.buyerEmail || '',
+          buyerAddress: editingInvoice.buyerAddress || '',
+        });
 
-      const refreshedItems = editingInvoice.items.map((item) => {
-        const latestProduct = products.find(p => p.id === item.productId);
-        return latestProduct
-          ? {
-              ...item,
-              name: latestProduct.name,
-              sku: latestProduct.sku,
-              // Use item's price if it exists, otherwise fallback to latest product price
-              price: item.price ?? latestProduct.price, 
-              purchasePrice: latestProduct.purchasePrice || 0,
-            }
-          : { ...item };
-      });
-      setInvoiceItems(refreshedItems);
+        const refreshedItems = editingInvoice.items.map((item) => {
+          const latestProduct = products.find(p => p.id === item.productId);
+          return latestProduct
+            ? {
+                ...item,
+                name: latestProduct.name,
+                sku: latestProduct.sku,
+                price: item.price ?? latestProduct.price, 
+                purchasePrice: latestProduct.purchasePrice || 0,
+              }
+            : { ...item };
+        });
+        setInvoiceItems(refreshedItems);
 
-      setCustomerInfo({ 
-        name: editingInvoice.customer.name, 
-        email: editingInvoice.customer.email, 
-        address: editingInvoice.customer.address, 
-        phone: editingInvoice.customer.phone || '' 
-      });
-      setDiscount(editingInvoice.discountPercentage || 0);
-      setInvoiceType(editingInvoice.invoiceType as 'sale' | 'return' | 'gifted-damaged' | 'cash' || 'sale');
-    } else {
-      const year = new Date().getFullYear().toString().slice(-2);
-      const nextNumber = (allInvoices.length + 1).toString().padStart(3, '0'); // Use allInvoices from context
-      
-      setCurrentInvoice({
-        id: Date.now().toString(),
-        number: `${nextNumber}/${year}`,
-        date: new Date().toISOString().split('T')[0],
-        customer: { name: '', email: '', address: '', phone: '' },
-        items: [],
-        subtotal: 0,
-        discount: 0,
-        discountPercentage: 0,
-        total: 0,
-        status: 'draft',
-        invoiceType: 'sale',
-        itemsIds: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        buyerName: '',
-        buyerEmail: '',
-        buyerAddress: '',
-      });
-      setInvoiceItems([]);
-      setCustomerInfo({ name: '', email: '', address: '', phone: '' });
+        setCustomerInfo({ 
+          name: editingInvoice.customer.name, 
+          email: editingInvoice.customer.email, 
+          address: editingInvoice.customer.address, 
+          phone: editingInvoice.customer.phone || '' 
+        });
+        setDiscount(editingInvoice.discountPercentage || 0);
+        setInvoiceType(editingInvoice.invoiceType as 'sale' | 'return' | 'gifted-damaged' | 'cash' || 'sale');
+      }
       setInvoiceProductSearch('');
-      setDiscount(0);
-      setInvoiceType('sale');
+    };
+
+    if (showInvoiceModal) {
+      initializeInvoiceNumber();
     }
-    setInvoiceProductSearch('');
-  }, [editingInvoice, products, allInvoices]);
+  }, [editingInvoice, showInvoiceModal, products]); // Added products to dependency array
 
   const handleCloseInvoiceModal = useCallback(() => {
     setShowInvoiceModal(false);
     setEditingInvoice(null);
-    setCurrentInvoice(null);
+    setCurrentInvoice(null); // Ensure currentInvoice is reset
     setInvoiceItems([]);
     setCustomerInfo({ name: '', email: '', address: '', phone: '' });
     setInvoiceProductSearch('');
@@ -219,6 +225,10 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   }, [invoiceItems]);
 
   const handleSaveInvoice = useCallback(async () => {
+    if (!currentInvoice) {
+      toast.error("Invoice data not initialized.");
+      return;
+    }
     if (!customerInfo.name.trim()) {
       toast.error('Please enter customer name');
       return;
@@ -241,9 +251,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       discount: parseFloat(item.discount?.toFixed(2) || '0'),
     }));
 
-    const invoicePayloadBase: Omit<Invoice, 'id'> = {
-      number: currentInvoice!.number,
-      date: currentInvoice!.date,
+    const invoicePayloadBase: Omit<Invoice, 'id' | 'number'> = { // Omit 'number' for new invoices
+      date: currentInvoice.date,
       customer: customerInfo,
       subtotal: subtotal,
       discount: calculatedDiscountAmount,
@@ -253,7 +262,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       items: newItems,
       invoiceType,
       itemsIds: newItems.map(item => item.productId),
-      createdAt: currentInvoice?.createdAt || new Date(),
+      createdAt: currentInvoice.createdAt || new Date(),
       updatedAt: new Date(),
       buyerName: customerInfo.name,
       buyerEmail: customerInfo.email,
@@ -328,14 +337,11 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       
       // Add invoice update/create to the batch
       if (editingInvoice) {
-        await updateInvoice(editingInvoice.id, invoicePayloadBase); // This will add to the batch implicitly or handle its own update
+        // For existing invoices, the number is already set and should not be re-generated
+        await updateInvoice(editingInvoice.id, { ...invoicePayloadBase, number: editingInvoice.number });
       } else {
-        const isDuplicateNumber = allInvoices.some(inv => inv.number === invoicePayloadBase.number && !inv.deletedAt);
-        if (isDuplicateNumber) {
-          throw new Error(`Invoice number "${invoicePayloadBase.number}" already exists. Please use a unique number.`);
-        }
-        const newInvoiceRef = doc(collection(db, 'invoices'));
-        batch.set(newInvoiceRef, invoicePayloadBase);
+        // For new invoices, the createInvoice service will handle number generation transactionally
+        await createInvoice(invoicePayloadBase); // Pass the invoice without the 'number' field, as it will be generated
       }
       
       await batch.commit();
@@ -355,7 +361,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     allInvoices,
     products,
     updateInvoice,
-    createInvoice, // Although createInvoice is not directly used in the batch, it's part of the overall invoice management
+    createInvoice,
     fetchProducts,
     handleCloseInvoiceModal,
   ]);
@@ -452,8 +458,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                     <Label className="text-sm sm:text-base">Invoice Number</Label>
                     <Input
                       value={currentInvoice.number}
-                      onChange={(e) => setCurrentInvoice({ ...currentInvoice, number: e.target.value })}
-                      className="text-sm sm:text-base"
+                      readOnly // Make invoice number read-only
+                      className="text-sm sm:text-base bg-muted/50" // Add muted background for read-only
                     />
                   </div>
                   <div>

@@ -1,7 +1,8 @@
 import { db } from '@/firebase/config';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, getDoc, writeBatch, serverTimestamp, FieldValue } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, getDoc, writeBatch, serverTimestamp, FieldValue, runTransaction, limit } from 'firebase/firestore';
 import { Invoice, Product } from '@/types';
 import { activityLogService } from '@/services/firestore/activityLogService';
+import { generateNextInvoiceNumber } from '@/utils/invoiceNumbering'; // Import the new utility
 
 export const invoiceService = {
   list: async (): Promise<Invoice[]> => {
@@ -34,15 +35,43 @@ export const invoiceService = {
       deletedAt: data.deletedAt?.toDate ? data.deletedAt.toDate() : data.deletedAt,
     } as Invoice;
   },
-  create: async (invoice: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>, userEmail: string = 'Unknown User', userId: string | null = null): Promise<string> => {
-    const newInvoice: Omit<Invoice, 'id'> = {
-      ...invoice,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    const docRef = await addDoc(collection(db, 'invoices'), newInvoice);
-    await activityLogService.logAction(`New invoice ${invoice.number} created by ${userEmail}`, userId, userEmail);
-    return docRef.id;
+  create: async (invoice: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt' | 'number'>, userEmail: string = 'Unknown User', userId: string | null = null): Promise<string> => {
+    const invoicesColRef = collection(db, 'invoices');
+    let newInvoiceNumber: string = '';
+
+    await runTransaction(db, async (transaction) => {
+      // 1. Get the latest invoice number within the transaction
+      // This query needs to be robust to get the highest number for the current fiscal year.
+      // Ordering by 'number' desc and limiting to 1 works for the "000/YY" format.
+      const latestInvoiceQuery = query(invoicesColRef, orderBy('number', 'desc'), limit(1));
+      const latestInvoiceSnapshot = await transaction.get(latestInvoiceQuery);
+      const lastInvoiceNumber = latestInvoiceSnapshot.docs.length > 0 ? latestInvoiceSnapshot.docs[0].data().number : null;
+
+      // 2. Generate the next sequential number
+      newInvoiceNumber = generateNextInvoiceNumber(lastInvoiceNumber);
+
+      // 3. Check for uniqueness (optional, but good for explicit safety within transaction)
+      const existingInvoiceQuery = query(invoicesColRef, where('number', '==', newInvoiceNumber));
+      const existingInvoiceSnapshot = await transaction.get(existingInvoiceQuery);
+      if (!existingInvoiceSnapshot.empty) {
+        // This indicates a race condition that `generateNextInvoiceNumber` might not have caught
+        // or a very rare edge case. Throwing will retry the transaction.
+        throw new Error(`Invoice number ${newInvoiceNumber} already exists. Retrying transaction.`);
+      }
+
+      // 4. Create the new invoice document with the generated number
+      const newInvoiceDocRef = doc(invoicesColRef);
+      const invoiceWithNumber: Omit<Invoice, 'id'> = {
+        ...invoice,
+        number: newInvoiceNumber,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      transaction.set(newInvoiceDocRef, invoiceWithNumber);
+    });
+
+    await activityLogService.logAction(`New invoice ${newInvoiceNumber} created by ${userEmail}`, userId, userEmail);
+    return newInvoiceNumber; // Return the generated number
   },
   update: async (id: string, invoice: Partial<Omit<Invoice, 'id' | 'updatedAt'>>, userEmail: string = 'Unknown User', userId: string | null = null): Promise<void> => {
     const invoiceRef = doc(db, 'invoices', id);

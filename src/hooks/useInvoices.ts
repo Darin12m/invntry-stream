@@ -13,7 +13,7 @@ export const useInvoices = () => {
   const [errorInvoices, setErrorInvoices] = useState<string | null>(null);
   const [invoiceSortBy, setInvoiceSortBy] = useState<'number' | 'date' | 'customer' | 'total' | 'invoiceType'>('number');
   const [invoiceSortDirection, setInvoiceSortDirection] = useState<SortDirection>('asc');
-  const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
+  const [selectedInvoices, setSelectedInvoices] = new Set<string>());
 
   // Track if we've received the first snapshot
   const hasInitialSnapshot = useRef(false);
@@ -105,11 +105,11 @@ export const useInvoices = () => {
     };
   }, [currentUser, setInvoices, setError]);
 
-  const createInvoice = useCallback(async (invoice: Omit<Invoice, 'id'>) => {
+  const createInvoice = useCallback(async (invoice: Omit<Invoice, 'id' | 'number'>) => { // Updated type to omit 'number'
     try {
       const userEmail = currentUser?.email || 'Unknown User';
       const userId = currentUser?.uid || null;
-      await invoiceService.create(invoice, userEmail, userId);
+      await invoiceService.create(invoice, userEmail, userId); // invoiceService.create now generates the number
       toast.success('Invoice created successfully!');
       // No need to fetch - real-time listener will update
     } catch (error: any) {
