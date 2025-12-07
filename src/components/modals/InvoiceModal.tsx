@@ -375,7 +375,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         await updateInvoice(editingInvoice.id, { ...invoicePayloadBase, number: editingInvoice.number });
       } else {
         // For new invoices, the createInvoice service will handle number generation transactionally
-        await createInvoice(invoicePayloadBase); // Pass the invoice without the 'number' field, as it will be generated
+        const { invoiceId, invoiceNumber } = await createInvoice(invoicePayloadBase); // Handle new return type
+        console.log("Invoice saved successfully. Final ID:", invoiceId, "Number:", invoiceNumber); // Log as requested
       }
       
       await batch.commit();

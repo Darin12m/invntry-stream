@@ -35,9 +35,10 @@ export const invoiceService = {
       deletedAt: data.deletedAt?.toDate ? data.deletedAt.toDate() : data.deletedAt,
     } as Invoice;
   },
-  create: async (invoice: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt' | 'number'>, userEmail: string = 'Unknown User', userId: string | null = null): Promise<string> => {
+  create: async (invoice: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt' | 'number'>, userEmail: string = 'Unknown User', userId: string | null = null): Promise<{ invoiceId: string; invoiceNumber: string }> => {
     const invoicesColRef = collection(db, 'invoices');
     let newInvoiceNumber: string = '';
+    let newInvoiceId: string = ''; // To store the generated ID
 
     await runTransaction(db, async (transaction) => {
       // 1. Get the latest invoice number within the transaction
@@ -61,6 +62,8 @@ export const invoiceService = {
 
       // 4. Create the new invoice document with the generated number
       const newInvoiceDocRef = doc(invoicesColRef);
+      newInvoiceId = newInvoiceDocRef.id; // Capture the ID here
+
       const invoiceWithNumber: Omit<Invoice, 'id'> = {
         ...invoice,
         number: newInvoiceNumber,
@@ -68,10 +71,11 @@ export const invoiceService = {
         updatedAt: new Date(),
       };
       transaction.set(newInvoiceDocRef, invoiceWithNumber);
+      console.log("Invoice created with ID:", newInvoiceId); // Add console log as requested
     });
 
-    await activityLogService.logAction(`New invoice ${newInvoiceNumber} created by ${userEmail}`, userId, userEmail);
-    return newInvoiceNumber; // Return the generated number
+    await activityLogService.logAction(`New invoice ${newInvoiceNumber} created by ${userEmail} (ID: ${newInvoiceId})`, userId, userEmail);
+    return { invoiceId: newInvoiceId, invoiceNumber: newInvoiceNumber };
   },
   update: async (id: string, invoice: Partial<Omit<Invoice, 'id' | 'updatedAt'>>, userEmail: string = 'Unknown User', userId: string | null = null): Promise<void> => {
     const invoiceRef = doc(db, 'invoices', id);
