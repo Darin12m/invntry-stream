@@ -262,85 +262,78 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
     try {
       const batch = writeBatch(db);
-      
-      // If editing an existing invoice, first revert its previous stock changes
+      const productStockMap = new Map<string, number>(); // Map to store initial onHand for calculation
+      const productNetStockChanges = new Map<string, number>(); // Map to store net changes
+
+      // Populate productStockMap with current onHand values
+      products.forEach(p => productStockMap.set(p.id, p.onHand));
+
+      // If editing an existing invoice, calculate "revert" changes first
       if (editingInvoice) {
         const previousInvoice = allInvoices.find(inv => inv.id === editingInvoice.id);
         if (previousInvoice) {
-          // Safety Logic: Prevent Editing Deleted Invoice
           if (previousInvoice.deletedAt) {
             throw new Error("Cannot edit a deleted invoice. Please restore it first.");
           }
 
           for (const item of previousInvoice.items) {
-            const productRef = doc(db, 'products', item.productId);
-            const product = products.find(p => p.id === item.productId);
-            if (!product) {
-              throw new Error(`Product "${item.name}" (ID: ${item.productId}) not found. Cannot revert previous stock changes.`);
-            }
-            let newOnHand = product.onHand;
-            // Reverse previous effect - revert stock changes
-            // For sale/cash/gifted: add back the quantity that was subtracted
-            // For return: qty was negative, so add it back (subtracts stock)
+            const productId = item.productId;
+            const quantityToRevert = item.quantity ?? 0;
+            let change = 0;
+
             if (previousInvoice.invoiceType === 'sale' || previousInvoice.invoiceType === 'cash' || previousInvoice.invoiceType === 'gifted-damaged') {
-              newOnHand += item.quantity;
+              change = quantityToRevert; // Add back what was subtracted
             } else if (previousInvoice.invoiceType === 'return') {
-              newOnHand += item.quantity; // qty is negative, so this subtracts
+              change = quantityToRevert; // qty is negative, so adding it back subtracts stock
             }
-            batch.update(productRef, { onHand: newOnHand });
+            productNetStockChanges.set(productId, (productNetStockChanges.get(productId) || 0) + change);
           }
         }
       }
 
-      // Apply new stock changes and safety checks
+      // Apply new stock changes
       for (const item of newItems) {
-        // Safety Logic: Verify Product Exists
-        const productRef = doc(db, 'products', item.productId);
-        const product = products.find(p => p.id === item.productId);
-        if (!product) {
-          throw new Error(`Product "${item.name}" (ID: ${item.productId}) not found. Cannot update stock.`);
-        }
+        const productId = item.productId;
+        const quantityToApply = item.quantity ?? 0;
+        let change = 0;
 
-        // Safety Logic: Validate quantity based on invoice type
-        if ((invoicePayloadBase.invoiceType === 'sale' || invoicePayloadBase.invoiceType === 'cash') && item.quantity < 0) {
-          throw new Error(`Sale/Cash invoice item "${item.name}" cannot have negative quantity.`);
-        }
-        if (invoicePayloadBase.invoiceType === 'return' && item.quantity > 0) {
-          throw new Error(`Return invoice item "${item.name}" must have negative quantity (restores stock).`);
-        }
-        if (item.quantity === 0) {
-          toast.warning(`Item "${item.name}" has zero quantity and will not affect stock.`);
-          continue; // Skip stock update for 0 quantity items
-        }
-
-        let newOnHand = product.onHand;
-        // Base Math: Apply new effect
-        // Sale and Cash: decrease stock (qty is positive, so subtract)
-        // Return: increase stock (qty is negative, so subtracting negative = adding)
-        // Gifted-Damaged: decrease stock
         if (invoicePayloadBase.invoiceType === 'sale' || invoicePayloadBase.invoiceType === 'cash' || invoicePayloadBase.invoiceType === 'gifted-damaged') {
-          newOnHand -= item.quantity;
+          change = -quantityToApply; // Subtract for sales/cash/gifted
         } else if (invoicePayloadBase.invoiceType === 'return') {
-          // Return qty is negative, so: onHand -= (-qty) = onHand += |qty|
-          newOnHand -= item.quantity;
+          change = -quantityToApply; // qty is negative, so subtracting negative = adding stock
+        }
+        productNetStockChanges.set(productId, (productNetStockChanges.get(productId) || 0) + change);
+      }
+
+      // Apply net changes to products in the batch
+      for (const [productId, netChange] of productNetStockChanges.entries()) {
+        const productRef = doc(db, 'products', productId);
+        const initialOnHand = productStockMap.get(productId);
+        const product = products.find(p => p.id === productId); // Get product for name/error messages
+
+        if (initialOnHand === undefined || !product) {
+          throw new Error(`Product (ID: ${productId}) not found. Cannot update stock.`);
+        }
+
+        const newOnHand = initialOnHand + netChange;
+
+        // Safety Logic: Prevent Negative Stock (Except where allowed)
+        // Only check for negative stock if the invoice type is one that typically reduces stock
+        if (newOnHand < 0 && (invoicePayloadBase.invoiceType === 'sale' || invoicePayloadBase.invoiceType === 'cash' || invoicePayloadBase.invoiceType === 'gifted-damaged')) {
+          throw new Error(`Cannot save invoice: Product "${product.name}" would go into negative stock (${newOnHand}). Current: ${initialOnHand}, Net Change: ${netChange}`);
         }
         
-        // Safety Logic: Prevent Negative Stock (Except where allowed)
-        if (newOnHand < 0 && (invoicePayloadBase.invoiceType === 'sale' || invoicePayloadBase.invoiceType === 'cash' || invoicePayloadBase.invoiceType === 'gifted-damaged')) {
-          throw new Error(`Cannot save invoice: Product "${item.name}" would go into negative stock (${newOnHand}). Current: ${product.onHand}, Change: -${item.quantity}`);
-        }
         batch.update(productRef, { onHand: newOnHand });
       }
       
+      // Add invoice update/create to the batch
       if (editingInvoice) {
-        await updateInvoice(editingInvoice.id, invoicePayloadBase);
+        await updateInvoice(editingInvoice.id, invoicePayloadBase); // This will add to the batch implicitly or handle its own update
       } else {
-        // Safety Logic: Detect Duplicate Invoices (basic check for invoice number)
         const isDuplicateNumber = allInvoices.some(inv => inv.number === invoicePayloadBase.number && !inv.deletedAt);
         if (isDuplicateNumber) {
           throw new Error(`Invoice number "${invoicePayloadBase.number}" already exists. Please use a unique number.`);
         }
-
         const newInvoiceRef = doc(collection(db, 'invoices'));
         batch.set(newInvoiceRef, invoicePayloadBase);
       }
@@ -362,7 +355,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     allInvoices,
     products,
     updateInvoice,
-    createInvoice,
+    createInvoice, // Although createInvoice is not directly used in the batch, it's part of the overall invoice management
     fetchProducts,
     handleCloseInvoiceModal,
   ]);
