@@ -13,7 +13,7 @@ import { AppContext } from '@/context/AppContext';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useProducts } from '@/hooks/useProducts';
 import { calculateInvoiceTotals } from '@/utils/invoiceCalculations';
-import { useDeviceType } from '@/hooks/useDeviceType';
+import { useDeviceType } => '@/hooks/useDeviceType';
 import { invoiceService } from '@/services/firestore/invoiceService';
 import {
   getInvoiceNumberingType,
@@ -266,27 +266,70 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
   const handleManualInvoiceNumberChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setManualInvoiceNumber(value);
-    await validateManualInvoiceNumber(value, invoiceType);
-  }, [validateManualInvoiceNumber, invoiceType]);
+    
+    if (invoiceType === 'cash') {
+      const currentYearShort = String(new Date().getFullYear()).slice(-2);
+      const baseCashPrefixRegex = new RegExp(`^CASH [0-9]{3}\/${currentYearShort}`);
+      
+      let newNumber = value;
+
+      // If the input doesn't start with "CASH ", try to prepend it
+      if (!newNumber.startsWith('CASH ')) {
+        newNumber = 'CASH ' + newNumber.replace(/^CASH\s*/i, ''); // Ensure "CASH " prefix
+      }
+
+      // If the base prefix (CASH ###/YY) is being deleted or altered, revert it
+      const currentParsed = parseInvoiceNumber(manualInvoiceNumber);
+      const currentBasePrefix = currentParsed.isValid && currentParsed.prefix === 'CASH ' && currentParsed.year === currentYearShort
+        ? `${currentParsed.prefix}${String(currentParsed.sequential).padStart(3, '0')}/${currentParsed.year}`
+        : '';
+
+      if (currentBasePrefix && !newNumber.startsWith(currentBasePrefix)) {
+        // User tried to modify the base prefix. Revert to base prefix + any valid suffix they might have typed.
+        const suffixPart = newNumber.substring(currentBasePrefix.length);
+        const suffixMatch = suffixPart.match(/^([- ]?[0-9]{0,4})?$/);
+        const validSuffix = suffixMatch ? suffixMatch[0] : '';
+        newNumber = currentBasePrefix + validSuffix;
+        setInvoiceNumberError("Cannot modify the base CASH invoice number prefix.");
+        setIsDuplicateInvoiceNumber(false);
+      } else {
+        setInvoiceNumberError(null); // Clear error if base prefix is valid
+      }
+
+      setManualInvoiceNumber(newNumber);
+      await validateManualInvoiceNumber(newNumber, invoiceType);
+
+    } else {
+      // For other invoice types, allow full editing and validate
+      setManualInvoiceNumber(value);
+      await validateManualInvoiceNumber(value, invoiceType);
+    }
+  }, [validateManualInvoiceNumber, invoiceType, manualInvoiceNumber]);
 
   const handleInvoiceTypeChange = useCallback(async (newType: Invoice['invoiceType']) => {
     setInvoiceType(newType);
+    setInvoiceNumberError(null); // Clear errors on type change
+    setIsDuplicateInvoiceNumber(false);
+
     if (newType === 'online-sale') {
       setManualInvoiceNumber(''); // Empty for Online Sale
-      setInvoiceNumberError(null);
-      setIsDuplicateInvoiceNumber(false);
     } else {
       // For 'regular' and 'cash' types, re-suggest number based on new type.
-      // Only prefill if the manualInvoiceNumber is currently empty.
-      if (!manualInvoiceNumber.trim()) {
-        const suggestedNum = await getSuggestedInvoiceNumber(newType);
+      // Do not generate CASH 001/25 if ANY Cash invoice already exists.
+      // This logic ensures that the suggested number is always the next in sequence
+      // or '001' only if no prior invoices of that type exist for the current year.
+      const suggestedNum = await getSuggestedInvoiceNumber(newType);
+      
+      // Only prefill if the manualInvoiceNumber is currently empty or invalid for the new type.
+      // This respects user's existing input if it's valid for the new type.
+      if (!manualInvoiceNumber.trim() || 
+          (newType === 'cash' && !cashInvoiceNumberExtendedRegex.test(manualInvoiceNumber)) ||
+          (newType === 'regular' && !regularInvoiceNumberRegex.test(manualInvoiceNumber))
+      ) {
         setManualInvoiceNumber(suggestedNum);
-        await validateManualInvoiceNumber(suggestedNum, newType);
-      } else {
-        // If user has already typed something, keep it and validate against new type rules
-        await validateManualInvoiceNumber(manualInvoiceNumber, newType);
       }
+      // No immediate validation call here, as suggestedNum is expected to be valid.
+      // Validation will occur on user input or on save.
     }
 
     // Auto-convert quantities when switching to/from return
@@ -301,7 +344,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         quantity: Math.abs(item.quantity)
       })));
     }
-  }, [invoiceType, getSuggestedInvoiceNumber, validateManualInvoiceNumber, manualInvoiceNumber]);
+  }, [invoiceType, getSuggestedInvoiceNumber, manualInvoiceNumber]);
 
 
   const filteredInvoiceProducts = useMemo(() => products.filter(product =>
