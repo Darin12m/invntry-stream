@@ -265,10 +265,26 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   }, [editingInvoice]);
 
   const handleManualInvoiceNumberChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setManualInvoiceNumber(value);
-    await validateManualInvoiceNumber(value, invoiceType);
-  }, [validateManualInvoiceNumber, invoiceType]);
+    let value = e.target.value;
+    
+    if (invoiceType === 'cash') {
+      // If the input is empty, auto-fill with the suggested number
+      if (!value.trim()) {
+        const suggestedNum = await getSuggestedInvoiceNumber('cash');
+        value = suggestedNum;
+      } else if (!value.startsWith('CASH ')) {
+        // If it's not empty but doesn't start with 'CASH ', prepend it
+        value = 'CASH ' + value.replace(/^CASH\s*/i, ''); // Ensure only one 'CASH ' prefix
+      }
+      setManualInvoiceNumber(value);
+      // Immediately validate the new value
+      await validateManualInvoiceNumber(value, invoiceType);
+    } else {
+      // For other invoice types, allow full editing and validate
+      setManualInvoiceNumber(value);
+      await validateManualInvoiceNumber(value, invoiceType);
+    }
+  }, [validateManualInvoiceNumber, invoiceType, getSuggestedInvoiceNumber]);
 
   const handleInvoiceTypeChange = useCallback(async (newType: Invoice['invoiceType']) => {
     setInvoiceType(newType);
@@ -278,22 +294,29 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     if (newType === 'online-sale') {
       setManualInvoiceNumber(''); // Empty for Online Sale
     } else {
-      // For 'regular' and 'cash' types, re-suggest number based on new type.
-      // Do not generate CASH 001/25 if ANY Cash invoice already exists.
-      // This logic ensures that the suggested number is always the next in sequence
-      // or '001' only if no prior invoices of that type exist for the current year.
       const suggestedNum = await getSuggestedInvoiceNumber(newType);
       
-      // Only prefill if the manualInvoiceNumber is currently empty or invalid for the new type.
-      // This respects user's existing input if it's valid for the new type.
-      if (!manualInvoiceNumber.trim() || 
-          (newType === 'cash' && !cashInvoiceNumberExtendedRegex.test(manualInvoiceNumber)) ||
-          (newType === 'regular' && !regularInvoiceNumberRegex.test(manualInvoiceNumber))
-      ) {
+      // For 'cash' and 'regular' types:
+      // If the current manual input is empty OR if it's not a valid number for the *new* type,
+      // then overwrite with the suggested number.
+      const currentYearShort = String(new Date().getFullYear()).slice(-2);
+      const parsedManual = parseInvoiceNumber(manualInvoiceNumber);
+      const isManualValidForNewType = 
+        (newType === 'cash' && cashInvoiceNumberExtendedRegex.test(manualInvoiceNumber)) ||
+        (newType === 'regular' && regularInvoiceNumberRegex.test(manualInvoiceNumber));
+
+      // Condition to overwrite:
+      // 1. manual input is empty
+      // 2. manual input is not valid for the new type (e.g., '001/25' when switching to 'cash')
+      // 3. manual input is for a different year (e.g., 'CASH 001/24' when current year is '25')
+      if (!manualInvoiceNumber.trim() || !isManualValidForNewType || parsedManual.year !== currentYearShort) {
         setManualInvoiceNumber(suggestedNum);
+        // Immediately validate the suggested number to update error state if needed (e.g., duplicate)
+        await validateManualInvoiceNumber(suggestedNum, newType);
+      } else {
+        // If user has already typed something valid for the new type and current year, keep it and validate.
+        await validateManualInvoiceNumber(manualInvoiceNumber, newType);
       }
-      // No immediate validation call here, as suggestedNum is expected to be valid.
-      // Validation will occur on user input or on save.
     }
 
     // Auto-convert quantities when switching to/from return
@@ -308,7 +331,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         quantity: Math.abs(item.quantity)
       })));
     }
-  }, [invoiceType, getSuggestedInvoiceNumber, manualInvoiceNumber]);
+  }, [invoiceType, getSuggestedInvoiceNumber, validateManualInvoiceNumber, manualInvoiceNumber]);
 
 
   const filteredInvoiceProducts = useMemo(() => products.filter(product =>
