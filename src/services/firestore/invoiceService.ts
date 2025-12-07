@@ -56,10 +56,10 @@ export const invoiceService = {
         orderBy('number', 'desc'), // Order by number string to get highest sequential
         limit(1)
       );
-    } else { // 'regular' (includes 'sale', 'return', 'gifted-damaged', 'online-sale')
+    } else { // 'regular' (includes 'sale', 'return', 'gifted-damaged')
       q = query(
         invoicesColRef,
-        where('invoiceType', 'in', ['sale', 'return', 'gifted-damaged', 'online-sale']), // Include online-sale here
+        where('invoiceType', 'in', ['sale', 'return', 'gifted-damaged']), // Exclude 'online-sale' from regular numbering
         where('number', '>=', `001/${yearShort}`),
         where('number', '<=', `999/${yearShort}`),
         orderBy('number', 'desc'), // Order by number string to get highest sequential
@@ -92,7 +92,7 @@ export const invoiceService = {
       const numberingType = getInvoiceNumberingType(invoiceData.invoiceType);
       const currentYearShort = String(new Date().getFullYear()).slice(-2); // Get current year for uniqueness scope
 
-      // Check for duplicate invoice number within the same numbering type and year
+      // Check for duplicate invoice number within the same invoiceType and year
       const q = query(
         invoicesColRef,
         where("number", "==", invoiceData.number),
@@ -104,7 +104,12 @@ export const invoiceService = {
         const duplicateInvoice = existingInvoiceSnapshot.docs[0].data() as Invoice;
         const duplicateYearShort = duplicateInvoice.number.split('/').pop(); // Extract year from number
         
-        if (getInvoiceNumberingType(duplicateInvoice.invoiceType) === numberingType && duplicateYearShort === currentYearShort) {
+        // For 'freeform' (online-sale), we still check uniqueness by exact type and year
+        // For 'regular'/'cash', we check by numbering type and year
+        const isDuplicateByLogic = (numberingType === 'freeform' && duplicateInvoice.invoiceType === invoiceData.invoiceType && duplicateYearShort === currentYearShort) ||
+                                   (numberingType !== 'freeform' && getInvoiceNumberingType(duplicateInvoice.invoiceType) === numberingType && duplicateYearShort === currentYearShort);
+
+        if (isDuplicateByLogic) {
           throw new Error(`Invoice number "${invoiceData.number}" already exists for this invoice type and year.`);
         }
       }
@@ -154,7 +159,10 @@ export const invoiceService = {
           const duplicateYearShort = duplicateInvoice.number.split('/').pop(); // Extract year from number
 
           // Allow update if the duplicate is the same invoice being edited, or if it's a different type/year
-          if (duplicateInvoice.id !== id && getInvoiceNumberingType(duplicateInvoice.invoiceType) === numberingType && duplicateYearShort === currentYearShort) {
+          const isDuplicateByLogic = (numberingType === 'freeform' && duplicateInvoice.invoiceType === (invoice.invoiceType || currentInvoiceData.invoiceType) && duplicateYearShort === currentYearShort) ||
+                                     (numberingType !== 'freeform' && getInvoiceNumberingType(duplicateInvoice.invoiceType) === numberingType && duplicateYearShort === currentYearShort);
+
+          if (duplicateInvoice.id !== id && isDuplicateByLogic) {
             throw new Error(`Invoice number "${invoice.number}" already exists for this invoice type and year.`);
           }
         }

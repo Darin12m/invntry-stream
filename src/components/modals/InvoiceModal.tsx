@@ -56,6 +56,11 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const getSuggestedInvoiceNumber = useCallback(async (type: Invoice['invoiceType']) => {
     const currentYearShort = String(new Date().getFullYear()).slice(-2);
     const numberingType = getInvoiceNumberingType(type);
+    
+    if (numberingType === 'freeform') {
+      return ''; // No suggestion for freeform types
+    }
+
     const latestNumber = await invoiceService._getLatestInvoiceNumber(numberingType, currentYearShort);
     
     let suggestedNumber = '';
@@ -191,13 +196,14 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
 
     const numberingType = getInvoiceNumberingType(currentInvoiceType);
-    let isValidFormat = false;
+    let isValidFormat = true; // Assume valid for freeform
 
     if (numberingType === 'cash') {
       isValidFormat = cashInvoiceNumberRegex.test(number);
-    } else { // 'regular' (includes 'sale', 'return', 'gifted-damaged', 'online-sale')
+    } else if (numberingType === 'regular') { // 'sale', 'return', 'gifted-damaged'
       isValidFormat = regularInvoiceNumberRegex.test(number);
     }
+    // For 'freeform' (online-sale), isValidFormat remains true
 
     if (!isValidFormat) {
       setInvoiceNumberError(numberingType === 'cash'
@@ -228,7 +234,12 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         const duplicateInvoice = querySnapshot.docs[0].data() as Invoice;
         const duplicateYearShort = duplicateInvoice.number.split('/').pop(); // Extract year from number
         
-        if (getInvoiceNumberingType(duplicateInvoice.invoiceType) === numberingType && duplicateYearShort === currentYearShort) {
+        // For 'freeform' (online-sale), we check uniqueness by exact type and year
+        // For 'regular'/'cash', we check by numbering type and year
+        const isDuplicateByLogic = (numberingType === 'freeform' && duplicateInvoice.invoiceType === currentInvoiceType && duplicateYearShort === currentYearShort) ||
+                                   (numberingType !== 'freeform' && getInvoiceNumberingType(duplicateInvoice.invoiceType) === numberingType && duplicateYearShort === currentYearShort);
+
+        if (isDuplicateByLogic) {
           isDuplicate = true;
         }
       }
@@ -395,7 +406,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
 
     // --- Auto-update invoice number if sequence has changed (only for non-editing, non-online-sale) ---
-    if (!editingInvoice && invoiceType !== 'online-sale') {
+    if (!editingInvoice && invoiceType !== 'online-sale') { // Exclude online-sale from auto-update
       const currentYearShort = String(new Date().getFullYear()).slice(-2);
       const numberingType = getInvoiceNumberingType(invoiceType);
       const latestNumberFromDb = await invoiceService._getLatestInvoiceNumber(numberingType, currentYearShort);
@@ -676,7 +687,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       id="invoiceNumber"
                       value={manualInvoiceNumber}
                       onChange={handleManualInvoiceNumberChange}
-                      placeholder="e.g., 001/25 or CASH 001/25"
+                      placeholder={invoiceType === 'online-sale' ? "Enter invoice number" : "e.g., 001/25 or CASH 001/25"}
                       className={`text-sm sm:text-base ${invoiceNumberError ? 'border-destructive' : ''}`}
                     />
                     {invoiceNumberError && (

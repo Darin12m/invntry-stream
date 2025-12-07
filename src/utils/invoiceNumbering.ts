@@ -7,11 +7,13 @@ export const regularInvoiceNumberRegex = /^[0-9]{3}\/[0-9]{2}$/;
 export const cashInvoiceNumberRegex = /^CASH [0-9]{3}\/[0-9]{2}$/;
 
 /**
- * Determines the numbering type ('regular' or 'cash') based on the invoice's functional type.
- * 'online-sale' is treated as 'regular' for numbering sequence purposes.
+ * Determines the numbering type ('regular', 'cash', or 'freeform') based on the invoice's functional type.
+ * 'online-sale' is treated as 'freeform' for numbering sequence purposes, meaning no strict format.
  */
-export const getInvoiceNumberingType = (invoiceType: Invoice['invoiceType']): 'regular' | 'cash' => {
-  return invoiceType === 'cash' ? 'cash' : 'regular'; // 'online-sale' will fall into 'regular'
+export const getInvoiceNumberingType = (invoiceType: Invoice['invoiceType']): 'regular' | 'cash' | 'freeform' => {
+  if (invoiceType === 'cash') return 'cash';
+  if (invoiceType === 'online-sale') return 'freeform'; // New type for freeform numbers
+  return 'regular'; // Covers 'sale', 'return', 'gifted-damaged'
 };
 
 /**
