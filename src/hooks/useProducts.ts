@@ -179,6 +179,19 @@ export const useProducts = () => {
     }
   }, [products, currentUser, setError]);
 
+  const bulkCreateOrUpdateProducts = useCallback(async (productsToImport: Omit<Product, 'id'>[]) => {
+    const userEmail = currentUser?.email || 'Unknown User';
+    const userId = currentUser?.uid || null;
+    const results = await productService.bulkCreateOrUpdate(productsToImport, products, userEmail, userId);
+    if (results.errors.length > 0) {
+      toast.warning(`Import finished with ${results.errors.length} issues.`);
+    } else {
+      toast.success(`Successfully imported ${results.successCount} products.`);
+    }
+    await activityLogService.logAction(`Bulk product import completed by ${userEmail}. Success: ${results.successCount}, Errors: ${results.errors.length}`, userId, userEmail);
+    return results;
+  }, [currentUser, products]);
+
   const handleSort = useCallback((column: typeof sortColumn) => {
     if (sortColumn === column) {
       setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
@@ -238,6 +251,7 @@ export const useProducts = () => {
     deleteProduct,
     bulkDeleteProducts,
     deleteAllProducts,
+    bulkCreateOrUpdateProducts, // Expose the new bulk import function
     sortColumn,
     sortDirection,
     handleSort,

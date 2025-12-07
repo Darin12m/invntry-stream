@@ -23,6 +23,7 @@ import {
   UploadCloud,
   Wrench,
   AlertTriangle,
+  FileSpreadsheet, // New icon for Excel import
 } from 'lucide-react';
 import { toast } from "sonner";
 import { AppContext } from '@/context/AppContext';
@@ -32,6 +33,7 @@ import { useActivityLogs } from '@/hooks/useActivityLogs';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useProducts } from '@/hooks/useProducts';
 import ActivityLogModal from '@/components/modals/ActivityLogModal';
+import ImportProductsModal from '@/components/modals/ImportProductsModal'; // Import the new modal
 import { db } from '@/firebase/config';
 import { writeBatch, doc } from 'firebase/firestore';
 import { productService } from '@/services/firestore/productService';
@@ -40,7 +42,7 @@ import { settingsService } from '@/services/firestore/settingsService';
 import { activityLogService } from '@/services/firestore/activityLogService';
 import { AppSettings } from '@/types';
 import { useNavigate } from 'react-router-dom';
-import { useDeviceType } from '@/hooks/useDeviceType'; // Import useDeviceType
+import { useDeviceType } from '@/hooks/useDeviceType';
 
 const SettingsPage: React.FC = () => {
   const { currentUser, products, invoices, activityLogs, handleClearAllData, fetchAppData } = useContext(AppContext);
@@ -49,10 +51,11 @@ const SettingsPage: React.FC = () => {
   const { restoreInvoice, permanentDeleteInvoice } = useInvoices();
   const { fetchActivityLogs } = useActivityLogs();
   const navigate = useNavigate();
-  const { isIOS } = useDeviceType(); // Use the hook
+  const { isIOS } = useDeviceType();
 
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
   const [showActivityLogModal, setShowActivityLogModal] = useState(false);
+  const [showImportProductsModal, setShowImportProductsModal] = useState(false); // New state for import modal
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
   const restoreFileInputRef = useRef<HTMLInputElement>(null);
@@ -341,6 +344,18 @@ const SettingsPage: React.FC = () => {
             <SelectItem value="YYYY-MM-DD" className="text-sm sm:text-base">YYYY-MM-DD (e.g., 2023-12-25)</SelectItem> {/* Adjusted font size */}
           </SelectContent>
         </Select>
+      </div>
+      {/* New: Import Products from Excel Button */}
+      <div className="pt-4 border-t">
+        <Button
+          onClick={() => setShowImportProductsModal(true)}
+          variant="outline"
+          className="w-full shadow-elegant"
+          size={isIOS ? "sm" : "default"}
+        >
+          <FileSpreadsheet className="h-4 w-4 mr-2" />
+          Import Products from Excel
+        </Button>
       </div>
     </Card>
   );
@@ -704,6 +719,11 @@ const SettingsPage: React.FC = () => {
         showActivityLogModal={showActivityLogModal}
         setShowActivityLogModal={setShowActivityLogModal}
         activityLogs={activityLogs}
+      />
+      <ImportProductsModal
+        showImportProductsModal={showImportProductsModal}
+        setShowImportProductsModal={setShowImportProductsModal}
+        onImportSuccess={fetchAppData} // Pass fetchAppData to refresh products after import
       />
     </div>
   );
