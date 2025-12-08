@@ -2,43 +2,67 @@ import { Invoice } from '@/types';
 
 // Regex for validating invoice numbers
 // Regular: ###/YY (e.g., 001/25)
-// Cash: CASH ###/YY (e.g., CASH 001/25)
 export const regularInvoiceNumberRegex = /^[0-9]{3}\/[0-9]{2}$/;
-export const cashInvoiceNumberRegex = /^CASH [0-9]{3}\/[0-9]{2}$/;
+// Cash: CASH ###/YY (e.g., CASH 001/25)
 // New regex for extended cash invoice numbers: CASH ###/YY followed by optional space/dash and 4 digits
 export const cashInvoiceNumberExtendedRegex = /^CASH [0-9]{3}\/[0-9]{2}([- ]?[0-9]{4})?$/;
+// Return: RET-###/YY (e.g., RET-001/25)
+export const returnInvoiceNumberRegex = /^RET-[0-9]{3}\/[0-9]{2}$/;
+// Gifted/Damaged: GD-###/YY (e.g., GD-001/25)
+export const giftedDamagedInvoiceNumberRegex = /^GD-[0-9]{3}\/[0-9]{2}$/;
 
 
 /**
- * Determines the numbering type ('regular', 'cash', or 'freeform') based on the invoice's functional type.
- * 'online-sale' is treated as 'freeform' for numbering sequence purposes, meaning no strict format.
+ * Returns the expected prefix for a given invoice type.
  */
-export const getInvoiceNumberingType = (invoiceType: Invoice['invoiceType']): 'regular' | 'cash' | 'freeform' => {
-  if (invoiceType === 'cash') return 'cash';
-  if (invoiceType === 'online-sale') return 'freeform'; // New type for freeform numbers
-  return 'regular'; // Covers 'sale', 'return', 'gifted-damaged'
+export const getInvoicePrefix = (invoiceType: Invoice['invoiceType']): string => {
+  switch (invoiceType) {
+    case 'cash': return 'CASH ';
+    case 'return': return 'RET-';
+    case 'gifted-damaged': return 'GD-';
+    case 'sale': return ''; // No prefix for regular sales
+    case 'online-sale': return ''; // No prefix for online sales (manual)
+    default: return '';
+  }
 };
 
 /**
  * Parses an invoice number string into its sequential part, year, and prefix.
- * Returns isValid: false if the format is incorrect.
+ * Returns isValid: false if the format is incorrect for the given type.
  */
-export const parseInvoiceNumber = (number: string): { sequential: number; year: string; prefix: string; isValid: boolean; suffix?: string } => {
+export const parseInvoiceNumber = (number: string, invoiceType: Invoice['invoiceType']): { sequential: number; year: string; prefix: string; isValid: boolean; suffix?: string } => {
   let match;
-  let prefix = '';
+  let prefix = getInvoicePrefix(invoiceType);
   let suffix = '';
 
-  // Try to match extended cash format first
-  const extendedCashMatch = number.match(/^CASH ([0-9]{3})\/([0-9]{2})([- ]?([0-9]{4}))?$/);
-  if (extendedCashMatch) {
-    match = [number, extendedCashMatch[1], extendedCashMatch[2]]; // Base parts
-    prefix = 'CASH ';
-    suffix = extendedCashMatch[3] || ''; // Capture the optional suffix part
-  } else if (cashInvoiceNumberRegex.test(number)) {
-    match = number.match(/^CASH ([0-9]{3})\/([0-9]{2})$/);
-    prefix = 'CASH ';
-  } else if (regularInvoiceNumberRegex.test(number)) {
-    match = number.match(/^([0-9]{3})\/([0-9]{2})$/);
+  switch (invoiceType) {
+    case 'cash':
+      const extendedCashMatch = number.match(/^CASH ([0-9]{3})\/([0-9]{2})([- ]?([0-9]{4}))?$/);
+      if (extendedCashMatch) {
+        match = [number, extendedCashMatch[1], extendedCashMatch[2]];
+        prefix = 'CASH ';
+        suffix = extendedCashMatch[3] || '';
+      }
+      break;
+    case 'return':
+      match = number.match(/^RET-([0-9]{3})\/([0-9]{2})$/);
+      prefix = 'RET-';
+      break;
+    case 'gifted-damaged':
+      match = number.match(/^GD-([0-9]{3})\/([0-9]{2})$/);
+      prefix = 'GD-';
+      break;
+    case 'sale': // Regular sale
+      match = number.match(/^([0-9]{3})\/([0-9]{2})$/);
+      prefix = '';
+      break;
+    case 'online-sale':
+      // For 'online-sale', any non-empty string is considered valid format-wise for parsing purposes
+      if (number.trim() !== '') {
+        // We don't extract sequential/year in a structured way for freeform
+        return { sequential: 0, year: '', prefix: '', isValid: true, suffix: '' };
+      }
+      break;
   }
 
   if (match) {
@@ -51,19 +75,19 @@ export const parseInvoiceNumber = (number: string): { sequential: number; year: 
 };
 
 /**
- * Generates the next suggested invoice number based on the latest number, current year, and numbering type.
+ * Generates the next suggested invoice number based on the latest number, current year, and invoice type.
  */
 export const generateNextSuggestedNumber = (
   latestNumber: string,
   currentYearShort: string,
-  numberingType: 'regular' | 'cash'
+  invoiceType: Invoice['invoiceType']
 ): string => {
-  const prefix = numberingType === 'cash' ? 'CASH ' : '';
+  const prefix = getInvoicePrefix(invoiceType);
   let nextSequential = 1;
   let yearSuffix = currentYearShort;
 
   if (latestNumber) {
-    const parsed = parseInvoiceNumber(latestNumber);
+    const parsed = parseInvoiceNumber(latestNumber, invoiceType);
     // Only consider numbers of the same type and valid format
     if (parsed.isValid && parsed.prefix === prefix) {
       if (parsed.year === currentYearShort) {
@@ -84,7 +108,7 @@ export const generateNextSuggestedNumber = (
  * This function is more for consistency or if display rules diverge from storage format.
  */
 export const formatInvoiceNumberForDisplay = (invoiceNumber: string, invoiceType: Invoice['invoiceType']): string => {
-  // For now, the stored invoiceNumber should already be in the correct format (e.g., "CASH 001/25" or "001/25")
+  // For now, the stored invoiceNumber should already be in the correct format
   // so we just return it. This function can be extended if display logic becomes more complex.
   return invoiceNumber;
 };

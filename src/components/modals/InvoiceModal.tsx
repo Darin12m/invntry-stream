@@ -16,12 +16,13 @@ import { calculateInvoiceTotals } from '@/utils/invoiceCalculations';
 import { useDeviceType } from '@/hooks/useDeviceType';
 import { invoiceService } from '@/services/firestore/invoiceService';
 import {
-  getInvoiceNumberingType,
+  getInvoicePrefix,
   parseInvoiceNumber,
   generateNextSuggestedNumber,
   regularInvoiceNumberRegex,
-  cashInvoiceNumberRegex,
-  cashInvoiceNumberExtendedRegex
+  cashInvoiceNumberExtendedRegex,
+  returnInvoiceNumberRegex,
+  giftedDamagedInvoiceNumberRegex
 } from '@/utils/invoiceNumbering'; // Import new utilities
 
 interface InvoiceModalProps {
@@ -56,33 +57,14 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   // Helper to generate a suggested number based on current type and year
   const getSuggestedInvoiceNumber = useCallback(async (type: Invoice['invoiceType']) => {
     const currentYearShort = String(new Date().getFullYear()).slice(-2);
-    const numberingType = getInvoiceNumberingType(type);
     
-    if (numberingType === 'freeform') {
+    if (type === 'online-sale') {
       return ''; // No suggestion for freeform types
     }
 
-    const latestNumber = await invoiceService._getLatestInvoiceNumber(numberingType, currentYearShort);
+    const latestNumber = await invoiceService._getLatestInvoiceNumber(type, currentYearShort);
     
-    let suggestedNumber = '';
-    if (latestNumber) {
-      const parsed = parseInvoiceNumber(latestNumber);
-      if (parsed.isValid && parsed.prefix === (numberingType === 'cash' ? 'CASH ' : '')) {
-        if (parsed.year === currentYearShort) {
-          suggestedNumber = generateNextSuggestedNumber(latestNumber, currentYearShort, numberingType);
-        } else {
-          // New year, reset sequence
-          suggestedNumber = generateNextSuggestedNumber('', currentYearShort, numberingType);
-        }
-      } else {
-        // Latest number found but invalid format or wrong type, start fresh for this type/year
-        suggestedNumber = generateNextSuggestedNumber('', currentYearShort, numberingType);
-      }
-    } else {
-      // No previous invoices of this type/year, start from 001
-      suggestedNumber = generateNextSuggestedNumber('', currentYearShort, numberingType);
-    }
-    return suggestedNumber;
+    return generateNextSuggestedNumber(latestNumber, currentYearShort, type);
   }, []);
 
   useEffect(() => {
@@ -193,31 +175,38 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       return false;
     }
 
-    const numberingType = getInvoiceNumberingType(currentInvoiceType);
     let isValidFormat = true;
+    let formatErrorMessage = '';
 
-    if (numberingType === 'cash') {
-      // For CASH, validate against the extended regex
-      isValidFormat = cashInvoiceNumberExtendedRegex.test(number);
-      if (!isValidFormat) {
-        setInvoiceNumberError("Format must be CASH ###/YY or CASH ###/YY-#### or CASH ###/YY ####");
-        setIsDuplicateInvoiceNumber(false);
-        return false;
-      }
-    } else if (numberingType === 'regular') { // 'sale', 'return', 'gifted-damaged'
-      isValidFormat = regularInvoiceNumberRegex.test(number);
-      if (!isValidFormat) {
-        setInvoiceNumberError("Format must be ###/YY (e.g., 001/25)");
-        setIsDuplicateInvoiceNumber(false);
-        return false;
-      }
+    switch (currentInvoiceType) {
+      case 'sale':
+        isValidFormat = regularInvoiceNumberRegex.test(number);
+        formatErrorMessage = "Format must be ###/YY (e.g., 001/25)";
+        break;
+      case 'cash':
+        isValidFormat = cashInvoiceNumberExtendedRegex.test(number);
+        formatErrorMessage = "Format must be CASH ###/YY or CASH ###/YY-#### or CASH ###/YY ####";
+        break;
+      case 'return':
+        isValidFormat = returnInvoiceNumberRegex.test(number);
+        formatErrorMessage = "Format must be RET-###/YY (e.g., RET-001/25)";
+        break;
+      case 'gifted-damaged':
+        isValidFormat = giftedDamagedInvoiceNumberRegex.test(number);
+        formatErrorMessage = "Format must be GD-###/YY (e.g., GD-001/25)";
+        break;
+      case 'online-sale':
+        // For 'online-sale', any non-empty string is valid format-wise
+        isValidFormat = number.trim().length > 0;
+        formatErrorMessage = "Online Sale invoice number cannot be empty.";
+        break;
+      default:
+        isValidFormat = false;
+        formatErrorMessage = "Invalid invoice type selected.";
     }
-    // For 'freeform' (online-sale), isValidFormat remains true, no format validation
 
     if (!isValidFormat) {
-      setInvoiceNumberError(numberingType === 'cash'
-        ? "Format must be CASH ###/YY or CASH ###/YY-#### or CASH ###/YY ####"
-        : "Format must be ###/YY (e.g., 001/25)");
+      setInvoiceNumberError(formatErrorMessage);
       setIsDuplicateInvoiceNumber(false);
       return false;
     }
@@ -241,12 +230,12 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       } else {
         // Check if the duplicate is of the same numbering type and year
         const duplicateInvoice = querySnapshot.docs[0].data() as Invoice;
-        const duplicateYearShort = parseInvoiceNumber(duplicateInvoice.number).year;
+        const parsedDuplicate = parseInvoiceNumber(duplicateInvoice.number, duplicateInvoice.invoiceType);
+        const parsedNew = parseInvoiceNumber(number, currentInvoiceType);
         
-        // For 'freeform' (online-sale), we check uniqueness by exact type and year
-        // For 'regular'/'cash', we check by numbering type and year
-        const isDuplicateByLogic = (numberingType === 'freeform' && duplicateInvoice.invoiceType === currentInvoiceType && duplicateYearShort === currentYearShort) ||
-                                   (numberingType !== 'freeform' && getInvoiceNumberingType(duplicateInvoice.invoiceType) === numberingType && duplicateYearShort === currentYearShort);
+        // Check if the year part matches for structured numbers
+        const isSameYear = (parsedDuplicate.isValid && parsedNew.isValid && parsedDuplicate.year === parsedNew.year) ||
+                           (currentInvoiceType === 'online-sale' && parsedDuplicate.year === currentYearShort); // For online-sale, just check current year
 
         if (isDuplicateByLogic) {
           isDuplicate = true;
@@ -266,25 +255,51 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
   const handleManualInvoiceNumberChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
-    
-    if (invoiceType === 'cash') {
-      // If the input is empty, auto-fill with the suggested number
-      if (!value.trim()) {
-        const suggestedNum = await getSuggestedInvoiceNumber('cash');
-        value = suggestedNum;
-      } else if (!value.startsWith('CASH ')) {
-        // If it's not empty but doesn't start with 'CASH ', prepend it
-        value = 'CASH ' + value.replace(/^CASH\s*/i, ''); // Ensure only one 'CASH ' prefix
+    const currentYearShort = String(new Date().getFullYear()).slice(-2);
+    const prefix = getInvoicePrefix(invoiceType);
+
+    if (invoiceType !== 'online-sale' && prefix) {
+      // For types with a fixed prefix (Cash, Return, Gifted/Damaged)
+      const basePattern = new RegExp(`^${prefix}[0-9]{3}\/${currentYearShort}`);
+      
+      // If the input doesn't start with the required prefix, prepend it
+      if (!value.startsWith(prefix)) {
+        value = prefix + value.replace(new RegExp(`^${prefix.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\s*`, 'i'), '');
       }
-      setManualInvoiceNumber(value);
-      // Immediately validate the new value
-      await validateManualInvoiceNumber(value, invoiceType);
+
+      // If the base pattern (e.g., CASH ###/YY) is being deleted or altered, revert it
+      const parsedCurrentManual = parseInvoiceNumber(manualInvoiceNumber, invoiceType);
+      const currentBasePrefixPart = parsedCurrentManual.isValid && parsedCurrentManual.prefix === prefix && parsedCurrentManual.year === currentYearShort
+        ? `${parsedCurrentManual.prefix}${String(parsedCurrentManual.sequential).padStart(3, '0')}/${parsedCurrentManual.year}`
+        : '';
+
+      if (currentBasePrefixPart && !value.startsWith(currentBasePrefixPart)) {
+        // User tried to modify the base prefix part. Revert to base prefix + any valid suffix they might have typed.
+        const suffixPart = value.substring(currentBasePrefixPart.length);
+        let validSuffix = '';
+        if (invoiceType === 'cash') {
+          const suffixMatch = suffixPart.match(/^([- ]?[0-9]{0,4})?$/);
+          validSuffix = suffixMatch ? suffixMatch[0] : '';
+        }
+        value = currentBasePrefixPart + validSuffix;
+        setInvoiceNumberError(`Cannot modify the base invoice number prefix for ${invoiceType} type.`);
+        setIsDuplicateInvoiceNumber(false);
+      } else {
+        setInvoiceNumberError(null); // Clear error if base prefix is valid
+      }
+    } else if (invoiceType === 'online-sale') {
+      // For online-sale, allow full freeform editing
+      setInvoiceNumberError(null);
+      setIsDuplicateInvoiceNumber(false);
     } else {
-      // For other invoice types, allow full editing and validate
-      setManualInvoiceNumber(value);
-      await validateManualInvoiceNumber(value, invoiceType);
+      // For 'sale' (no prefix), allow full editing
+      setInvoiceNumberError(null);
+      setIsDuplicateInvoiceNumber(false);
     }
-  }, [validateManualInvoiceNumber, invoiceType, getSuggestedInvoiceNumber]);
+
+    setManualInvoiceNumber(value);
+    await validateManualInvoiceNumber(value, invoiceType);
+  }, [validateManualInvoiceNumber, invoiceType, manualInvoiceNumber]);
 
   const handleInvoiceTypeChange = useCallback(async (newType: Invoice['invoiceType']) => {
     setInvoiceType(newType);
@@ -295,21 +310,15 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setManualInvoiceNumber(''); // Empty for Online Sale
     } else {
       const suggestedNum = await getSuggestedInvoiceNumber(newType);
-      
-      // For 'cash' and 'regular' types:
-      // If the current manual input is empty OR if it's not a valid number for the *new* type,
-      // then overwrite with the suggested number.
       const currentYearShort = String(new Date().getFullYear()).slice(-2);
-      const parsedManual = parseInvoiceNumber(manualInvoiceNumber);
-      const isManualValidForNewType = 
-        (newType === 'cash' && cashInvoiceNumberExtendedRegex.test(manualInvoiceNumber)) ||
-        (newType === 'regular' && regularInvoiceNumberRegex.test(manualInvoiceNumber));
+      const newTypePrefix = getInvoicePrefix(newType);
 
-      // Condition to overwrite:
-      // 1. manual input is empty
-      // 2. manual input is not valid for the new type (e.g., '001/25' when switching to 'cash')
-      // 3. manual input is for a different year (e.g., 'CASH 001/24' when current year is '25')
-      if (!manualInvoiceNumber.trim() || !isManualValidForNewType || parsedManual.year !== currentYearShort) {
+      // Check if current manual input is valid for the new type and current year
+      const parsedManual = parseInvoiceNumber(manualInvoiceNumber, newType);
+      const isManualValidForNewTypeAndYear = parsedManual.isValid && parsedManual.prefix === newTypePrefix && parsedManual.year === currentYearShort;
+
+      // Only prefill if the manualInvoiceNumber is currently empty OR if it's not valid for the new type/year
+      if (!manualInvoiceNumber.trim() || !isManualValidForNewTypeAndYear) {
         setManualInvoiceNumber(suggestedNum);
         // Immediately validate the suggested number to update error state if needed (e.g., duplicate)
         await validateManualInvoiceNumber(suggestedNum, newType);
@@ -451,15 +460,14 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     // --- Auto-update invoice number if sequence has changed (only for new, non-freeform invoices) ---
     // This logic is now only for *new* invoices, and only if the user hasn't typed anything,
     // or if their typed number is a lower sequential number than what's suggested.
-    if (!editingInvoice && getInvoiceNumberingType(invoiceType) !== 'freeform') {
+    if (!editingInvoice && invoiceType !== 'online-sale') {
       const currentYearShort = String(new Date().getFullYear()).slice(-2);
-      const numberingType = getInvoiceNumberingType(invoiceType);
-      const latestNumberFromDb = await invoiceService._getLatestInvoiceNumber(numberingType, currentYearShort);
-      const suggestedNextNumber = generateNextSuggestedNumber(latestNumberFromDb, currentYearShort, numberingType);
+      const latestNumberFromDb = await invoiceService._getLatestInvoiceNumber(invoiceType, currentYearShort);
+      const suggestedNextNumber = generateNextSuggestedNumber(latestNumberFromDb, currentYearShort, invoiceType);
 
       // Do not overwrite user's manual input if it's valid and not a lower sequential number
-      const parsedManual = parseInvoiceNumber(manualInvoiceNumber);
-      const parsedSuggested = parseInvoiceNumber(suggestedNextNumber);
+      const parsedManual = parseInvoiceNumber(manualInvoiceNumber, invoiceType);
+      const parsedSuggested = parseInvoiceNumber(suggestedNextNumber, invoiceType);
 
       if (parsedSuggested.isValid && 
           (!parsedManual.isValid || 
@@ -729,7 +737,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       id="invoiceNumber"
                       value={manualInvoiceNumber}
                       onChange={handleManualInvoiceNumberChange}
-                      placeholder={invoiceType === 'online-sale' ? "Enter invoice number" : (invoiceType === 'cash' ? "CASH 001/25 1234" : "e.g., 001/25")}
+                      placeholder={invoiceType === 'online-sale' ? "Enter invoice number" : (invoiceType === 'cash' ? "CASH 001/25 1234" : (invoiceType === 'return' ? "RET-001/25" : (invoiceType === 'gifted-damaged' ? "GD-001/25" : "e.g., 001/25")))}
                       className={`text-sm sm:text-base ${invoiceNumberError ? 'border-destructive' : ''}`}
                     />
                     {invoiceNumberError && (
