@@ -1,12 +1,11 @@
 import React, { useContext, useMemo, useState } from 'react';
-import { BarChart3, DollarSign, ShoppingCart, TrendingUp, FileText, TrendingDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { BarChart3, DollarSign, ShoppingCart, TrendingUp, FileText, TrendingDown, ChevronUp, ChevronDown, Eye } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Invoice, Product, DashboardMetrics } from '@/types';
 import { AppContext } from '@/context/AppContext';
-import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useDeviceType } from '@/hooks/useDeviceType';
 import InvoiceViewerModal from '@/components/modals/InvoiceViewerModal';
 import html2canvas from 'html2canvas';
@@ -18,7 +17,7 @@ interface DashboardTabProps {
   setDateFilter: (filter: { from: string; to: string }) => void;
   metrics: DashboardMetrics;
   calculateDashboardMetrics: () => Promise<void>;
-  products: Product[]; // Needed for calculating invoice costs
+  products: Product[];
 }
 
 const DashboardTab: React.FC<DashboardTabProps> = ({
@@ -32,13 +31,11 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
   const { isIOS } = useDeviceType();
   const currency = settings?.currency || 'MKD';
   
-  // Invoice viewer modal state
   const [showInvoiceViewer, setShowInvoiceViewer] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
 
-  // Sorting state for the invoice table
   const [sortColumn, setSortColumn] = useState<'number' | 'date' | 'customer' | 'sales' | 'costs' | 'profit'>('date');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc'); // Default to date descending
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const handleViewInvoice = (invoice: Invoice) => {
     setViewingInvoice(invoice);
@@ -72,7 +69,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
 
       switch (sortColumn) {
         case 'number':
-          // Extract numeric part for proper sorting (e.g., "001/25" -> 1)
           aValue = parseInt(a.number.split('/')[0], 10);
           bValue = parseInt(b.number.split('/')[0], 10);
           break;
@@ -110,38 +106,38 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <p className="text-muted-foreground text-base sm:text-lg">Loading dashboard...</p> {/* Adjusted font size */}
+        <p className="text-muted-foreground">Loading dashboard...</p>
       </div>
     );
   }
   
   return (
-    <div className="space-y-4 sm:space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
+    <div className="space-y-6 animate-fade-in">
+      {/* Header - Swiss Bold Typography */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Dashboard</h2>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">Sales performance and profit analysis</p>
+          <h2 className="text-3xl font-black tracking-tighter text-foreground">Dashboard</h2>
+          <p className="text-muted-foreground mt-1">Sales performance and profit analysis</p>
         </div>
       </div>
 
       {/* Date Filter */}
-      <Card className="p-3 sm:p-4 shadow-card">
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-center">
-          <Label className="whitespace-nowrap text-sm sm:text-base">Date Range:</Label>
-          <div className="flex gap-1 sm:gap-2 items-center flex-wrap">
+      <Card className="p-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-center">
+          <Label className="text-[11px] uppercase tracking-widest text-muted-foreground font-medium whitespace-nowrap">Date Range</Label>
+          <div className="flex gap-2 items-center flex-wrap">
             <Input
               type="date"
               value={dateFilter.from}
               onChange={(e) => setDateFilter({ ...dateFilter, from: e.target.value })}
-              className="w-auto text-sm sm:text-base"
+              className="w-auto"
             />
-            <span className="text-muted-foreground text-sm sm:text-base">to</span>
+            <span className="text-muted-foreground">to</span>
             <Input
               type="date"
               value={dateFilter.to}
               onChange={(e) => setDateFilter({ ...dateFilter, to: e.target.value })}
-              className="w-auto text-sm sm:text-base"
+              className="w-auto"
             />
           </div>
           <Button 
@@ -150,113 +146,119 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
               to: new Date().toISOString().split('T')[0] 
             })}
             variant="outline"
-            size={isIOS ? "sm" : "default"}
+            size="sm"
           >
             Reset to Year
           </Button>
         </div>
       </Card>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        <Card className="p-4 sm:p-6 shadow-card bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400">Total Sales</p>
-              <p className="text-xl sm:text-2xl font-bold text-blue-900 dark:text-blue-100">{metrics.totalSales.toFixed(2)} {currency}</p>
+      {/* Summary Cards - Clean Neo-SaaS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Total Sales */}
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-primary/10">
+              <DollarSign className="h-6 w-6 text-primary" />
             </div>
-            <div className="p-2 sm:p-3 bg-blue-500 rounded-full">
-              <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            <div>
+              <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-medium">Total Sales</p>
+              <p className="text-2xl font-black tracking-tight text-foreground">{metrics.totalSales.toFixed(2)} {currency}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 sm:p-6 shadow-card bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-red-200 dark:border-red-800">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs sm:text-sm font-medium text-red-600 dark:text-red-400">Total Costs</p>
-              <p className="text-xl sm:text-2xl font-bold text-red-900 dark:text-red-100">{metrics.totalCosts.toFixed(2)} {currency}</p>
+        {/* Total Costs */}
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-destructive/10">
+              <ShoppingCart className="h-6 w-6 text-destructive" />
             </div>
-            <div className="p-2 sm:p-3 bg-red-500 rounded-full">
-              <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            <div>
+              <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-medium">Total Costs</p>
+              <p className="text-2xl font-black tracking-tight text-foreground">{metrics.totalCosts.toFixed(2)} {currency}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 sm:p-6 shadow-card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs sm:text-sm font-medium text-green-600 dark:text-green-400">Total Profit</p>
-              <p className="text-xl sm:text-2xl font-bold text-green-900 dark:text-green-100">{metrics.totalProfit.toFixed(2)} {currency}</p>
+        {/* Total Profit */}
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-success/10">
+              <TrendingUp className="h-6 w-6 text-success" />
             </div>
-            <div className="p-2 sm:p-3 bg-green-500 rounded-full">
-              <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            <div>
+              <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-medium">Total Profit</p>
+              <p className="text-2xl font-black tracking-tight text-foreground">{metrics.totalProfit.toFixed(2)} {currency}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 sm:p-6 shadow-card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs sm:text-sm font-medium text-purple-600 dark:text-purple-400">Invoices</p>
-              <p className="text-xl sm:text-2xl font-bold text-purple-900 dark:text-purple-100">{metrics.numberOfInvoices}</p>
+        {/* Invoices */}
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-primary/10">
+              <FileText className="h-6 w-6 text-primary" />
             </div>
-            <div className="p-2 sm:p-3 bg-purple-500 rounded-full">
-              <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            <div>
+              <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-medium">Invoices</p>
+              <p className="text-2xl font-black tracking-tight text-foreground">{metrics.numberOfInvoices}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 sm:p-6 shadow-card bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200 dark:border-orange-800">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs sm:text-sm font-medium text-orange-600 dark:text-orange-400">Negative Items</p>
-              <p className="text-xl sm:text-2xl font-bold text-orange-900 dark:text-orange-100">{metrics.totalNegativeQuantity}</p>
-              <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">Returns/Damaged/Free</p>
+        {/* Negative Items */}
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-warning/10">
+              <TrendingDown className="h-6 w-6 text-warning-foreground" />
             </div>
-            <div className="p-2 sm:p-3 bg-orange-500 rounded-full">
-              <TrendingDown className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            <div>
+              <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-medium">Negative Items</p>
+              <p className="text-2xl font-black tracking-tight text-foreground">{metrics.totalNegativeQuantity}</p>
+              <p className="text-xs text-muted-foreground">Returns/Damaged/Free</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 sm:p-6 shadow-card bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border-amber-200 dark:border-amber-800">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs sm:text-sm font-medium text-amber-600 dark:text-amber-400">Negative Value</p>
-              <p className="text-xl sm:text-2xl font-bold text-amber-900 dark:text-amber-100">{metrics.totalNegativeValue.toFixed(2)} {currency}</p>
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Total lost/returned value</p>
+        {/* Negative Value */}
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-warning/10">
+              <DollarSign className="h-6 w-6 text-warning-foreground" />
             </div>
-            <div className="p-2 sm:p-3 bg-amber-500 rounded-full">
-              <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            <div>
+              <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-medium">Negative Value</p>
+              <p className="text-2xl font-black tracking-tight text-foreground">{metrics.totalNegativeValue.toFixed(2)} {currency}</p>
+              <p className="text-xs text-muted-foreground">Total lost/returned value</p>
             </div>
           </div>
         </Card>
       </div>
 
       {/* Detailed Invoice Table */}
-      <Card className="shadow-card">
-        <div className="p-4 sm:p-6 border-b">
-          <h3 className="text-lg sm:text-xl font-semibold">Invoice Details</h3>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+      <Card className="overflow-hidden">
+        <div className="p-6 border-b border-border/50">
+          <h3 className="text-lg font-bold tracking-tight text-foreground">Invoice Details</h3>
+          <p className="text-sm text-muted-foreground mt-1">
             {metrics.filteredInvoices.length} invoices from {new Date(dateFilter.from).toLocaleDateString()} to {new Date(dateFilter.to).toLocaleDateString()}
           </p>
         </div>
         <div className="overflow-x-auto">
           {metrics.filteredInvoices.length === 0 ? (
-            <div className="text-center py-8 sm:py-12">
-              <BarChart3 className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-3 sm:mb-4 text-muted-foreground" />
-              <h3 className="text-lg sm:text-xl font-semibold mb-2">No invoices in selected period</h3>
-              <p className="text-sm sm:text-base text-muted-foreground mb-3 sm:mb-4">Adjust the date range to see data</p>
+            <div className="text-center py-12">
+              <BarChart3 className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-xl font-bold mb-2">No invoices in selected period</h3>
+              <p className="text-muted-foreground mb-4">Adjust the date range to see data</p>
             </div>
           ) : (
             <table className="w-full min-w-[600px]">
               <thead>
-                <tr className="border-b bg-muted/30">
-                  <th className="text-left p-2 sm:p-4 font-medium text-xs sm:text-sm">
+                <tr className="border-b border-border/50">
+                  <th className="text-left p-4">
                     <button
                       onClick={() => handleSort('number')}
-                      className="flex items-center gap-1 hover:text-primary transition-colors"
+                      className="flex items-center gap-1 text-[11px] uppercase tracking-widest text-muted-foreground font-medium hover:text-foreground transition-colors"
                     >
                       Invoice #
                       {sortColumn === 'number' && (
@@ -264,10 +266,10 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                       )}
                     </button>
                   </th>
-                  <th className="text-left p-2 sm:p-4 font-medium text-xs sm:text-sm">
+                  <th className="text-left p-4">
                     <button
                       onClick={() => handleSort('date')}
-                      className="flex items-center gap-1 hover:text-primary transition-colors"
+                      className="flex items-center gap-1 text-[11px] uppercase tracking-widest text-muted-foreground font-medium hover:text-foreground transition-colors"
                     >
                       Date
                       {sortColumn === 'date' && (
@@ -275,10 +277,10 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                       )}
                     </button>
                   </th>
-                  <th className="text-left p-2 sm:p-4 font-medium text-xs sm:text-sm">
+                  <th className="text-left p-4">
                     <button
                       onClick={() => handleSort('customer')}
-                      className="flex items-center gap-1 hover:text-primary transition-colors"
+                      className="flex items-center gap-1 text-[11px] uppercase tracking-widest text-muted-foreground font-medium hover:text-foreground transition-colors"
                     >
                       Customer
                       {sortColumn === 'customer' && (
@@ -286,10 +288,10 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                       )}
                     </button>
                   </th>
-                  <th className="text-right p-2 sm:p-4 font-medium text-xs sm:text-sm">
+                  <th className="text-right p-4">
                     <button
                       onClick={() => handleSort('sales')}
-                      className="flex items-center justify-end gap-1 hover:text-primary transition-colors w-full"
+                      className="flex items-center justify-end gap-1 w-full text-[11px] uppercase tracking-widest text-muted-foreground font-medium hover:text-foreground transition-colors"
                     >
                       Sales
                       {sortColumn === 'sales' && (
@@ -297,10 +299,10 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                       )}
                     </button>
                   </th>
-                  <th className="text-right p-2 sm:p-4 font-medium text-xs sm:text-sm">
+                  <th className="text-right p-4">
                     <button
                       onClick={() => handleSort('costs')}
-                      className="flex items-center justify-end gap-1 hover:text-primary transition-colors w-full"
+                      className="flex items-center justify-end gap-1 w-full text-[11px] uppercase tracking-widest text-muted-foreground font-medium hover:text-foreground transition-colors"
                     >
                       Costs
                       {sortColumn === 'costs' && (
@@ -308,10 +310,10 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                       )}
                     </button>
                   </th>
-                  <th className="text-right p-2 sm:p-4 font-medium text-xs sm:text-sm">
+                  <th className="text-right p-4">
                     <button
                       onClick={() => handleSort('profit')}
-                      className="flex items-center justify-end gap-1 hover:text-primary transition-colors w-full"
+                      className="flex items-center justify-end gap-1 w-full text-[11px] uppercase tracking-widest text-muted-foreground font-medium hover:text-foreground transition-colors"
                     >
                       Profit
                       {sortColumn === 'profit' && (
@@ -319,41 +321,37 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                       )}
                     </button>
                   </th>
-                  <th className="text-center p-2 sm:p-4 font-medium text-xs sm:text-sm">Actions</th>
+                  <th className="text-center p-4 text-[11px] uppercase tracking-widest text-muted-foreground font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedInvoices.map(invoice => {
-                  // invoiceCosts and invoiceProfit are already calculated in sortedInvoices useMemo
-                  // No need to recalculate here
-                  
-                  return (
-                    <tr key={invoice.id} className="border-b hover:bg-muted/20 transition-colors">
-                      <td className="p-2 sm:p-4 font-medium text-xs sm:text-sm">{invoice.number}</td> {/* Adjusted padding and font size */}
-                      <td className="p-2 sm:p-4 text-muted-foreground text-xs sm:text-sm">{new Date(invoice.date).toLocaleDateString()}</td> {/* Adjusted padding and font size */}
-                      <td className="p-2 sm:p-4 text-xs sm:text-sm">{invoice.customer.name}</td> {/* Adjusted padding and font size */}
-                      <td className="p-2 sm:p-4 text-right font-medium text-blue-600 text-xs sm:text-sm">{invoice.total.toFixed(2)} {currency}</td> {/* Adjusted padding and font size */}
-                      <td className="p-2 sm:p-4 text-right font-medium text-red-600 text-xs sm:text-sm">{invoice.invoiceCosts.toFixed(2)} {currency}</td> {/* Adjusted padding and font size */}
-                      <td className={`p-2 sm:p-4 text-right font-medium text-xs sm:text-sm ${invoice.invoiceProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}> {/* Adjusted padding and font size */}
-                        {invoice.invoiceProfit.toFixed(2)} {currency}
-                      </td>
-                      <td className="p-2 sm:p-4 text-center"> {/* Adjusted padding */}
-                        <Button
-                          onClick={() => handleViewInvoice(invoice)}
-                          variant="outline"
-                          size="sm"
-                        >
-                          <FileText className="h-3 w-3 sm:h-4 sm:w-4" /> {/* Adjusted icon size */}
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {sortedInvoices.map(invoice => (
+                  <tr key={invoice.id} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
+                    <td className="p-4 font-medium text-sm">{invoice.number}</td>
+                    <td className="p-4 text-muted-foreground text-sm">{new Date(invoice.date).toLocaleDateString()}</td>
+                    <td className="p-4 text-sm">{invoice.customer.name}</td>
+                    <td className="p-4 text-right font-medium text-primary text-sm">{invoice.total.toFixed(2)} {currency}</td>
+                    <td className="p-4 text-right font-medium text-destructive text-sm">{invoice.invoiceCosts.toFixed(2)} {currency}</td>
+                    <td className={`p-4 text-right font-medium text-sm ${invoice.invoiceProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {invoice.invoiceProfit.toFixed(2)} {currency}
+                    </td>
+                    <td className="p-4 text-center">
+                      <Button
+                        onClick={() => handleViewInvoice(invoice)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
         </div>
       </Card>
+
       {/* Invoice Viewer Modal */}
       <InvoiceViewerModal
         showInvoiceViewer={showInvoiceViewer}

@@ -154,10 +154,10 @@ const InvoicesTab: React.FC = React.memo(() => {
   return (
     <div className="space-y-4 sm:space-y-6 animate-fade-in"> {/* Adjusted spacing */}
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4"> {/* Adjusted spacing */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Invoices</h2> {/* Adjusted font size */}
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage and track all invoices</p> {/* Adjusted font size */}
+          <h2 className="text-3xl font-black tracking-tighter text-foreground">Invoices</h2>
+          <p className="text-muted-foreground mt-1">Manage and track all invoices</p>
         </div>
         <div className="flex gap-2 sm:gap-3 flex-wrap justify-end"> {/* Adjusted spacing */}
           {selectedInvoices.size > 0 && (

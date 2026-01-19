@@ -237,7 +237,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         const isSameYear = (parsedDuplicate.isValid && parsedNew.isValid && parsedDuplicate.year === parsedNew.year) ||
                            (currentInvoiceType === 'online-sale' && parsedDuplicate.year === currentYearShort); // For online-sale, just check current year
 
-        if (isDuplicateByLogic) {
+        if (isSameYear) {
           isDuplicate = true;
         }
       }

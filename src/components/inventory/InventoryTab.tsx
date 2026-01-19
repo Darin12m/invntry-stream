@@ -134,10 +134,10 @@ const InventoryTab: React.FC = React.memo(() => {
   return (
     <div className="space-y-4 sm:space-y-6 animate-fade-in w-full max-w-full overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Inventory Management</h2>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage your products and stock levels</p>
+          <h2 className="text-3xl font-black tracking-tighter text-foreground">Inventory</h2>
+          <p className="text-muted-foreground mt-1">Manage your products and stock levels</p>
         </div>
         <div className="flex gap-2 sm:gap-3 flex-wrap justify-end">
           {selectedProducts.size > 0 && (

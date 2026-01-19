@@ -41,7 +41,7 @@ const AppLayout: React.FC = () => {
             setDateFilter={setDateFilter}
             metrics={metrics}
             calculateDashboardMetrics={calculateDashboardMetrics}
-            products={products} // Pass products for local invoice cost calculation
+            products={products}
           />
         );
       case 'settings':
@@ -53,18 +53,26 @@ const AppLayout: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg">Loading application data...</p>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <Package className="h-6 w-6 text-primary animate-pulse" />
+          </div>
+          <p className="text-muted-foreground font-medium">Loading application data...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-destructive/10 text-destructive p-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Application Error</h1>
-          <p className="mb-4">{error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-destructive/5 p-4">
+        <div className="text-center max-w-md">
+          <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+            <Package className="h-6 w-6 text-destructive" />
+          </div>
+          <h1 className="text-xl font-bold text-foreground mb-2">Application Error</h1>
+          <p className="text-muted-foreground mb-4">{error}</p>
           <Button onClick={() => window.location.reload()} variant="outline">Reload App</Button>
         </div>
       </div>
@@ -72,43 +80,40 @@ const AppLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-surface overflow-x-hidden max-w-full w-full">
-      {/* Navigation */}
+    <div className="min-h-screen bg-background overflow-x-hidden max-w-full w-full">
+      {/* Glassmorphism Navigation */}
       <nav 
-        className="bg-card/95 backdrop-blur-md shadow-sm border-b border-border/50 sticky top-0 z-40 w-full max-w-full overflow-hidden"
+        className="bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-40 w-full max-w-full overflow-hidden"
         style={isIOS ? { paddingTop: 'env(safe-area-inset-top)' } : {}}
       >
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14 sm:h-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
             {/* Logo/Title */}
             <div className="flex items-center flex-shrink-0">
-              <div className="bg-gradient-primary p-2 rounded-xl shadow-sm">
-                <Package className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
+              <div className="p-2.5 rounded-2xl bg-primary shadow-lg shadow-primary/25">
+                <Package className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="ml-2.5 sm:ml-3 text-base sm:text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                WeParty Inventory
+              <span className="ml-3 text-xl font-black tracking-tighter text-foreground">
+                WeParty
               </span>
             </div>
 
-            {/* Navigation icons - larger icons, tighter spacing on mobile */}
-            <div className="flex items-center gap-0.5 sm:gap-1 lg:gap-3">
-              {navItems.map(({ key, icon: Icon }) => (
+            {/* Navigation - Pill style buttons */}
+            <div className="flex items-center gap-1">
+              {navItems.map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
                   onClick={() => setActiveTab(key)}
-                  className={`relative flex items-center justify-center p-2 sm:px-3 sm:py-2 rounded-xl transition-all duration-200 ${
+                  className={`relative flex items-center justify-center px-3 py-2 sm:px-4 rounded-xl text-sm font-medium transition-all duration-200 ${
                     activeTab === key
                       ? 'bg-primary/10 text-primary'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                   }`}
-                  aria-label={key}
+                  aria-label={label}
                 >
-                  <Icon className={`h-6 w-6 sm:h-6 sm:w-6 lg:h-7 lg:w-7 ${!isMobile ? 'lg:mr-2' : ''}`} />
+                  <Icon className={`h-5 w-5 ${!isMobile ? 'sm:mr-2' : ''}`} />
                   {!isMobile && (
-                    <span className="hidden lg:inline text-sm font-medium capitalize">{key}</span>
-                  )}
-                  {activeTab === key && (
-                    <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full sm:hidden" />
+                    <span className="hidden sm:inline">{label}</span>
                   )}
                 </button>
               ))}
@@ -118,7 +123,7 @@ const AppLayout: React.FC = () => {
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-4 px-3 sm:py-6 sm:px-4 lg:px-8 w-full overflow-x-hidden">
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 w-full overflow-x-hidden">
         {renderTabContent()}
       </main>
     </div>

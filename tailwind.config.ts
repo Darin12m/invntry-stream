@@ -106,9 +106,9 @@ export default {
         'gradient-card': 'var(--gradient-card)',
       },
       boxShadow: {
-        'elegant': 'var(--shadow-elegant)',
-        'glow': 'var(--shadow-glow)',
-        'card': 'var(--shadow-card)',
+        'neo': 'var(--shadow-neo)',
+        'neo-lg': 'var(--shadow-neo-lg)',
+        'neo-glow': 'var(--shadow-neo-glow)',
       },
       transitionProperty: {
         'smooth': 'var(--transition-smooth)',
