@@ -2,7 +2,7 @@ import { db } from '@/firebase/config';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, getDoc, writeBatch, serverTimestamp, FieldValue, setDoc, limit } from 'firebase/firestore';
 import { Invoice, Product } from '@/types';
 import { activityLogService } from '@/services/firestore/activityLogService';
-import { getInvoicePrefix, regularInvoiceNumberRegex, cashInvoiceNumberExtendedRegex, returnInvoiceNumberRegex, giftedDamagedInvoiceNumberRegex } from '@/utils/invoiceNumbering'; // Import new utilities
+import { getInvoicePrefix, parseInvoiceNumber, regularInvoiceNumberRegex, cashInvoiceNumberExtendedRegex, returnInvoiceNumberRegex, giftedDamagedInvoiceNumberRegex } from '@/utils/invoiceNumbering';
 
 export const invoiceService = {
   list: async (): Promise<Invoice[]> => {
@@ -103,7 +103,7 @@ export const invoiceService = {
     const latestInvoiceSnapshot = await getDocs(q);
 
     if (!latestInvoiceSnapshot.empty) {
-      const lastInvoiceData = latestInvoiceSnapshot.docs[0].data();
+      const lastInvoiceData = latestInvoiceSnapshot.docs[0].data() as Invoice;
       // Double-check the format and type to be safe
       if (regex.test(lastInvoiceData.number)) {
         return lastInvoiceData.number;
