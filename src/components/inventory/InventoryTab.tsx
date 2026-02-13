@@ -153,7 +153,6 @@ const InventoryTab: React.FC = React.memo(() => {
           )}
           <Button
             onClick={handleAddProduct}
-            className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
             size="sm"
           >
             <Plus className="h-4 w-4 mr-2" />
