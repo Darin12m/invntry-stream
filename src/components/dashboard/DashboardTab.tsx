@@ -142,7 +142,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
           </div>
           <Button 
             onClick={() => setDateFilter({ 
-              from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], 
+              from: new Date(new Date().getFullYear() - 1, 0, 1).toISOString().split('T')[0], 
               to: new Date().toISOString().split('T')[0] 
             })}
             variant="outline"

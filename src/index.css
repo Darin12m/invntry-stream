@@ -152,17 +152,28 @@
 
   html {
     height: -webkit-fill-available;
-    overflow-x: hidden !important;
     max-width: 100% !important;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    overflow-y: auto;
   }
 
   html, body {
-    overflow-x: hidden !important;
     max-width: 100% !important;
     position: relative;
-    touch-action: pan-y !important;
+  }
+
+  @media (pointer: coarse) {
+    html, body {
+      touch-action: pan-y !important;
+      overflow-x: hidden !important;
+    }
+  }
+
+  @media (pointer: fine) {
+    body {
+      overflow-x: hidden;
+    }
   }
 
   body {
