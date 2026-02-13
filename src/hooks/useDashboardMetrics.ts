@@ -7,7 +7,7 @@ export const useDashboardMetrics = (products: Product[], invoices: Invoice[]) =>
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [errorMetrics, setErrorMetrics] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState({ 
-    from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // Start of year
+    from: new Date(new Date().getFullYear() - 1, 0, 1).toISOString().split('T')[0], // Start of last year
     to: new Date().toISOString().split('T')[0] // Today
   });
 
@@ -31,7 +31,7 @@ export const useDashboardMetrics = (products: Product[], invoices: Invoice[]) =>
       let totalProfit = 0;
 
       filteredInvoices.forEach(invoice => {
-        if (invoice.invoiceType === 'sale') {
+        if (invoice.invoiceType === 'sale' || invoice.invoiceType === 'cash' || invoice.invoiceType === 'online-sale') {
           const invoiceTotal = invoice.total ?? 0;
           totalSales += invoiceTotal;
 
